@@ -72,15 +72,27 @@ const userSchema = new mongoose.Schema(
       },
       stepGoal: {
         type: Number,
-        default: 10000, // Default 10,000 steps
+        default: 10000, // WHO recommends 10,000 steps/day
         min: [1000, "Step goal must be at least 1,000"],
         max: [50000, "Step goal cannot exceed 50,000"],
       },
       sleepGoal: {
         type: Number,
-        default: 8, // Default 8 hours
+        default: 8, // 8 hours recommended
         min: [4, "Sleep goal must be at least 4 hours"],
         max: [12, "Sleep goal cannot exceed 12 hours"],
+      },
+      calorieGoal: {
+        type: Number,
+        default: 2000, // Average daily calories
+        min: [500, "Calorie goal must be at least 500"],
+        max: [5000, "Calorie goal cannot exceed 5,000"],
+      },
+      distanceGoal: {
+        type: Number,
+        default: 5, // 5 km per day
+        min: [0.5, "Distance goal must be at least 0.5 km"],
+        max: [100, "Distance goal cannot exceed 100 km"],
       },
     },
   },
