@@ -1,481 +1,450 @@
-// Import necessary modules
-import bcrypt from "bcryptjs";  // Library for hashing and comparing passwords securely
-import jwt from "jsonwebtoken";  // Library for creating and verifying JSON Web Tokens (JWT)
-import User from "../models/User.js";  // Import the User database model
+import jwt from "jsonwebtoken";
+import User from "../models/User.js";
+import { asyncHandler, ErrorResponse } from "../middleware/errorHandler.js";
 
-// ===== REGISTER CONTROLLER =====
 /**
- * Register a new user account
- * This function handles user registration by creating a new user in the database
- * 
- * Process Flow:
- * 1. Extract email, password, name from request body
- * 2. Validate required fields are present
- * 3. Check if user already exists in database
- * 4. Create new user document (password is automatically hashed via User model pre-save hook)
- * 5. Generate JWT token for immediate authentication
- * 6. Return user data (without password) and token
- * 
- * Error Handling:
- * - 400: Missing required fields (name, email, password)
- * - 400: Duplicate email (user already exists)
- * - 400: Validation errors (invalid email format, password too short, etc.)
- * - 500: Server errors (database connection issues, etc.)
- * 
- * @route POST /api/auth/register
- * @access Public (anyone can register)
+ * ============================================
+ * JWT TOKEN GENERATION UTILITY
+ * ============================================
+ *
+ * Purpose: Generate JWT tokens consistently across all auth controllers
+ *
+ * Security considerations:
+ * - Tokens expire after JWT_EXPIRE time (7 days in your .env)
+ * - Uses HS256 algorithm (symmetric key)
+ * - Payload contains only user ID (minimal data exposure)
+ *
+ * @param {string} userId - The MongoDB ObjectId of the user
+ * @returns {string} - Signed JWT token
  */
-export const registerUser = async (req, res) => {
-  try {
-    // Step 1: Extract email, password, name from request body
-    const { name, email, password } = req.body;
 
-    // Step 2: Validate required fields
-    if (!name || !email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Please provide name, email, and password",
-      });
+const generateToken = (userId) => {
+  return jwt.sign(
+    { id: userId }, // Payload: only user ID
+    process.env.JWT_SECRET, // Secret key from .env
+    {
+      expiresIn: process.env.JWT_EXPIRE, // Expiration time from .env (7d)
+      algorithm: "HS256", // Signing algorithm
     }
-
-    // Step 3: Check if user already exists
-    // This prevents duplicate email registrations
-    const existingUser = await User.findOne({ email });
-
-    if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: "User with this email already exists",
-      });
-    }
-
-    // Step 4: Create new user document
-    // Note: Password hashing happens automatically via User model's pre-save hook
-    // The User model uses bcrypt to hash the password before saving to database
-    const user = await User.create({
-      name,
-      email,
-      password,  // Will be hashed by User model pre-save middleware
-    });
-
-    // Step 5: Generate JWT token
-    // Token includes user ID and expires in 7 days (or value from JWT_EXPIRE env var)
-    const token = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRE || "7d" }
-    );
-
-    // Step 6: Return user data (without password) and token
-    // Password is automatically excluded because User model has 'select: false'
-    res.status(201).json({
-      success: true,
-      message: "User registered successfully",
-      data: {
-        user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          profilePicture: user.profilePicture,
-          googleFitConnected: user.googleFitConnected,
-          goals: user.goals,
-          createdAt: user.createdAt,
-        },
-        token,
-      },
-    });
-  } catch (error) {
-    console.error("❌ Registration error:", error);
-
-    // Error Handling: Mongoose validation errors
-    if (error.name === "ValidationError") {
-      // Extract all validation error messages
-      const messages = Object.values(error.errors).map((err) => err.message);
-      return res.status(400).json({
-        success: false,
-        message: "Validation error",
-        errors: messages,
-      });
-    }
-
-    // Error Handling: Duplicate email (MongoDB unique constraint violation)
-    if (error.code === 11000) {
-      return res.status(400).json({
-        success: false,
-        message: "User with this email already exists",
-      });
-    }
-
-    // Error Handling: Server errors
-    res.status(500).json({
-      success: false,
-      message: "Server error during registration",
-      error: error.message,
-    });
-  }
+  );
 };
 
-// Export register as an alias for backwards compatibility
-export const register = registerUser;
-
-// ===== LOGIN CONTROLLER =====
 /**
- * Login an existing user
- * This function authenticates a user by checking their email and password
- * @route POST /api/auth/login
- * @access Public (anyone can attempt to login)
+ * ============================================
+ * UTILITY: SEND TOKEN RESPONSE
+ * ============================================
+ *
+ * Purpose: Standardize token response format across registration and login
+ *
+ * @param {Object} user - User document from MongoDB
+ * @param {number} statusCode - HTTP status code (200 or 201)
+ * @param {Object} res - Express response object
  */
-export const login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Please provide email and password",
-      });
-    }
+const sendTokenResponse = (user, statusCode, res) => {
+  // Generate JWT token
+  const token = generateToken(user._id);
 
-    const user = await User.findOne({ email }).select("+password");
+  // Create user object without password
+  const userResponse = {
+    id: user._id,
+    name: user.name,
+    email: user.email,
+    profilePicture: user.profilePicture,
+    googleFitConnected: user.googleFitConnected,
+    goals: user.goals,
+    createdAt: user.createdAt,
+  };
 
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid email or password",
-      });
-    }
-
-    const isPasswordCorrect = await user.comparePassword(password);
-
-    if (!isPasswordCorrect) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid email or password",
-      });
-    }
-
-    const token = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRE || "7d" }
-    );
-
-    res.status(200).json({
-      success: true,
-      message: "Login successful",
-      data: {
-        user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          profilePicture: user.profilePicture,
-          googleFitConnected: user.googleFitConnected,
-          goals: user.goals,
-        },
-        token,
-      },
-    });
-  } catch (error) {
-    console.error("❌ Login error:", error);
-
-    res.status(500).json({
-      success: false,
-      message: "Server error during login",
-      error: error.message,
-    });
-  }
+  // Send response
+  res.status(statusCode).json({
+    success: true,
+    message:
+      statusCode === 201 ? "User registered successfully" : "Login successful",
+    token,
+    user: userResponse,
+  });
 };
 
-// ===== GET CURRENT USER CONTROLLER =====
 /**
- * Get the currently authenticated user's profile
- * This function retrieves the complete profile of the authenticated user
- * 
- * Process Flow:
- * 1. Extract user ID from authenticated request (set by authenticate middleware)
- * 2. Fetch fresh user data from database
- * 3. Return user profile with all details (password automatically excluded)
- * 
- * Error Handling:
+ * ============================================
+ * SUB-TASK 3.2.2: USER REGISTRATION
+ * ============================================
+ *
+ * @route   POST /api/auth/register
+ * @desc    Register a new user
+ * @access  Public
+ *
+ * Process:
+ * 1. Extract registration data from request body
+ * 2. Check if user already exists (email uniqueness)
+ * 3. Create new user (password is hashed via User model pre-save hook)
+ * 4. Generate JWT token
+ * 5. Return user data and token
+ *
+ * Request Body:
+ * {
+ *   "name": "John Doe",
+ *   "email": "john@example.com",
+ *   "password": "Test1234!",
+ *   "confirmPassword": "Test1234!"
+ * }
+ *
+ * Response (201):
+ * {
+ *   "success": true,
+ *   "message": "User registered successfully",
+ *   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+ *   "user": { ... }
+ * }
+ *
+ * Errors:
+ * - 400: User already exists (handled by validator.js duplicate check)
+ * - 400: Validation errors (handled by validator.js)
+ * - 500: Server error during user creation
+ */
+
+export const registerUser = asyncHandler(async (req, res, next) => {
+  const { name, email, password } = req.body;
+
+  // ===== DOUBLE-CHECK: User Existence =====
+  // Note: This is also checked in validator.js, but we check again
+  // for extra security in case validation is bypassed
+  const existingUser = await User.findOne({ email });
+
+  if (existingUser) {
+    return next(
+      new ErrorResponse(
+        "Email is already registered. Please use a different email or log in.",
+        400
+      )
+    );
+  }
+
+  // ===== CREATE USER =====
+  // Password is automatically hashed via User model pre-save middleware
+  // No need to manually hash here - the User schema handles it
+  const user = await User.create({
+    name,
+    email,
+    password, // Will be hashed by bcrypt in User model pre-save hook
+  });
+
+  // ===== VERIFY USER CREATION =====
+  if (!user) {
+    return next(
+      new ErrorResponse("Failed to create user. Please try again.", 500)
+    );
+  }
+
+  // ===== LOG REGISTRATION (Optional for analytics) =====
+  console.log(`✅ New user registered: ${user.email} (ID: ${user._id})`);
+
+  // ===== SEND TOKEN RESPONSE =====
+  sendTokenResponse(user, 201, res);
+});
+
+/**
+ * ============================================
+ * SUB-TASK 3.2.3: USER LOGIN
+ * ============================================
+ *
+ * @route   POST /api/auth/login
+ * @desc    Authenticate user and return token
+ * @access  Public
+ *
+ * Process:
+ * 1. Extract email and password from request body
+ * 2. Find user by email (include password field)
+ * 3. Verify password using comparePassword method
+ * 4. Generate JWT token
+ * 5. Return user data and token
+ *
+ * Request Body:
+ * {
+ *   "email": "john@example.com",
+ *   "password": "Test1234!"
+ * }
+ *
+ * Response (200):
+ * {
+ *   "success": true,
+ *   "message": "Login successful",
+ *   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+ *   "user": { ... }
+ * }
+ *
+ * Errors:
+ * - 401: Invalid credentials (email not found or password mismatch)
+ * - 400: Validation errors (missing email/password)
+ */
+
+export const loginUser = asyncHandler(async (req, res, next) => {
+  const { email, password } = req.body;
+
+  // ===== VALIDATE INPUT =====
+  // Note: This is also handled by validator.js, but we check for extra safety
+  if (!email || !password) {
+    return next(new ErrorResponse("Please provide email and password", 400));
+  }
+
+  // ===== FIND USER BY EMAIL (INCLUDING PASSWORD) =====
+  // By default, password is excluded (select: false in User model)
+  // We need to explicitly include it for comparison
+  const user = await User.findOne({ email }).select("+password");
+
+  // ===== CHECK USER EXISTENCE =====
+  if (!user) {
+    // Security best practice: Don't reveal whether email exists
+    // Use generic message to prevent email enumeration attacks
+    return next(new ErrorResponse("Invalid email or password", 401));
+  }
+
+  // ===== VERIFY PASSWORD =====
+  // Use comparePassword method from User model
+  // This method uses bcrypt.compare() internally
+  const isPasswordCorrect = await user.comparePassword(password);
+
+  if (!isPasswordCorrect) {
+    return next(new ErrorResponse("Invalid email or password", 401));
+  }
+
+  // ===== LOG LOGIN (Optional for security monitoring) =====
+  console.log(`✅ User logged in: ${user.email} (ID: ${user._id})`);
+
+  // ===== SEND TOKEN RESPONSE =====
+  sendTokenResponse(user, 200, res);
+});
+
+/**
+ * ============================================
+ * SUB-TASK 3.2.4: GET CURRENT USER
+ * ============================================
+ *
+ * @route   GET /api/auth/me
+ * @desc    Get currently authenticated user's profile
+ * @access  Private (requires authentication)
+ *
+ * Process:
+ * 1. Extract user ID from req.user (attached by auth middleware)
+ * 2. Fetch full user data from database
+ * 3. Return user profile without password
+ *
+ * Headers:
+ * Authorization: Bearer <token>
+ *
+ * Response (200):
+ * {
+ *   "success": true,
+ *   "user": {
+ *     "id": "671f8a3c5d6e7f8a9b0c1d2e",
+ *     "name": "John Doe",
+ *     "email": "john@example.com",
+ *     "profilePicture": null,
+ *     "googleFitConnected": false,
+ *     "goals": { ... },
+ *     "createdAt": "2025-10-20T15:30:00.000Z"
+ *   }
+ * }
+ *
+ * Errors:
+ * - 401: Not authenticated (no token or invalid token)
  * - 404: User not found in database
- * - 500: Server/database errors
- * 
- * @route GET /api/auth/me
- * @access Private (requires authentication token)
  */
-export const getCurrentUser = async (req, res) => {
-  try {
-    // Step 1: Extract user ID from authenticated request
-    // The authenticate middleware has already verified the token and set req.userId
-    const userId = req.userId;
 
-    // Step 2: Fetch user data from database
-    // We fetch fresh data to ensure we have the most up-to-date information
-    // Password is automatically excluded due to 'select: false' in User model
-    const user = await User.findById(userId);
+export const getCurrentUser = asyncHandler(async (req, res, next) => {
+  // ===== EXTRACT USER FROM REQUEST =====
+  // The auth middleware already attached the user to req.user
+  // We fetch fresh data from database to ensure it's up-to-date
 
-    // Step 3: Error handling - User not found
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
+  const user = await User.findById(req.user._id).select("-password");
 
-    // Step 4: Return user profile
-    res.status(200).json({
-      success: true,
-      message: "User profile retrieved successfully",
-      data: {
-        user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          profilePicture: user.profilePicture,
-          googleId: user.googleId,
-          googleFitConnected: user.googleFitConnected,
-          goals: user.goals,
-          createdAt: user.createdAt,
-          updatedAt: user.updatedAt,
-        },
-      },
-    });
-  } catch (error) {
-    console.error("❌ Get current user error:", error);
-
-    // Error Handling: Server errors
-    res.status(500).json({
-      success: false,
-      message: "Server error while fetching user data",
-      error: error.message,
-    });
+  // ===== VERIFY USER EXISTS =====
+  if (!user) {
+    return next(
+      new ErrorResponse("User not found. Account may have been deleted.", 404)
+    );
   }
-};
 
-// Export getMe as an alias for backwards compatibility
-export const getMe = getCurrentUser;
+  // ===== RETURN USER DATA =====
+  res.status(200).json({
+    success: true,
+    user: {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      profilePicture: user.profilePicture,
+      googleFitConnected: user.googleFitConnected,
+      googleId: user.googleId,
+      goals: user.goals,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    },
+  });
+});
 
-// ===== UPDATE USER PROFILE CONTROLLER =====
 /**
- * Update the authenticated user's profile
- * This function allows users to update specific profile fields
- * 
- * Process Flow:
- * 1. Extract updatable fields from request body (name, profilePicture, goals)
- * 2. Validate that email/password are NOT being changed (security)
- * 3. Build update object with only provided fields
- * 4. Update user document with validation
- * 5. Return updated user data
- * 
- * Updatable Fields:
- * - name: User's display name (2-50 characters)
- * - profilePicture: URL to profile image (must be valid URL)
- * - goals: Health goals object (weightGoal, stepGoal, sleepGoal, calorieGoal, distanceGoal)
- * 
- * Non-updatable Fields (Security):
- * - email: Cannot be changed (use separate endpoint if needed)
- * - password: Cannot be changed here (use changePassword endpoint)
- * - googleId: System managed
- * - googleFitConnected: System managed
- * 
- * Error Handling:
- * - 400: No data provided or attempting to change restricted fields
- * - 400: Validation errors (invalid URL, out of range values, etc.)
+ * ============================================
+ * SUB-TASK 3.2.5: UPDATE USER PROFILE
+ * ============================================
+ *
+ * @route   PUT /api/auth/profile
+ * @desc    Update authenticated user's profile
+ * @access  Private (requires authentication)
+ *
+ * Process:
+ * 1. Extract updatable fields from request body
+ * 2. Validate that restricted fields (email, password) are not being updated
+ * 3. Update user document in database
+ * 4. Return updated user data
+ *
+ * Updatable fields:
+ * - name
+ * - profilePicture
+ * - goals (weightGoal, stepGoal, sleepGoal, calorieGoal, distanceGoal)
+ *
+ * Non-updatable fields (security):
+ * - email (requires separate email change flow with verification)
+ * - password (requires separate password change flow with old password)
+ * - googleId, googleFitConnected (managed by OAuth flow)
+ *
+ * Request Body (all fields optional):
+ * {
+ *   "name": "John Updated",
+ *   "profilePicture": "https://example.com/photo.jpg",
+ *   "goals": {
+ *     "stepGoal": 12000,
+ *     "sleepGoal": 8,
+ *     "calorieGoal": 2200
+ *   }
+ * }
+ *
+ * Response (200):
+ * {
+ *   "success": true,
+ *   "message": "Profile updated successfully",
+ *   "user": { ... }
+ * }
+ *
+ * Errors:
+ * - 400: Attempting to update restricted fields
+ * - 400: Validation errors (invalid values)
  * - 404: User not found
- * - 500: Server/database errors
- * 
- * @route PUT /api/auth/profile
- * @access Private (requires authentication token)
  */
-export const updateProfile = async (req, res) => {
-  try {
-    // Step 1: Extract fields from request body
-    const { name, profilePicture, goals, email, password, googleId, googleFitConnected } = req.body;
 
-    // Step 2: Validate that restricted fields are not being changed
-    if (email !== undefined) {
-      return res.status(400).json({
-        success: false,
-        message: "Email cannot be changed. Please contact support if you need to update your email.",
-      });
+export const updateProfile = asyncHandler(async (req, res, next) => {
+  // ===== DEFINE UPDATABLE FIELDS =====
+  // Only these fields can be updated via this endpoint
+  const allowedUpdates = ["name", "profilePicture", "goals"];
+
+  // ===== EXTRACT UPDATE DATA =====
+  const updates = {};
+
+  // Only include fields that are present in request body and are allowed
+  allowedUpdates.forEach((field) => {
+    if (req.body[field] !== undefined) {
+      updates[field] = req.body[field];
     }
+  });
 
-    if (password !== undefined) {
-      return res.status(400).json({
-        success: false,
-        message: "Password cannot be changed here. Please use the change password endpoint.",
-      });
-    }
-
-    if (googleId !== undefined) {
-      return res.status(400).json({
-        success: false,
-        message: "Google ID is system managed and cannot be changed.",
-      });
-    }
-
-    if (googleFitConnected !== undefined) {
-      return res.status(400).json({
-        success: false,
-        message: "Google Fit connection status is system managed.",
-      });
-    }
-
-    // Step 3: Build update object with only provided, updatable fields
-    const updateData = {};
-    
-    if (name !== undefined) {
-      updateData.name = name;
-    }
-    
-    if (profilePicture !== undefined) {
-      updateData.profilePicture = profilePicture;
-    }
-    
-    if (goals !== undefined) {
-      // Allow partial goal updates - merge with existing goals
-      updateData.goals = goals;
-    }
-
-    // Check if any valid update data was provided
-    if (Object.keys(updateData).length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "No update data provided. Please provide at least one field to update (name, profilePicture, or goals).",
-      });
-    }
-
-    // Step 4: Update user document with validation
-    // new: true -> return updated document
-    // runValidators: true -> run schema validations
-    const updatedUser = await User.findByIdAndUpdate(
-      req.userId,
-      updateData,
-      { new: true, runValidators: true }
-    );
-
-    // Step 5: Handle user not found
-    if (!updatedUser) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    // Step 6: Return updated user data
-    res.status(200).json({
-      success: true,
-      message: "Profile updated successfully",
-      data: {
-        user: {
-          id: updatedUser._id,
-          name: updatedUser.name,
-          email: updatedUser.email,
-          profilePicture: updatedUser.profilePicture,
-          googleId: updatedUser.googleId,
-          googleFitConnected: updatedUser.googleFitConnected,
-          goals: updatedUser.goals,
-          createdAt: updatedUser.createdAt,
-          updatedAt: updatedUser.updatedAt,
-        },
-      },
-    });
-  } catch (error) {
-    console.error("❌ Update profile error:", error);
-
-    // Error Handling: Mongoose validation errors
-    if (error.name === "ValidationError") {
-      const messages = Object.values(error.errors).map((err) => err.message);
-      return res.status(400).json({
-        success: false,
-        message: "Validation error",
-        errors: messages,
-      });
-    }
-
-    // Error Handling: Cast errors (invalid data types)
-    if (error.name === "CastError") {
-      return res.status(400).json({
-        success: false,
-        message: `Invalid ${error.path}: ${error.value}`,
-      });
-    }
-
-    // Error Handling: Server errors
-    res.status(500).json({
-      success: false,
-      message: "Server error while updating profile",
-      error: error.message,
-    });
+  // ===== CHECK IF ANY UPDATES PROVIDED =====
+  if (Object.keys(updates).length === 0) {
+    return next(new ErrorResponse("No valid fields provided for update", 400));
   }
-};
 
-// ===== CHANGE PASSWORD CONTROLLER =====
+  // ===== PREVENT RESTRICTED FIELD UPDATES =====
+  // Security: Prevent users from updating email, password, or OAuth fields
+  const restrictedFields = [
+    "email",
+    "password",
+    "googleId",
+    "googleFitConnected",
+  ];
+  const attemptedRestrictedUpdates = restrictedFields.filter(
+    (field) => req.body[field] !== undefined
+  );
+
+  if (attemptedRestrictedUpdates.length > 0) {
+    return next(
+      new ErrorResponse(
+        `Cannot update restricted fields: ${attemptedRestrictedUpdates.join(
+          ", "
+        )}. ` + "Use dedicated endpoints for email/password changes.",
+        400
+      )
+    );
+  }
+
+  // ===== UPDATE USER IN DATABASE =====
+  // findByIdAndUpdate with runValidators ensures Mongoose schema validation runs
+  const user = await User.findByIdAndUpdate(req.user._id, updates, {
+    new: true, // Return updated document
+    runValidators: true, // Run Mongoose schema validators
+  }).select("-password");
+
+  // ===== VERIFY UPDATE SUCCESS =====
+  if (!user) {
+    return next(
+      new ErrorResponse("Failed to update profile. User not found.", 404)
+    );
+  }
+
+  // ===== LOG UPDATE (Optional for audit trail) =====
+  console.log(`✅ Profile updated for user: ${user.email} (ID: ${user._id})`);
+
+  // ===== RETURN UPDATED USER DATA =====
+  res.status(200).json({
+    success: true,
+    message: "Profile updated successfully",
+    user: {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      profilePicture: user.profilePicture,
+      googleFitConnected: user.googleFitConnected,
+      goals: user.goals,
+      updatedAt: user.updatedAt,
+    },
+  });
+});
+
 /**
- * Change the authenticated user's password
- * Requires the current password for security verification
- * @route PUT /api/auth/change-password
- * @access Private (requires authentication token)
+ * ============================================
+ * BONUS: LOGOUT USER (Optional)
+ * ============================================
+ *
+ * @route   POST /api/auth/logout
+ * @desc    Logout user (client-side token deletion)
+ * @access  Private
+ *
+ * Note: JWT is stateless, so logout is handled client-side by deleting token
+ * This endpoint is mainly for logging purposes and future token blacklisting
  */
-export const changePassword = async (req, res) => {
-  try {
-    const { currentPassword, newPassword } = req.body;
 
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({
-        success: false,
-        message: "Please provide current password and new password",
-      });
-    }
+export const logoutUser = asyncHandler(async (req, res, next) => {
+  // In a stateless JWT system, logout is handled client-side
+  // The client deletes the token from localStorage/cookies
 
-    if (newPassword.length < 8) {
-      return res.status(400).json({
-        success: false,
-        message: "New password must be at least 8 characters long",
-      });
-    }
+  // Optional: Log logout for security monitoring
+  console.log(`✅ User logged out: ${req.user.email} (ID: ${req.user._id})`);
 
-    const user = await User.findById(req.userId).select("+password");
+  res.status(200).json({
+    success: true,
+    message:
+      "Logged out successfully. Please delete your token on the client side.",
+  });
+});
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
+/**
+ * ============================================
+ * EXPORT ALL CONTROLLERS
+ * ============================================
+ */
 
-    const isPasswordCorrect = await user.comparePassword(currentPassword);
-
-    if (!isPasswordCorrect) {
-      return res.status(401).json({
-        success: false,
-        message: "Current password is incorrect",
-      });
-    }
-
-    user.password = newPassword;
-    await user.save();
-
-    const token = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRE || "7d" }
-    );
-
-    res.status(200).json({
-      success: true,
-      message: "Password changed successfully",
-      data: {
-        token,
-      },
-    });
-  } catch (error) {
-    console.error("❌ Change password error:", error);
-
-    res.status(500).json({
-      success: false,
-      message: "Server error while changing password",
-      error: error.message,
-    });
-  }
+export default {
+  registerUser,
+  loginUser,
+  getCurrentUser,
+  updateProfile,
+  logoutUser,
 };

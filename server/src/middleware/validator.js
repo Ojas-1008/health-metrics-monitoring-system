@@ -1,272 +1,404 @@
-import { body, param, query, validationResult } from 'express-validator';
+import { body, validationResult } from "express-validator";
+import User from "../models/User.js";
 
-// ===== VALIDATION RESULT HANDLER =====
-// This function checks if there were any validation errors
-// Think of it as the "report card" for the data
-export const handleValidationErrors = (req, res, next) => {
-  // Get all validation errors from the request
+/**
+ * ============================================
+ * VALIDATION RESULT HANDLER MIDDLEWARE
+ * ============================================
+ *
+ * Purpose: Extract and format validation errors from express-validator
+ *
+ * This middleware should be placed AFTER validation chains in routes
+ * It checks if any validation errors occurred and returns formatted error response
+ *
+ * Usage:
+ * router.post('/register', validateRegister, handleValidationErrors, controller)
+ */
+
+const handleValidationErrors = (req, res, next) => {
+  // Extract validation errors from request
   const errors = validationResult(req);
-  
-  // If there are no errors, continue to the next middleware
+
+  // If no errors, proceed to next middleware/controller
   if (errors.isEmpty()) {
     return next();
   }
-  
-  // If there ARE errors, send them back to the user
-  // Format: array of error messages
+
+  // Format errors into a more readable structure
+  // Instead of: [{ msg: 'Error', param: 'email', location: 'body' }]
+  // Return: { email: 'Error', password: 'Error' }
+  const formattedErrors = {};
+
+  errors.array().forEach((error) => {
+    // Group errors by field name
+    if (!formattedErrors[error.path]) {
+      formattedErrors[error.path] = error.msg;
+    }
+  });
+
+  // Return 400 Bad Request with detailed error information
   return res.status(400).json({
     success: false,
-    message: 'Validation failed',
-    errors: errors.array().map(err => ({
-      field: err.path,        // Which field has the problem
-      message: err.msg,       // What's wrong with it
-      value: err.value        // What value they sent (optional)
-    }))
+    message: "Validation failed. Please check your input.",
+    errors: formattedErrors,
+    errorCount: errors.array().length,
   });
 };
 
-// ===== EMAIL VALIDATION =====
-// Checks if the email format is correct
-export const validateEmail = () => {
-  return body('email')
-    .trim()                              // Remove extra spaces
-    .notEmpty()                          // Can't be empty
-    .withMessage('Email is required')
-    .isEmail()                           // Must be valid email format
-    .withMessage('Please provide a valid email address')
-    .normalizeEmail();                   // Convert to lowercase
-};
+/**
+ * ============================================
+ * REGISTRATION VALIDATION CHAIN
+ * ============================================
+ *
+ * Validates user registration data:
+ * - Name: required, 2-50 characters, trimmed
+ * - Email: required, valid format, unique in database
+ * - Password: required, min 8 chars, 1 uppercase, 1 number
+ * - Confirm Password: must match password
+ *
+ * Security Features:
+ * - Trim and sanitize inputs to prevent XSS attacks
+ * - Check for duplicate emails before registration
+ * - Strong password requirements
+ */
 
-// ===== PASSWORD VALIDATION =====
-// Checks if password is strong enough
-export const validatePassword = (fieldName = 'password') => {
-  return body(fieldName)
-    .trim()
+const validateRegister = [
+  // ===== NAME VALIDATION =====
+  body("name")
+    .trim() // Remove leading/trailing whitespace
     .notEmpty()
-    .withMessage(`${fieldName.charAt(0).toUpperCase() + fieldName.slice(1)} is required`)
-    .isLength({ min: 8 })
-    .withMessage('Password must be at least 8 characters long')
-    .matches(/[A-Z]/)
-    .withMessage('Password must contain at least one uppercase letter')
-    .matches(/[a-z]/)
-    .withMessage('Password must contain at least one lowercase letter')
-    .matches(/[0-9]/)
-    .withMessage('Password must contain at least one number')
-    .matches(/[@$!%*?&#]/)
-    .withMessage('Password must contain at least one special character (@$!%*?&#)');
-};
-
-// ===== NAME VALIDATION =====
-export const validateName = () => {
-  return body('name')
-    .trim()
-    .notEmpty()
-    .withMessage('Name is required')
+    .withMessage("Name is required")
     .isLength({ min: 2, max: 50 })
-    .withMessage('Name must be between 2 and 50 characters')
+    .withMessage("Name must be between 2 and 50 characters")
     .matches(/^[a-zA-Z\s]+$/)
-    .withMessage('Name can only contain letters and spaces');
-};
+    .withMessage("Name can only contain letters and spaces")
+    .escape(), // Sanitize to prevent XSS attacks
 
-// ===== REGISTRATION VALIDATION CHAIN =====
-// Combines all validations needed for user registration
-export const registerValidation = [
-  validateName(),
-  validateEmail(),
-  validatePassword(),
-  handleValidationErrors  // IMPORTANT: Must be last
-];
-
-// ===== LOGIN VALIDATION CHAIN =====
-// Simpler validation for login (just check if fields exist)
-export const loginValidation = [
-  body('email')
+  // ===== EMAIL VALIDATION =====
+  body("email")
     .trim()
     .notEmpty()
-    .withMessage('Email is required')
+    .withMessage("Email is required")
     .isEmail()
-    .withMessage('Please provide a valid email address'),
-  
-  body('password')
-    .trim()
-    .notEmpty()
-    .withMessage('Password is required'),
-  
-  handleValidationErrors
-];
-
-// ===== HEALTH METRICS VALIDATION =====
-// Validation for health metrics data
-
-// Validate date field
-export const validateDate = () => {
-  return body('date')
-    .notEmpty()
-    .withMessage('Date is required')
-    .isISO8601()
-    .withMessage('Date must be in valid ISO format (YYYY-MM-DD)');
-};
-
-// Validate steps (must be positive number)
-export const validateSteps = () => {
-  return body('metrics.steps')
-    .optional()
-    .isInt({ min: 0, max: 100000 })
-    .withMessage('Steps must be a number between 0 and 100,000');
-};
-
-// Validate distance (must be positive)
-export const validateDistance = () => {
-  return body('metrics.distance')
-    .optional()
-    .isFloat({ min: 0, max: 500 })
-    .withMessage('Distance must be between 0 and 500 km');
-};
-
-// Validate calories
-export const validateCalories = () => {
-  return body('metrics.calories')
-    .optional()
-    .isInt({ min: 0, max: 10000 })
-    .withMessage('Calories must be between 0 and 10,000');
-};
-
-// Validate weight
-export const validateWeight = () => {
-  return body('metrics.weight')
-    .optional()
-    .isFloat({ min: 30, max: 300 })
-    .withMessage('Weight must be between 30 and 300 kg');
-};
-
-// Validate sleep hours
-export const validateSleepHours = () => {
-  return body('metrics.sleepHours')
-    .optional()
-    .isFloat({ min: 0, max: 24 })
-    .withMessage('Sleep hours must be between 0 and 24');
-};
-
-// Complete health metrics validation chain
-export const createMetricValidation = [
-  validateDate(),
-  validateSteps(),
-  validateDistance(),
-  validateCalories(),
-  validateWeight(),
-  validateSleepHours(),
-  handleValidationErrors
-];
-
-// ===== UPDATE PROFILE VALIDATION =====
-export const updateProfileValidation = [
-  body('name')
-    .optional()
-    .trim()
-    .isLength({ min: 2, max: 50 })
-    .withMessage('Name must be between 2 and 50 characters'),
-  
-  body('email')
-    .optional()
-    .trim()
-    .isEmail()
-    .withMessage('Please provide a valid email address')
-    .normalizeEmail(),
-  
-  body('goals.stepGoal')
-    .optional()
-    .isInt({ min: 1000, max: 50000 })
-    .withMessage('Step goal must be between 1,000 and 50,000'),
-  
-  body('goals.weightGoal')
-    .optional()
-    .isFloat({ min: 30, max: 300 })
-    .withMessage('Weight goal must be between 30 and 300 kg'),
-  
-  body('goals.sleepGoal')
-    .optional()
-    .isFloat({ min: 4, max: 12 })
-    .withMessage('Sleep goal must be between 4 and 12 hours'),
-  
-  handleValidationErrors
-];
-
-// ===== PASSWORD CHANGE VALIDATION =====
-export const changePasswordValidation = [
-  body('currentPassword')
-    .trim()
-    .notEmpty()
-    .withMessage('Current password is required'),
-  
-  body('newPassword')
-    .trim()
-    .notEmpty()
-    .withMessage('New password is required')
-    .isLength({ min: 8 })
-    .withMessage('New password must be at least 8 characters long')
-    .matches(/[A-Z]/)
-    .withMessage('New password must contain at least one uppercase letter')
-    .matches(/[0-9]/)
-    .withMessage('New password must contain at least one number')
-    .custom((value, { req }) => {
-      if (value === req.body.currentPassword) {
-        throw new Error('New password must be different from current password');
+    .withMessage("Please provide a valid email address")
+    .normalizeEmail() // Converts email to lowercase and removes dots from Gmail addresses
+    .custom(async (email) => {
+      // Check if email already exists in database
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        throw new Error(
+          "Email is already registered. Please use a different email or log in."
+        );
       }
       return true;
     }),
-  
-  handleValidationErrors
+
+  // ===== PASSWORD VALIDATION =====
+  body("password")
+    .notEmpty()
+    .withMessage("Password is required")
+    .isLength({ min: 8 })
+    .withMessage("Password must be at least 8 characters long")
+    .matches(/[A-Z]/)
+    .withMessage("Password must contain at least one uppercase letter")
+    .matches(/[a-z]/)
+    .withMessage("Password must contain at least one lowercase letter")
+    .matches(/[0-9]/)
+    .withMessage("Password must contain at least one number")
+    .matches(/[!@#$%^&*(),.?":{}|<>]/)
+    .withMessage(
+      "Password must contain at least one special character (!@#$%^&*...)"
+    ),
+
+  // ===== CONFIRM PASSWORD VALIDATION =====
+  body("confirmPassword")
+    .notEmpty()
+    .withMessage("Please confirm your password")
+    .custom((value, { req }) => {
+      // Check if password and confirmPassword match
+      if (value !== req.body.password) {
+        throw new Error("Passwords do not match");
+      }
+      return true;
+    }),
 ];
 
-// ===== MONGODB ID VALIDATION =====
-// Validate MongoDB ObjectId format in URL parameters
-export const validateMongoId = (paramName = 'id') => {
-  return param(paramName)
-    .isMongoId()
-    .withMessage(`Invalid ${paramName} format`);
-};
+/**
+ * ============================================
+ * LOGIN VALIDATION CHAIN
+ * ============================================
+ *
+ * Validates user login credentials:
+ * - Email: required, valid format
+ * - Password: required
+ *
+ * Note: We don't check password strength here since it's already validated during registration
+ */
 
-// ===== QUERY PARAMETER VALIDATION =====
-// For filtering and pagination
-export const validateDateRange = () => {
-  return [
-    query('startDate')
-      .optional()
-      .isISO8601()
-      .withMessage('Start date must be in valid ISO format'),
-    
-    query('endDate')
-      .optional()
-      .isISO8601()
-      .withMessage('End date must be in valid ISO format')
-      .custom((value, { req }) => {
-        if (req.query.startDate && value) {
-          const start = new Date(req.query.startDate);
-          const end = new Date(value);
-          if (end < start) {
-            throw new Error('End date must be after start date');
-          }
-        }
-        return true;
-      }),
-    
-    handleValidationErrors
-  ];
-};
+const validateLogin = [
+  // ===== EMAIL VALIDATION =====
+  body("email")
+    .trim()
+    .notEmpty()
+    .withMessage("Email is required")
+    .isEmail()
+    .withMessage("Please provide a valid email address")
+    .normalizeEmail(),
 
-// ===== PAGINATION VALIDATION =====
-export const validatePagination = () => {
-  return [
-    query('page')
-      .optional()
-      .isInt({ min: 1 })
-      .withMessage('Page must be a positive integer'),
-    
-    query('limit')
-      .optional()
-      .isInt({ min: 1, max: 100 })
-      .withMessage('Limit must be between 1 and 100'),
-    
-    handleValidationErrors
-  ];
+  // ===== PASSWORD VALIDATION =====
+  body("password").notEmpty().withMessage("Password is required"),
+];
+
+/**
+ * ============================================
+ * PROFILE UPDATE VALIDATION CHAIN
+ * ============================================
+ *
+ * Validates profile update data (all fields optional):
+ * - Name: 2-50 characters if provided
+ * - Profile Picture: valid URL if provided
+ * - Goals: numeric values within reasonable ranges
+ *
+ * Note: Email cannot be updated (security best practice)
+ * Note: Password updates should use a separate endpoint with old password verification
+ */
+
+const validateProfileUpdate = [
+  // ===== NAME VALIDATION (Optional) =====
+  body("name")
+    .optional()
+    .trim()
+    .isLength({ min: 2, max: 50 })
+    .withMessage("Name must be between 2 and 50 characters")
+    .matches(/^[a-zA-Z\s]+$/)
+    .withMessage("Name can only contain letters and spaces")
+    .escape(),
+
+  // ===== PROFILE PICTURE VALIDATION (Optional) =====
+  body("profilePicture")
+    .optional({ nullable: true, checkFalsy: true })
+    .trim()
+    .isURL({ protocols: ["http", "https"], require_protocol: true })
+    .withMessage("Profile picture must be a valid URL")
+    .isLength({ max: 500 })
+    .withMessage("Profile picture URL is too long"),
+
+  // ===== GOALS VALIDATION (Optional) =====
+
+  // Weight Goal
+  body("goals.weightGoal")
+    .optional({ nullable: true })
+    .isFloat({ min: 30, max: 300 })
+    .withMessage("Weight goal must be between 30 and 300 kg")
+    .toFloat(), // Convert string to number
+
+  // Step Goal
+  body("goals.stepGoal")
+    .optional({ nullable: true })
+    .isInt({ min: 1000, max: 50000 })
+    .withMessage("Step goal must be between 1,000 and 50,000 steps")
+    .toInt(),
+
+  // Sleep Goal (in hours)
+  body("goals.sleepGoal")
+    .optional({ nullable: true })
+    .isFloat({ min: 4, max: 12 })
+    .withMessage("Sleep goal must be between 4 and 12 hours")
+    .toFloat(),
+
+  // Calorie Goal
+  body("goals.calorieGoal")
+    .optional({ nullable: true })
+    .isInt({ min: 500, max: 5000 })
+    .withMessage("Calorie goal must be between 500 and 5,000 calories")
+    .toInt(),
+
+  // Distance Goal (in kilometers)
+  body("goals.distanceGoal")
+    .optional({ nullable: true })
+    .isFloat({ min: 0.5, max: 100 })
+    .withMessage("Distance goal must be between 0.5 and 100 km")
+    .toFloat(),
+];
+
+/**
+ * ============================================
+ * PASSWORD CHANGE VALIDATION CHAIN
+ * ============================================
+ *
+ * Validates password change request:
+ * - Current Password: required (for security verification)
+ * - New Password: required, meets strength requirements
+ * - Confirm New Password: must match new password
+ */
+
+const validatePasswordChange = [
+  // ===== CURRENT PASSWORD VALIDATION =====
+  body("currentPassword")
+    .notEmpty()
+    .withMessage("Current password is required"),
+
+  // ===== NEW PASSWORD VALIDATION =====
+  body("newPassword")
+    .notEmpty()
+    .withMessage("New password is required")
+    .isLength({ min: 8 })
+    .withMessage("New password must be at least 8 characters long")
+    .matches(/[A-Z]/)
+    .withMessage("New password must contain at least one uppercase letter")
+    .matches(/[a-z]/)
+    .withMessage("New password must contain at least one lowercase letter")
+    .matches(/[0-9]/)
+    .withMessage("New password must contain at least one number")
+    .matches(/[!@#$%^&*(),.?":{}|<>]/)
+    .withMessage("New password must contain at least one special character")
+    .custom((value, { req }) => {
+      // Ensure new password is different from current password
+      if (value === req.body.currentPassword) {
+        throw new Error("New password must be different from current password");
+      }
+      return true;
+    }),
+
+  // ===== CONFIRM NEW PASSWORD VALIDATION =====
+  body("confirmNewPassword")
+    .notEmpty()
+    .withMessage("Please confirm your new password")
+    .custom((value, { req }) => {
+      if (value !== req.body.newPassword) {
+        throw new Error("Password confirmation does not match");
+      }
+      return true;
+    }),
+];
+
+/**
+ * ============================================
+ * HEALTH METRICS VALIDATION CHAIN (For Future Use)
+ * ============================================
+ *
+ * Validates health metric data submission:
+ * - Metric Type: required, must be valid type
+ * - Value: required, must be non-negative number
+ * - Date: valid date format
+ * - Unit: required for certain metrics
+ */
+
+const validateHealthMetric = [
+  // ===== METRIC TYPE VALIDATION =====
+  body("metricType")
+    .trim()
+    .notEmpty()
+    .withMessage("Metric type is required")
+    .isIn([
+      "steps",
+      "weight",
+      "sleep",
+      "heart_rate",
+      "calories",
+      "distance",
+      "blood_pressure",
+    ])
+    .withMessage(
+      "Invalid metric type. Allowed types: steps, weight, sleep, heart_rate, calories, distance, blood_pressure"
+    ),
+
+  // ===== VALUE VALIDATION =====
+  body("value")
+    .notEmpty()
+    .withMessage("Metric value is required")
+    .isFloat({ min: 0 })
+    .withMessage("Metric value must be a non-negative number")
+    .toFloat(),
+
+  // ===== DATE VALIDATION =====
+  body("date")
+    .optional()
+    .isISO8601()
+    .withMessage("Date must be in valid ISO 8601 format (YYYY-MM-DD)")
+    .toDate()
+    .custom((date) => {
+      // Ensure date is not in the future
+      if (new Date(date) > new Date()) {
+        throw new Error("Date cannot be in the future");
+      }
+      return true;
+    }),
+
+  // ===== UNIT VALIDATION =====
+  body("unit")
+    .trim()
+    .notEmpty()
+    .withMessage("Unit is required")
+    .isIn(["steps", "kg", "lbs", "hours", "bpm", "kcal", "km", "miles", "mmHg"])
+    .withMessage("Invalid unit"),
+
+  // ===== NOTES VALIDATION (Optional) =====
+  body("notes")
+    .optional({ nullable: true, checkFalsy: true })
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage("Notes cannot exceed 500 characters")
+    .escape(), // Sanitize to prevent XSS
+];
+
+/**
+ * ============================================
+ * EMAIL VALIDATION (Standalone)
+ * ============================================
+ *
+ * For endpoints that only need email validation (e.g., forgot password, resend verification)
+ */
+
+const validateEmail = [
+  body("email")
+    .trim()
+    .notEmpty()
+    .withMessage("Email is required")
+    .isEmail()
+    .withMessage("Please provide a valid email address")
+    .normalizeEmail(),
+];
+
+/**
+ * ============================================
+ * GOOGLE FIT CONNECTION VALIDATION
+ * ============================================
+ *
+ * Validates Google Fit authorization code
+ */
+
+const validateGoogleFitAuth = [
+  body("authorizationCode")
+    .trim()
+    .notEmpty()
+    .withMessage("Authorization code is required")
+    .isLength({ min: 10 })
+    .withMessage("Invalid authorization code format"),
+];
+
+/**
+ * ============================================
+ * EXPORT ALL VALIDATION FUNCTIONS
+ * ============================================
+ */
+
+export {
+  // Validation result handler (MUST be used after validation chains)
+  handleValidationErrors,
+
+  // Authentication validations
+  validateRegister,
+  validateLogin,
+  validatePasswordChange,
+
+  // Profile validations
+  validateProfileUpdate,
+
+  // Health metrics validations
+  validateHealthMetric,
+
+  // Utility validations
+  validateEmail,
+  validateGoogleFitAuth,
 };

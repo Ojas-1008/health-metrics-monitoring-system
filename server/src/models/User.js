@@ -36,11 +36,11 @@ const userSchema = new mongoose.Schema(
     },
 
     // Google ID (for OAuth login - optional for now)
+    // Important: Do NOT set default to null to avoid unique index conflicts on null
+    // We'll enforce uniqueness with a partial index that only applies when googleId is non-null
     googleId: {
       type: String,
-      default: null,
-      unique: true,
-      sparse: true, // Allows multiple null values
+      // No default: keep undefined when not provided so it won't be indexed
     },
 
     // Profile picture URL
@@ -100,6 +100,13 @@ const userSchema = new mongoose.Schema(
     // Mongoose automatically creates createdAt and updatedAt fields
     timestamps: true,
   }
+);
+
+// Ensure a partial unique index on googleId so only defined values must be unique
+// This prevents duplicate key errors for multiple users without Google OAuth
+userSchema.index(
+  { googleId: 1 },
+  { unique: true, partialFilterExpression: { googleId: { $type: "string" } } }
 );
 
 // ===== MIDDLEWARE: Hash Password Before Saving =====

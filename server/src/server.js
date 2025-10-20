@@ -1,37 +1,48 @@
+import express from 'express';
 import dotenv from 'dotenv';
+import cors from 'cors';
 import connectDB from './config/database.js';
-import app from './app.js';
+import { errorHandler, notFound } from './middleware/errorHandler.js';
+
+// Import test routes
+import testRoutes from './routes/test.js';
+import validatorTestRoutes from './routes/validatorTest.js';
+import testErrorRoutes from './routes/testErrors.js';
+
+// Import production routes
+import authRoutes from './routes/authRoutes.js';
 
 // Load environment variables
 dotenv.config();
 
-// Define PORT
+// Connect to MongoDB
+connectDB();
+
+const app = express();
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// ===== TEST ROUTES =====
+app.use('/api/test', testRoutes);
+app.use('/api/validator-test', validatorTestRoutes);
+app.use('/api/test-errors', testErrorRoutes);
+
+// ===== PRODUCTION ROUTES =====
+app.use('/api/auth', authRoutes);
+
+// ===== 404 handler for unknown routes (should be after all routes)
+app.use(notFound);
+
+// ===== Global error handler (must be last)
+app.use(errorHandler);
+
 const PORT = process.env.PORT || 5000;
-
-// Connect to Database and Start Server
-const startServer = async () => {
-  try {
-    // Connect to MongoDB first
-    await connectDB();
-
-    // Start Express server only after successful DB connection
-    const server = app.listen(PORT, '0.0.0.0', () => {
-      console.log(`🚀 Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
-      console.log(`📡 API endpoint: http://localhost:${PORT}/api`);
-    });
-
-    server.on('error', (error) => {
-      console.error('❌ Server error:', error);
-      process.exit(1);
-    });
-  } catch (error) {
-    console.error('❌ Failed to start server:', error.message);
-    console.error('Full error:', error);
-    process.exit(1);
-  }
-};
-
-// Start the server
-startServer();
-
-export default app;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Test the auth middleware at: http://localhost:${PORT}/api/test`);
+  console.log(`Test validator routes at: http://localhost:${PORT}/api/validator-test`);
+  console.log(`Test error routes at: http://localhost:${PORT}/api/test-errors`);
+  console.log(`Auth API endpoints at: http://localhost:${PORT}/api/auth`);
+});

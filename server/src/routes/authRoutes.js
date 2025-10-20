@@ -1,92 +1,117 @@
-// ===== AUTHENTICATION ROUTES =====
-// This file defines all authentication-related API endpoints
-// Routes are organized into two categories:
-// 1. Public routes - No authentication required (register, login)
-// 2. Protected routes - Require valid JWT token (profile management, password change)
-
-// Import Express Router to define routes
 import express from 'express';
-
-// Import authentication controllers
-// These handle the business logic for each endpoint
-import { 
-  registerUser,      // POST /api/auth/register - Create new user account
-  login,             // POST /api/auth/login - Authenticate user and return token
-  getCurrentUser,    // GET /api/auth/me - Get current user profile
-  updateProfile,     // PUT /api/auth/profile - Update user profile
-  changePassword     // PUT /api/auth/change-password - Change user password
+import {
+  registerUser,
+  loginUser,
+  getCurrentUser,
+  updateProfile,
+  logoutUser
 } from '../controllers/authController.js';
-
-// Import authentication middleware
-// This middleware verifies JWT tokens and attaches user data to request
-import { authenticate } from '../middleware/auth.js';
-
-// Import validation middleware
-// These validate and sanitize incoming request data before it reaches controllers
-import { 
-  registerValidation,        // Validates name, email, password for registration
-  loginValidation,           // Validates email and password for login
-  updateProfileValidation,   // Validates profile update fields
-  changePasswordValidation   // Validates current and new password
+import { protect } from '../middleware/auth.js';
+import {
+  validateRegister,
+  validateLogin,
+  validateProfileUpdate,
+  handleValidationErrors
 } from '../middleware/validator.js';
 
-// Create Express router instance
 const router = express.Router();
 
+/**
+ * ============================================
+ * AUTHENTICATION ROUTES
+ * ============================================
+ *
+ * Purpose: Handle user registration, login, profile management
+ * All routes use centralized error handling via errorHandler middleware
+ */
+
 // ===== PUBLIC ROUTES =====
-// These routes don't require authentication
-// Anyone can access them to register or login
 
 /**
- * @route   POST /api/auth/register
- * @desc    Register a new user account
- * @access  Public
- * @body    { name, email, password }
- * @returns { success, message, data: { user, token } }
+ * POST /api/auth/register
+ * Register a new user
+ *
+ * Request Body:
+ * {
+ *   "name": "John Doe",
+ *   "email": "john@example.com",
+ *   "password": "Test1234!",
+ *   "confirmPassword": "Test1234!"
+ * }
  */
-router.post('/register', registerValidation, registerUser);
+router.post(
+  '/register',
+  validateRegister,
+  handleValidationErrors,
+  registerUser
+);
 
 /**
- * @route   POST /api/auth/login
- * @desc    Login existing user and get authentication token
- * @access  Public
- * @body    { email, password }
- * @returns { success, message, data: { user, token } }
+ * POST /api/auth/login
+ * Login user and return JWT token
+ *
+ * Request Body:
+ * {
+ *   "email": "john@example.com",
+ *   "password": "Test1234!"
+ * }
  */
-router.post('/login', loginValidation, login);
+router.post(
+  '/login',
+  validateLogin,
+  handleValidationErrors,
+  loginUser
+);
 
-// ===== PROTECTED ROUTES =====
-// These routes require a valid JWT token in the Authorization header
-// Format: "Authorization: Bearer <token>"
+// ===== PROTECTED ROUTES (Require Authentication) =====
 
 /**
- * @route   GET /api/auth/me
- * @desc    Get current authenticated user's profile
- * @access  Private (requires authentication)
- * @headers Authorization: Bearer <token>
- * @returns { success, message, data: { user } }
+ * GET /api/auth/me
+ * Get current authenticated user's profile
+ *
+ * Headers:
+ * Authorization: Bearer <token>
  */
-router.get('/me', authenticate, getCurrentUser);
+router.get('/me', protect, getCurrentUser);
 
 /**
- * @route   PUT /api/auth/profile
- * @desc    Update current user's profile information
- * @access  Private (requires authentication)
- * @headers Authorization: Bearer <token>
- * @body    { name?, email?, goals?: { stepGoal?, weightGoal?, sleepGoal? } }
- * @returns { success, message, data: { user } }
+ * PUT /api/auth/profile
+ * Update authenticated user's profile
+ *
+ * Updatable fields: name, profilePicture, goals (nested)
+ *
+ * Headers:
+ * Authorization: Bearer <token>
+ *
+ * Request Body (all optional):
+ * {
+ *   "name": "Jane Doe",
+ *   "profilePicture": "https://example.com/photo.jpg",
+ *   "goals": {
+ *     "stepGoal": 12000,
+ *     "sleepGoal": 8,
+ *     "calorieGoal": 2200
+ *   }
+ * }
  */
-router.put('/profile', authenticate, updateProfileValidation, updateProfile);
+router.put(
+  '/profile',
+  protect,
+  validateProfileUpdate,
+  handleValidationErrors,
+  updateProfile
+);
 
 /**
- * @route   PUT /api/auth/change-password
- * @desc    Change current user's password
- * @access  Private (requires authentication)
- * @headers Authorization: Bearer <token>
- * @body    { currentPassword, newPassword }
- * @returns { success, message }
+ * POST /api/auth/logout
+ * Logout user (client-side token deletion)
+ *
+ * Note: JWT is stateless. Real logout happens when client deletes token.
+ * This endpoint is for logging/tracking purposes.
+ *
+ * Headers:
+ * Authorization: Bearer <token>
  */
-router.put('/change-password', authenticate, changePasswordValidation, changePassword);
+router.post('/logout', protect, logoutUser);
 
-// Export router to be mounted in main server.js
 export default router;
