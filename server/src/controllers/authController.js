@@ -189,21 +189,61 @@ export const login = async (req, res) => {
 // ===== GET CURRENT USER CONTROLLER =====
 /**
  * Get the currently authenticated user's profile
- * This requires authentication - user must provide a valid JWT token
+ * This function retrieves the complete profile of the authenticated user
+ * 
+ * Process Flow:
+ * 1. Extract user ID from authenticated request (set by authenticate middleware)
+ * 2. Fetch fresh user data from database
+ * 3. Return user profile with all details (password automatically excluded)
+ * 
+ * Error Handling:
+ * - 404: User not found in database
+ * - 500: Server/database errors
+ * 
  * @route GET /api/auth/me
  * @access Private (requires authentication token)
  */
-export const getMe = async (req, res) => {
+export const getCurrentUser = async (req, res) => {
   try {
+    // Step 1: Extract user ID from authenticated request
+    // The authenticate middleware has already verified the token and set req.userId
+    const userId = req.userId;
+
+    // Step 2: Fetch user data from database
+    // We fetch fresh data to ensure we have the most up-to-date information
+    // Password is automatically excluded due to 'select: false' in User model
+    const user = await User.findById(userId);
+
+    // Step 3: Error handling - User not found
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Step 4: Return user profile
     res.status(200).json({
       success: true,
+      message: "User profile retrieved successfully",
       data: {
-        user: req.user,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          profilePicture: user.profilePicture,
+          googleId: user.googleId,
+          googleFitConnected: user.googleFitConnected,
+          goals: user.goals,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+        },
       },
     });
   } catch (error) {
-    console.error("❌ Get me error:", error);
+    console.error("❌ Get current user error:", error);
 
+    // Error Handling: Server errors
     res.status(500).json({
       success: false,
       message: "Server error while fetching user data",
@@ -212,35 +252,109 @@ export const getMe = async (req, res) => {
   }
 };
 
+// Export getMe as an alias for backwards compatibility
+export const getMe = getCurrentUser;
+
 // ===== UPDATE USER PROFILE CONTROLLER =====
 /**
  * Update the authenticated user's profile
- * Allows users to update their name, profile picture, and health goals
+ * This function allows users to update specific profile fields
+ * 
+ * Process Flow:
+ * 1. Extract updatable fields from request body (name, profilePicture, goals)
+ * 2. Validate that email/password are NOT being changed (security)
+ * 3. Build update object with only provided fields
+ * 4. Update user document with validation
+ * 5. Return updated user data
+ * 
+ * Updatable Fields:
+ * - name: User's display name (2-50 characters)
+ * - profilePicture: URL to profile image (must be valid URL)
+ * - goals: Health goals object (weightGoal, stepGoal, sleepGoal, calorieGoal, distanceGoal)
+ * 
+ * Non-updatable Fields (Security):
+ * - email: Cannot be changed (use separate endpoint if needed)
+ * - password: Cannot be changed here (use changePassword endpoint)
+ * - googleId: System managed
+ * - googleFitConnected: System managed
+ * 
+ * Error Handling:
+ * - 400: No data provided or attempting to change restricted fields
+ * - 400: Validation errors (invalid URL, out of range values, etc.)
+ * - 404: User not found
+ * - 500: Server/database errors
+ * 
  * @route PUT /api/auth/profile
  * @access Private (requires authentication token)
  */
 export const updateProfile = async (req, res) => {
   try {
-    const { name, profilePicture, goals } = req.body;
+    // Step 1: Extract fields from request body
+    const { name, profilePicture, goals, email, password, googleId, googleFitConnected } = req.body;
 
-    const updateData = {};
-    if (name) updateData.name = name;
-    if (profilePicture) updateData.profilePicture = profilePicture;
-    if (goals) updateData.goals = goals;
-
-    if (Object.keys(updateData).length === 0) {
+    // Step 2: Validate that restricted fields are not being changed
+    if (email !== undefined) {
       return res.status(400).json({
         success: false,
-        message: "No update data provided",
+        message: "Email cannot be changed. Please contact support if you need to update your email.",
       });
     }
 
+    if (password !== undefined) {
+      return res.status(400).json({
+        success: false,
+        message: "Password cannot be changed here. Please use the change password endpoint.",
+      });
+    }
+
+    if (googleId !== undefined) {
+      return res.status(400).json({
+        success: false,
+        message: "Google ID is system managed and cannot be changed.",
+      });
+    }
+
+    if (googleFitConnected !== undefined) {
+      return res.status(400).json({
+        success: false,
+        message: "Google Fit connection status is system managed.",
+      });
+    }
+
+    // Step 3: Build update object with only provided, updatable fields
+    const updateData = {};
+    
+    if (name !== undefined) {
+      updateData.name = name;
+    }
+    
+    if (profilePicture !== undefined) {
+      updateData.profilePicture = profilePicture;
+    }
+    
+    if (goals !== undefined) {
+      // Allow partial goal updates - merge with existing goals
+      updateData.goals = goals;
+    }
+
+    // Check if any valid update data was provided
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No update data provided. Please provide at least one field to update (name, profilePicture, or goals).",
+      });
+    }
+
+    // Step 4: Update user document with validation
+    // new: true -> return updated document
+    // runValidators: true -> run schema validations
     const updatedUser = await User.findByIdAndUpdate(
       req.userId,
       updateData,
       { new: true, runValidators: true }
     );
 
+    // Step 5: Handle user not found
     if (!updatedUser) {
       return res.status(404).json({
         success: false,
@@ -248,16 +362,28 @@ export const updateProfile = async (req, res) => {
       });
     }
 
+    // Step 6: Return updated user data
     res.status(200).json({
       success: true,
       message: "Profile updated successfully",
       data: {
-        user: updatedUser,
+        user: {
+          id: updatedUser._id,
+          name: updatedUser.name,
+          email: updatedUser.email,
+          profilePicture: updatedUser.profilePicture,
+          googleId: updatedUser.googleId,
+          googleFitConnected: updatedUser.googleFitConnected,
+          goals: updatedUser.goals,
+          createdAt: updatedUser.createdAt,
+          updatedAt: updatedUser.updatedAt,
+        },
       },
     });
   } catch (error) {
     console.error("❌ Update profile error:", error);
 
+    // Error Handling: Mongoose validation errors
     if (error.name === "ValidationError") {
       const messages = Object.values(error.errors).map((err) => err.message);
       return res.status(400).json({
@@ -267,6 +393,15 @@ export const updateProfile = async (req, res) => {
       });
     }
 
+    // Error Handling: Cast errors (invalid data types)
+    if (error.name === "CastError") {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid ${error.path}: ${error.value}`,
+      });
+    }
+
+    // Error Handling: Server errors
     res.status(500).json({
       success: false,
       message: "Server error while updating profile",
