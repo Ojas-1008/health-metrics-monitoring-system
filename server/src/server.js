@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import connectDB from './config/database.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
+import authRoutes from './routes/authRoutes.js';
 
 // Load environment variables
 dotenv.config();
@@ -35,6 +36,15 @@ app.get('/', (req, res) => {
 // Define PORT
 const PORT = process.env.PORT || 5000;
 
+// ===== ROUTES (Must be defined BEFORE starting server) =====
+app.use('/api/auth', authRoutes);
+
+// ===== 404 HANDLER (Must be AFTER all routes) =====
+app.use(notFound);       // 404 handler
+
+// ===== ERROR HANDLER (Must be LAST middleware) =====
+app.use(errorHandler);   // Error handler (MUST BE LAST)
+
 // Connect to Database and Start Server
 const startServer = async () => {
   try {
@@ -60,15 +70,5 @@ const startServer = async () => {
 
 // Start the server
 startServer();
-
-// ===== ROUTES (ADD YOUR ROUTES HERE) =====
-// Example: app.use('/api/auth', authRoutes);
-// Example: app.use('/api/metrics', metricsRoutes);
-
-// ===== 404 HANDLER (Must be AFTER all routes) =====
-app.use(notFound);       // 404 handler
-
-// ===== ERROR HANDLER (Must be LAST middleware) =====
-app.use(errorHandler);   // Error handler (MUST BE LAST)
 
 export default app;

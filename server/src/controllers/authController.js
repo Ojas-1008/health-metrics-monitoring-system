@@ -7,13 +7,30 @@ import User from "../models/User.js";  // Import the User database model
 /**
  * Register a new user account
  * This function handles user registration by creating a new user in the database
+ * 
+ * Process Flow:
+ * 1. Extract email, password, name from request body
+ * 2. Validate required fields are present
+ * 3. Check if user already exists in database
+ * 4. Create new user document (password is automatically hashed via User model pre-save hook)
+ * 5. Generate JWT token for immediate authentication
+ * 6. Return user data (without password) and token
+ * 
+ * Error Handling:
+ * - 400: Missing required fields (name, email, password)
+ * - 400: Duplicate email (user already exists)
+ * - 400: Validation errors (invalid email format, password too short, etc.)
+ * - 500: Server errors (database connection issues, etc.)
+ * 
  * @route POST /api/auth/register
  * @access Public (anyone can register)
  */
-export const register = async (req, res) => {
+export const registerUser = async (req, res) => {
   try {
+    // Step 1: Extract email, password, name from request body
     const { name, email, password } = req.body;
 
+    // Step 2: Validate required fields
     if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
@@ -21,6 +38,8 @@ export const register = async (req, res) => {
       });
     }
 
+    // Step 3: Check if user already exists
+    // This prevents duplicate email registrations
     const existingUser = await User.findOne({ email });
 
     if (existingUser) {
@@ -30,18 +49,25 @@ export const register = async (req, res) => {
       });
     }
 
+    // Step 4: Create new user document
+    // Note: Password hashing happens automatically via User model's pre-save hook
+    // The User model uses bcrypt to hash the password before saving to database
     const user = await User.create({
       name,
       email,
-      password,  // This will be automatically hashed by the User model
+      password,  // Will be hashed by User model pre-save middleware
     });
 
+    // Step 5: Generate JWT token
+    // Token includes user ID and expires in 7 days (or value from JWT_EXPIRE env var)
     const token = jwt.sign(
       { userId: user._id },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRE || "7d" }
     );
 
+    // Step 6: Return user data (without password) and token
+    // Password is automatically excluded because User model has 'select: false'
     res.status(201).json({
       success: true,
       message: "User registered successfully",
@@ -53,6 +79,7 @@ export const register = async (req, res) => {
           profilePicture: user.profilePicture,
           googleFitConnected: user.googleFitConnected,
           goals: user.goals,
+          createdAt: user.createdAt,
         },
         token,
       },
@@ -60,7 +87,9 @@ export const register = async (req, res) => {
   } catch (error) {
     console.error("❌ Registration error:", error);
 
+    // Error Handling: Mongoose validation errors
     if (error.name === "ValidationError") {
+      // Extract all validation error messages
       const messages = Object.values(error.errors).map((err) => err.message);
       return res.status(400).json({
         success: false,
@@ -69,6 +98,15 @@ export const register = async (req, res) => {
       });
     }
 
+    // Error Handling: Duplicate email (MongoDB unique constraint violation)
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: "User with this email already exists",
+      });
+    }
+
+    // Error Handling: Server errors
     res.status(500).json({
       success: false,
       message: "Server error during registration",
@@ -76,6 +114,9 @@ export const register = async (req, res) => {
     });
   }
 };
+
+// Export register as an alias for backwards compatibility
+export const register = registerUser;
 
 // ===== LOGIN CONTROLLER =====
 /**
