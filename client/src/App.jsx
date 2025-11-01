@@ -1,4 +1,4 @@
-import './App.css'
+import './App.css';
 
 function App() {
   return (
@@ -9,24 +9,8 @@ function App() {
             Health Metrics App
           </h1>
           <p className="text-gray-600">
-            Tailwind CSS is working! 🎉
+            Monitoring System
           </p>
-        </div>
-        
-        <div className="space-y-4">
-          <input 
-            type="text" 
-            placeholder="Enter your email" 
-            className="input-field"
-          />
-          
-          <button className="btn-primary w-full">
-            Get Started
-          </button>
-          
-          <button className="btn-secondary w-full">
-            Learn More
-          </button>
         </div>
         
         <div className="grid grid-cols-3 gap-4 pt-4 border-t">
@@ -45,7 +29,7 @@ function App() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
