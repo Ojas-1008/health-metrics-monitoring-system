@@ -6,6 +6,8 @@ import { errorHandler, notFound } from "./middleware/errorHandler.js";
 
 // Import Routes
 import authRoutes from "./routes/authRoutes.js";
+import healthMetricsRoutes from "./routes/healthMetricsRoutes.js";
+import goalsRoutes from "./routes/goalsRoutes.js";
 
 /**
  * ============================================
@@ -77,12 +79,15 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+
 // Authentication Routes
 app.use("/api/auth", authRoutes);
 
-// TODO: Add more routes as you build them
-// app.use('/api/metrics', metricsRoutes);
-// app.use('/api/analytics', analyticsRoutes);
+// Health Metrics Routes
+app.use("/api/metrics", healthMetricsRoutes);
+
+// Goals Routes
+app.use("/api/goals", goalsRoutes);
 
 /**
  * ============================================
@@ -115,11 +120,25 @@ const server = app.listen(PORT, () => {
   console.log(`Base URL: http://localhost:${PORT}`);
   console.log("\n📍 Available Endpoints:");
   console.log("  • Health Check: GET /api/health");
-  console.log("  • Register: POST /api/auth/register");
-  console.log("  • Login: POST /api/auth/login");
-  console.log("  • Get User: GET /api/auth/me");
-  console.log("  • Update Profile: PUT /api/auth/profile");
-  console.log("  • Logout: POST /api/auth/logout");
+  console.log("\n  Authentication:");
+  console.log("    - Register: POST /api/auth/register");
+  console.log("    - Login: POST /api/auth/login");
+  console.log("    - Get User: GET /api/auth/me");
+  console.log("    - Update Profile: PUT /api/auth/profile");
+  console.log("    - Logout: POST /api/auth/logout");
+  console.log("\n  Health Metrics:");
+  console.log("    - Add/Update Metrics: POST /api/metrics");
+  console.log("    - Get by Range: GET /api/metrics?startDate=...&endDate=...");
+  console.log("    - Get by Date: GET /api/metrics/:date");
+  console.log("    - Delete: DELETE /api/metrics/:date");
+  console.log("    - Summary: GET /api/metrics/summary/:period");
+  console.log("    - Latest: GET /api/metrics/latest");
+  console.log("\n  Goals:");
+  console.log("    - Set Goals: POST /api/goals");
+  console.log("    - Get Goals: GET /api/goals");
+  console.log("    - Update Goals: PUT /api/goals");
+  console.log("    - Reset Goals: DELETE /api/goals");
+  console.log("    - Get Progress: GET /api/goals/progress");
   console.log("========================================\n");
 });
 

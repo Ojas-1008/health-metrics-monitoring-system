@@ -202,10 +202,13 @@ health-metrics-monitoring-system/
 - ✅ Organized folder structure with documentation
 - ✅ Express backend with MVC architecture
 - ✅ Environment configuration setup
+- ✅ JWT authentication backend (register, login, me, profile, logout)
+- ✅ Axios API layer with interceptors (token attach, global error handling)
+- ✅ Auth service (register/login/me/profile/logout) and React AuthContext with useAuth hook
+- ✅ Temporary test components: TestAuth and TestAuthFlow for end-to-end auth verification
 
 ### Planned Features (In Development)
-- 🚧 User authentication (JWT)
-- 🚧 Health metrics tracking (steps, calories, weight, sleep, heart rate)
+- 🚧 Health metrics tracking (steps, calories, distance, calories, sleep, weight)
 - 🚧 Interactive data visualizations with Recharts
 - 🚧 Goals management system
 - 🚧 Google Fit API integration
@@ -242,7 +245,7 @@ cd ../server
 npm install
 ```
 
-4. **Set up environment variables**
+4. **Set up environment variables (server)**
 ```bash
 cd server
 cp .env.example .env
@@ -259,6 +262,30 @@ JWT_EXPIRE=7d
 CLIENT_URL=http://localhost:5173
 GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
+```
+
+5. **Set up environment variables (client)**
+
+```bash
+cd client
+cp .env.example .env
+# Edit .env if needed (default values work for local dev)
+```
+
+Client .env variables used by Vite (restart Vite after changes):
+
+```env
+VITE_API_URL=http://localhost:5000/api
+VITE_APP_NAME=Health Metrics Monitoring System
+VITE_APP_VERSION=1.0.0
+VITE_NODE_ENV=development
+VITE_TOKEN_KEY=health_metrics_token
+VITE_GOOGLE_CLIENT_ID=your_google_client_id_here
+VITE_GOOGLE_REDIRECT_URI=http://localhost:5173/auth/google/callback
+VITE_ENABLE_GOOGLE_FIT=false
+VITE_ENABLE_ANALYTICS=false
+VITE_API_TIMEOUT=10000
+VITE_REQUEST_RETRY_LIMIT=3
 ```
 
 ### Running the Application
@@ -342,15 +369,16 @@ primary: {
 ### Frontend Architecture
 
 ```
-React Component Tree
+React Component Tree (current key pieces)
 ├── App.jsx (Root)
-├── Layouts
-│   ├── DashboardLayout (with navbar/sidebar)
-│   └── AuthLayout (centered)
-├── Pages
-│   ├── Auth (Login, Register)
-│   └── Dashboard (Home, Metrics, Profile)
-└── Components (Reusable)
+├── context/
+│   └── AuthContext.jsx (AuthProvider + useAuth)
+├── api/
+│   └── axiosConfig.js (configured axios instance + token utilities)
+├── services/
+│   └── authService.js (register, login, me, profile, logout)
+├── TestAuth.jsx (temporary verification component)
+└── TestAuthFlow.jsx (interactive register/login/logout tester)
 ```
 
 ### Backend Architecture
@@ -360,9 +388,8 @@ Express Middleware Chain
 ├── CORS
 ├── Body Parser
 ├── Routes
-│   ├── /api/auth (public)
-│   ├── /api/metrics (protected)
-│   └── /api/user (protected)
+│   ├── /api/auth (register, login, me, profile, logout)
+│   └── /api/metrics (planned)
 ├── Auth Middleware (JWT verify)
 ├── Validation Middleware
 ├── Controllers
@@ -396,12 +423,15 @@ Content-Type: application/json
 {
   "name": "John Doe",
   "email": "john@example.com",
-  "password": "securePassword123"
+  "password": "Test1234!",
+  "confirmPassword": "Test1234!"
 }
 
 Response: 201 Created
 {
-  "token": "jwt-token-here",
+  "success": true,
+  "message": "User registered successfully",
+  "token": "<jwt>",
   "user": { "id": "...", "name": "...", "email": "..." }
 }
 ```
@@ -418,10 +448,69 @@ Content-Type: application/json
 
 Response: 200 OK
 {
-  "token": "jwt-token-here",
+  "success": true,
+  "message": "Login successful",
+  "token": "<jwt>",
   "user": { "id": "...", "name": "...", "email": "..." }
 }
 ```
+
+#### Get Current User (Protected)
+```http
+GET /api/auth/me
+Authorization: Bearer <jwt>
+
+Response: 200 OK
+{
+  "success": true,
+  "user": { "id": "...", "name": "...", "email": "..." }
+}
+```
+
+#### Update Profile (Protected)
+```http
+PUT /api/auth/profile
+Authorization: Bearer <jwt>
+Content-Type: application/json
+
+{
+  "name": "New Name"
+}
+
+Response: 200 OK
+{
+  "success": true,
+  "message": "Profile updated successfully",
+  "user": { "id": "...", "name": "New Name", "email": "..." }
+}
+```
+
+#### Logout (Protected)
+```http
+POST /api/auth/logout
+Authorization: Bearer <jwt>
+
+Response: 200 OK
+{
+  "success": true,
+  "message": "Logged out successfully"
+}
+```
+
+## 🔍 Quick Frontend Auth Verification
+
+The repo includes two temporary components to verify auth end-to-end during development.
+
+- TestAuth.jsx – simple snapshot of AuthContext state
+- TestAuthFlow.jsx – interactive register/login/logout tester
+
+Current App.jsx renders TestAuthFlow inside AuthProvider. To verify:
+
+1) Start backend and frontend (see Getting Started)
+2) Visit http://localhost:5173
+3) Use the Register and Login forms; check the status panel and browser console logs
+
+Note: These components are for development only and can be removed or routed behind a dev path later.
 
 ### Health Metrics Endpoints (Coming Soon)
 
@@ -465,4 +554,4 @@ This project is licensed under the MIT License.
 
 **Development Status**: 🚧 In Active Development - Week 1: Project Setup Complete
 
-Last Updated: October 19, 2025
+Last Updated: November 1, 2025
