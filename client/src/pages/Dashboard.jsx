@@ -26,6 +26,7 @@ import MetricsForm from '../components/dashboard/MetricsForm';
 import MetricCard from '../components/dashboard/MetricCard';
 import MetricsList from '../components/dashboard/MetricsList';
 import SummaryStats from '../components/dashboard/SummaryStats';
+import GoalsSection from '../components/dashboard/GoalsSection';
 import Button from '../components/common/Button';
 import Alert from '../components/common/Alert';
 
@@ -86,6 +87,9 @@ const Dashboard = () => {
   // Reserved for future error display UI
   // eslint-disable-next-line no-unused-vars
   const [metricsError, setMetricsError] = useState(null);
+
+  // Goals State
+  const [goals, setGoals] = useState(null);
 
   // Previous Day Metrics State (for trend comparison)
   const [previousDayMetrics, setPreviousDayMetrics] = useState(null);
@@ -181,6 +185,14 @@ const Dashboard = () => {
       console.log('📊 Dashboard Action:', lastActionRef.current);
     }
   }, []);
+
+  /**
+   * Handle goals update
+   */
+  const handleGoalsUpdate = useCallback((updatedGoals) => {
+    setGoals(updatedGoals);
+    trackAction('GOALS_UPDATED', { goals: updatedGoals });
+  }, [trackAction]);
 
   // ===== TREND CALCULATION UTILITIES =====
 
@@ -1067,6 +1079,14 @@ const Dashboard = () => {
                 <span className="text-2xl text-blue-600">→</span>
               </div>
             )}
+          </div>
+
+          {/* ===== GOALS SECTION ===== */}
+          <div className="mb-8">
+            <GoalsSection
+              onGoalsUpdate={handleGoalsUpdate}
+              todayMetrics={todayMetrics}
+            />
           </div>
 
           {/* ===== ADVANCED SUMMARY STATS SECTION ===== */}

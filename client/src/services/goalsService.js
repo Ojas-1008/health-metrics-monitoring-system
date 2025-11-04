@@ -159,9 +159,12 @@ export const setGoals = async (goals) => {
       console.error('❌ Set goals error:', error);
     }
 
+    // Extract error message from API response or use default
+    const errorMessage = error.response?.data?.message || error.message || 'Failed to set goals. Please try again.';
+
     return {
       success: false,
-      message: error.message || 'Failed to set goals. Please try again.',
+      message: errorMessage,
     };
   }
 };
@@ -219,16 +222,19 @@ export const getGoals = async () => {
     }
 
     // Check if it's a 404 (user not found)
-    if (error.statusCode === 404) {
+    if (error.response?.status === 404) {
       return {
         success: false,
         message: 'User not found. Please log in again.',
       };
     }
 
+    // Extract error message from API response or use default
+    const errorMessage = error.response?.data?.message || error.message || 'Failed to retrieve goals. Please try again.';
+
     return {
       success: false,
-      message: error.message || 'Failed to retrieve goals. Please try again.',
+      message: errorMessage,
     };
   }
 };
@@ -309,9 +315,12 @@ export const updateGoals = async (goals) => {
       console.error('❌ Update goals error:', error);
     }
 
+    // Extract error message from API response or use default
+    const errorMessage = error.response?.data?.message || error.message || 'Failed to update goals. Please try again.';
+
     return {
       success: false,
-      message: error.message || 'Failed to update goals. Please try again.',
+      message: errorMessage,
     };
   }
 };
@@ -370,9 +379,12 @@ export const resetGoals = async () => {
       console.error('❌ Reset goals error:', error);
     }
 
+    // Extract error message from API response or use default
+    const errorMessage = error.response?.data?.message || error.message || 'Failed to reset goals. Please try again.';
+
     return {
       success: false,
-      message: error.message || 'Failed to reset goals. Please try again.',
+      message: errorMessage,
     };
   }
 };
@@ -446,16 +458,19 @@ export const getGoalProgress = async () => {
     }
 
     // Check if it's a 404 (user not found)
-    if (error.statusCode === 404) {
+    if (error.response?.status === 404) {
       return {
         success: false,
         message: 'User not found. Please log in again.',
       };
     }
 
+    // Extract error message from API response or use default
+    const errorMessage = error.response?.data?.message || error.message || 'Failed to retrieve goal progress. Please try again.';
+
     return {
       success: false,
-      message: error.message || 'Failed to retrieve goal progress. Please try again.',
+      message: errorMessage,
     };
   }
 };
