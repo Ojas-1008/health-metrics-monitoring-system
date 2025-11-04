@@ -21,16 +21,24 @@ A full-stack health tracking application with real-time analytics and predictive
 
 ## 🎯 Overview
 
-The Health Metrics Monitoring System is a comprehensive platform for tracking and analyzing personal health data. It integrates with Google Fit API, provides real-time visualizations, and uses predictive analytics to help users achieve their health goals.
+The Health Metrics Monitoring System is a comprehensive full-stack platform for tracking and analyzing personal health data. Built with React 19 and Express, it features a complete authentication system, health metrics tracking, goal management, and is designed for scalability with planned Apache Spark analytics integration.
+
+### Current Status
+
+**Backend**: Fully functional RESTful API with JWT authentication, health metrics CRUD operations, and goals management system.
+
+**Frontend**: Complete authentication UI with login/registration, protected routing, and dashboard foundation. Health metrics visualization in development.
 
 ### Key Capabilities
 
-- 🔐 Secure user authentication with JWT
-- 📊 Real-time health metrics tracking and visualization
-- 📈 Predictive analytics using Apache Spark
-- 🔄 Google Fit API integration for automatic data sync
-- 📱 Responsive design for mobile and desktop
-- 🎨 Modern UI with Tailwind CSS
+- 🔐 Complete authentication system (JWT-based with bcrypt password hashing)
+- 📊 Health metrics tracking API (steps, calories, distance, sleep, weight)
+- 🎯 Fitness goals management with progress tracking
+- 📱 Responsive React UI with Tailwind CSS
+- �️ Comprehensive input validation and error handling
+- 🔄 Real-time form validation and password strength indicators
+- � Metrics summary and analytics (daily, weekly, monthly, yearly)
+- 🎨 Modern UI with custom Tailwind theme and reusable components
 
 ## 🛠 Tech Stack
 
@@ -72,27 +80,46 @@ health-metrics-monitoring-system/
 ├── client/                          # Frontend React application
 │   ├── public/                      # Static assets
 │   ├── src/                         # Source code
+│   │   ├── api/                     # API configuration
+│   │   │   └── axiosConfig.js      # Axios instance + interceptors
 │   │   ├── assets/                  # Images, fonts, icons
 │   │   ├── components/              # Reusable React components
-│   │   │   ├── auth/               # Authentication components
-│   │   │   ├── charts/             # Chart wrapper components
+│   │   │   ├── auth/               # Authentication components (planned)
+│   │   │   ├── charts/             # Chart wrapper components (planned)
 │   │   │   ├── common/             # Shared UI components
-│   │   │   └── metrics/            # Health metrics components
-│   │   ├── hooks/                   # Custom React hooks
-│   │   ├── layouts/                 # Layout wrapper components
+│   │   │   │   ├── Alert.jsx       # Alert/notification component
+│   │   │   │   ├── Button.jsx      # Reusable button
+│   │   │   │   ├── Card.jsx        # Card container
+│   │   │   │   ├── Input.jsx       # Form input with validation
+│   │   │   │   └── PrivateRoute.jsx # Route protection wrapper
+│   │   │   ├── layout/             # Layout components
+│   │   │   │   ├── Header.jsx      # App header/navbar
+│   │   │   │   └── Layout.jsx      # Main layout wrapper
+│   │   │   └── metrics/            # Health metrics components (planned)
+│   │   ├── context/                 # React Context
+│   │   │   └── AuthContext.jsx     # Authentication state + useAuth hook
+│   │   ├── hooks/                   # Custom React hooks (planned)
+│   │   ├── layouts/                 # Page layouts (planned)
 │   │   ├── pages/                   # Full page components
-│   │   │   ├── auth/               # Login, Register pages
-│   │   │   └── dashboard/          # Dashboard pages
-│   │   ├── services/                # API integration (Axios)
-│   │   ├── stores/                  # Zustand state stores
+│   │   │   ├── auth/               # Auth-related pages (planned)
+│   │   │   ├── dashboard/          # Dashboard views (planned)
+│   │   │   ├── Dashboard.jsx       # Main dashboard page
+│   │   │   ├── Home.jsx            # Landing page
+│   │   │   ├── Login.jsx           # Login page
+│   │   │   ├── Register.jsx        # Registration page
+│   │   │   └── NotFound.jsx        # 404 error page
+│   │   ├── services/                # API integration layer
+│   │   │   └── authService.js      # Auth API calls
+│   │   ├── stores/                  # Zustand state stores (planned)
 │   │   ├── utils/                   # Helper functions
-│   │   ├── App.jsx                  # Root component
+│   │   │   └── validation.js       # Form validation utilities
+│   │   ├── App.jsx                  # Root component with routes
 │   │   ├── App.css                  # Component styles
 │   │   ├── index.css                # Global styles + Tailwind
 │   │   └── main.jsx                 # App entry point
 │   ├── index.html                   # HTML template
 │   ├── package.json                 # Frontend dependencies
-│   ├── vite.config.js              # Vite configuration
+│   ├── vite.config.js              # Vite configuration + API proxy
 │   ├── tailwind.config.js          # Tailwind customization
 │   ├── postcss.config.js           # PostCSS plugins
 │   └── eslint.config.js            # ESLint rules
@@ -100,43 +127,46 @@ health-metrics-monitoring-system/
 ├── server/                          # Backend Node.js/Express API
 │   ├── src/                         # Source code
 │   │   ├── config/                  # Configuration files
-│   │   │   ├── db.config.js        # MongoDB connection
-│   │   │   ├── jwt.config.js       # JWT settings
-│   │   │   └── cors.config.js      # CORS configuration
-│   │   ├── controllers/             # Request handlers
-│   │   │   ├── authController.js   # Authentication logic
-│   │   │   └── metricsController.js # Metrics CRUD
+│   │   │   └── database.js         # MongoDB connection
+│   │   ├── controllers/             # Request handlers (MVC)
+│   │   │   ├── authController.js   # Auth logic (register/login/profile/logout)
+│   │   │   ├── goalsController.js  # Goals management
+│   │   │   └── healthMetricsController.js # Metrics CRUD + analytics
 │   │   ├── models/                  # Mongoose schemas
-│   │   │   ├── User.model.js       # User schema
-│   │   │   └── HealthMetric.model.js # Metrics schema
+│   │   │   ├── User.js             # User model with bcrypt
+│   │   │   ├── HealthMetric.js     # Daily health metrics
+│   │   │   ├── Alert.js            # Notifications/alerts
+│   │   │   └── Analytics.js        # Health insights
 │   │   ├── routes/                  # API endpoints
-│   │   │   ├── auth.routes.js      # /api/auth routes
-│   │   │   └── metrics.routes.js   # /api/metrics routes
+│   │   │   ├── authRoutes.js       # /api/auth routes
+│   │   │   ├── goalsRoutes.js      # /api/goals routes
+│   │   │   └── healthMetricsRoutes.js # /api/metrics routes
 │   │   ├── middleware/              # Express middleware
-│   │   │   ├── auth.middleware.js  # JWT verification
-│   │   │   ├── validation.middleware.js # Input validation
-│   │   │   └── error.middleware.js # Error handling
-│   │   ├── services/                # Business logic
-│   │   │   ├── authService.js      # Auth operations
-│   │   │   ├── metricsService.js   # Metrics operations
-│   │   │   └── googleFitService.js # Google Fit integration
-│   │   ├── utils/                   # Helper functions
-│   │   │   ├── errorHandler.js     # Custom error classes
-│   │   │   └── validators.js       # Validation helpers
+│   │   │   ├── auth.js             # JWT verification (protect)
+│   │   │   ├── validator.js        # Input validation chains
+│   │   │   └── errorHandler.js     # Error handling + ErrorResponse
+│   │   ├── services/                # Business logic layer (planned)
+│   │   ├── utils/                   # Helper functions (planned)
 │   │   └── server.js                # Express app entry point
+│   ├── scripts/                     # Utility scripts
+│   │   └── fix-googleid-index.js   # MongoDB index maintenance
 │   ├── .env.example                 # Environment variables template
-│   ├── .gitignore                   # Git ignore patterns
 │   ├── package.json                 # Backend dependencies
 │   └── README.md                    # Server documentation
 │
 ├── spark-analytics/                 # Apache Spark analytics (planned)
-│   └── (Coming soon)
+│   └── README.md
 │
 ├── docs/                            # Additional documentation
-│   └── (API docs, architecture diagrams)
+│   ├── AUTH_API_REFERENCE.md       # Auth API detailed docs
+│   ├── AUTH_ROUTES_VERIFICATION.md # Auth testing guide
+│   └── (other documentation)
 │
 ├── .gitignore                       # Root Git ignore
 ├── package.json                     # Root workspace config
+├── ARCHITECTURE.md                  # Architecture documentation
+├── TECH_STACK.md                   # Technology stack details
+├── DOCUMENTATION_INDEX.md          # Documentation index
 └── README.md                        # This file
 ```
 
@@ -196,24 +226,48 @@ health-metrics-monitoring-system/
 ## ✨ Features
 
 ### Current Features (Implemented)
+
+#### Backend (100% Complete) ✅
 - ✅ Monorepo structure with client and server
-- ✅ React + Vite frontend with HMR
-- ✅ Tailwind CSS v4 with custom theme
-- ✅ Organized folder structure with documentation
 - ✅ Express backend with MVC architecture
+- ✅ MongoDB Atlas integration with Mongoose ODM
+- ✅ JWT authentication system (register, login, logout, profile management)
+- ✅ Centralized error handling with custom ErrorResponse class
+- ✅ Express-validator input validation chains
+- ✅ Health metrics CRUD API (add, update, get by date/range, delete, summary)
+- ✅ Goals management API (set, get, update, reset, progress tracking)
+- ✅ User model with bcrypt password hashing and partial unique indexes
+- ✅ HealthMetric, Alert, and Analytics data models
+- ✅ Protected routes with JWT middleware
+- ✅ CORS configuration for frontend integration
 - ✅ Environment configuration setup
-- ✅ JWT authentication backend (register, login, me, profile, logout)
-- ✅ Axios API layer with interceptors (token attach, global error handling)
-- ✅ Auth service (register/login/me/profile/logout) and React AuthContext with useAuth hook
-- ✅ Temporary test components: TestAuth and TestAuthFlow for end-to-end auth verification
+- ✅ Graceful server shutdown handling
+
+#### Frontend (90% Complete) ✅
+- ✅ React 19 + Vite 7 with HMR
+- ✅ Tailwind CSS v4 with custom theme and utility classes
+- ✅ React Router v7 with protected routes
+- ✅ AuthContext for global authentication state
+- ✅ Axios API layer with interceptors (token attach, error handling)
+- ✅ Auth service (register, login, getCurrentUser, updateProfile, logout)
+- ✅ Complete authentication UI (Login, Register pages)
+- ✅ Reusable UI components (Button, Input, Card, Alert, PrivateRoute)
+- ✅ Layout components (Header, Layout)
+- ✅ Dashboard page with metrics cards
+- ✅ Home landing page with hero section
+- ✅ Form validation with real-time feedback
+- ✅ Password strength indicator
+- ✅ Responsive design for mobile and desktop
+- ✅ Loading states and error handling
 
 ### Planned Features (In Development)
-- 🚧 Health metrics tracking (steps, calories, distance, calories, sleep, weight)
+- 🚧 Health metrics form and submission UI
 - 🚧 Interactive data visualizations with Recharts
-- 🚧 Goals management system
+- 🚧 Goals setting and progress visualization UI
+- 🚧 Profile management page
 - 🚧 Google Fit API integration
-- 🚧 Predictive health analytics with Spark
-- 🚧 Real-time notifications
+- 🚧 Predictive health analytics with Apache Spark
+- 🚧 Real-time notifications system
 - 🚧 Social features (sharing progress)
 
 ## 🚀 Getting Started
@@ -369,40 +423,123 @@ primary: {
 ### Frontend Architecture
 
 ```
-React Component Tree (current key pieces)
-├── App.jsx (Root)
+React Application Structure
+├── App.jsx (Root with React Router)
+│   ├── AuthProvider (Global auth state)
+│   ├── Routes
+│   │   ├── Public Routes
+│   │   │   ├── / (Home)
+│   │   │   ├── /login (Login - redirects if authenticated)
+│   │   │   └── /register (Register - redirects if authenticated)
+│   │   ├── Protected Routes (require authentication)
+│   │   │   └── /dashboard (Dashboard)
+│   │   └── /404 (Not Found)
+│
 ├── context/
-│   └── AuthContext.jsx (AuthProvider + useAuth)
-├── api/
-│   └── axiosConfig.js (configured axios instance + token utilities)
+│   └── AuthContext.jsx (useAuth hook, login/register/logout)
+│
 ├── services/
-│   └── authService.js (register, login, me, profile, logout)
-├── TestAuth.jsx (temporary verification component)
-└── TestAuthFlow.jsx (interactive register/login/logout tester)
+│   └── authService.js (API calls: register, login, getCurrentUser, updateProfile, logout)
+│
+├── components/
+│   ├── common/ (Button, Input, Card, Alert, PrivateRoute)
+│   └── layout/ (Header, Layout)
+│
+└── pages/
+    ├── Home.jsx (Landing page)
+    ├── Login.jsx (Authentication)
+    ├── Register.jsx (Registration with password strength)
+    ├── Dashboard.jsx (Main app dashboard)
+    └── NotFound.jsx (404 page)
 ```
 
 ### Backend Architecture
 
 ```
-Express Middleware Chain
-├── CORS
-├── Body Parser
-├── Routes
-│   ├── /api/auth (register, login, me, profile, logout)
-│   └── /api/metrics (planned)
-├── Auth Middleware (JWT verify)
-├── Validation Middleware
-├── Controllers
-├── Services (Business Logic)
-└── Error Handler
+Express API Structure
+├── server.js (Entry point)
+│   ├── Middleware Chain
+│   │   ├── CORS
+│   │   ├── Body Parser
+│   │   ├── Request Logger (dev only)
+│   │   ├── Routes
+│   │   ├── 404 Handler
+│   │   └── Error Handler
+│   │
+│   ├── Routes
+│   │   ├── /api/health (Health check)
+│   │   ├── /api/auth/* (Authentication endpoints)
+│   │   ├── /api/metrics/* (Health metrics CRUD)
+│   │   └── /api/goals/* (Goals management)
+│   │
+│   ├── Controllers
+│   │   ├── authController.js (register, login, me, updateProfile, logout)
+│   │   ├── healthMetricsController.js (CRUD + summary + latest)
+│   │   └── goalsController.js (set, get, update, reset, progress)
+│   │
+│   ├── Models (Mongoose)
+│   │   ├── User.js (with bcrypt, partial googleId index)
+│   │   ├── HealthMetric.js (daily metrics tracking)
+│   │   ├── Alert.js (notifications)
+│   │   └── Analytics.js (insights)
+│   │
+│   ├── Middleware
+│   │   ├── auth.js (JWT protect middleware)
+│   │   ├── validator.js (express-validator chains)
+│   │   └── errorHandler.js (ErrorResponse + asyncHandler)
+│   │
+│   └── Config
+│       └── database.js (MongoDB connection)
 ```
 
 ### Data Flow
 
 ```
-Client Request → Vite Proxy → Express → Middleware Chain 
-→ Controller → Service → Model → MongoDB
-→ Response ← ← ← ← ← ←
+Client Request → Vite Proxy → Express Server
+                                    ↓
+                           Middleware Chain:
+                           1. CORS
+                           2. Body Parser
+                           3. Request Logger (dev)
+                           4. Route Matching
+                                    ↓
+                      Protected Route → JWT Middleware (protect)
+                                    ↓
+                           Validation Middleware (express-validator)
+                                    ↓
+                           Controller (wrapped in asyncHandler)
+                                    ↓
+                           Mongoose Model
+                                    ↓
+                           MongoDB Atlas
+                                    ↓
+                           Response ← ErrorResponse (if error)
+                                    ↓
+Client Response ← JSON Response ← Express
+```
+
+### Request/Response Flow Example
+
+```
+1. User submits login form
+   ↓
+2. AuthContext.login() called
+   ↓
+3. authService.login() → axios.post('/api/auth/login')
+   ↓
+4. Vite proxy forwards to Express :5000
+   ↓
+5. Express validates email/password
+   ↓
+6. Controller verifies credentials with bcrypt
+   ↓
+7. JWT token generated and returned
+   ↓
+8. Token stored in localStorage
+   ↓
+9. Axios interceptor attaches token to future requests
+   ↓
+10. User redirected to dashboard
 ```
 
 ## 📡 API Documentation
@@ -443,7 +580,7 @@ Content-Type: application/json
 
 {
   "email": "john@example.com",
-  "password": "securePassword123"
+  "password": "Test1234!"
 }
 
 Response: 200 OK
@@ -463,7 +600,7 @@ Authorization: Bearer <jwt>
 Response: 200 OK
 {
   "success": true,
-  "user": { "id": "...", "name": "...", "email": "..." }
+  "user": { "id": "...", "name": "...", "email": "...", "goals": {...} }
 }
 ```
 
@@ -497,29 +634,186 @@ Response: 200 OK
 }
 ```
 
-## 🔍 Quick Frontend Auth Verification
+### Health Metrics Endpoints (Implemented) ✅
 
-The repo includes two temporary components to verify auth end-to-end during development.
-
-- TestAuth.jsx – simple snapshot of AuthContext state
-- TestAuthFlow.jsx – interactive register/login/logout tester
-
-Current App.jsx renders TestAuthFlow inside AuthProvider. To verify:
-
-1) Start backend and frontend (see Getting Started)
-2) Visit http://localhost:5173
-3) Use the Register and Login forms; check the status panel and browser console logs
-
-Note: These components are for development only and can be removed or routed behind a dev path later.
-
-### Health Metrics Endpoints (Coming Soon)
-
+#### Add or Update Metrics
 ```http
-GET    /api/metrics          # Get all user metrics
-POST   /api/metrics          # Create new metric
-GET    /api/metrics/:id      # Get single metric
-PUT    /api/metrics/:id      # Update metric
-DELETE /api/metrics/:id      # Delete metric
+POST /api/metrics
+Authorization: Bearer <jwt>
+Content-Type: application/json
+
+{
+  "date": "2025-11-03",
+  "metrics": {
+    "steps": 10247,
+    "calories": 1500,
+    "distance": 7.5,
+    "activeMinutes": 60,
+    "sleepHours": 8.5,
+    "weight": 70
+  },
+  "source": "manual",
+  "activities": ["running", "cycling"]
+}
+
+Response: 201 Created
+{
+  "success": true,
+  "message": "Metrics added successfully",
+  "data": { ...metrics document }
+}
+```
+
+#### Get Metrics by Date Range
+```http
+GET /api/metrics?startDate=2025-11-01&endDate=2025-11-03
+Authorization: Bearer <jwt>
+
+Response: 200 OK
+{
+  "success": true,
+  "count": 3,
+  "data": [ ...metrics array ]
+}
+```
+
+#### Get Metrics by Date
+```http
+GET /api/metrics/2025-11-03
+Authorization: Bearer <jwt>
+
+Response: 200 OK
+{
+  "success": true,
+  "data": { ...metrics document }
+}
+```
+
+#### Get Metrics Summary
+```http
+GET /api/metrics/summary/week
+Authorization: Bearer <jwt>
+
+Response: 200 OK
+{
+  "success": true,
+  "data": {
+    "period": "week",
+    "totalDays": 7,
+    "averages": { steps: 8500, calories: 1200, ... },
+    "totals": { steps: 59500, ... }
+  }
+}
+```
+
+#### Get Latest Metrics
+```http
+GET /api/metrics/latest
+Authorization: Bearer <jwt>
+
+Response: 200 OK
+{
+  "success": true,
+  "data": { ...latest metrics }
+}
+```
+
+#### Delete Metrics
+```http
+DELETE /api/metrics/2025-11-03
+Authorization: Bearer <jwt>
+
+Response: 200 OK
+{
+  "success": true,
+  "message": "Metrics deleted successfully"
+}
+```
+
+### Goals Endpoints (Implemented) ✅
+
+#### Set Goals
+```http
+POST /api/goals
+Authorization: Bearer <jwt>
+Content-Type: application/json
+
+{
+  "stepGoal": 10000,
+  "calorieGoal": 2000,
+  "sleepGoal": 8,
+  "weightGoal": 70,
+  "distanceGoal": 5
+}
+
+Response: 200 OK
+{
+  "success": true,
+  "message": "Goals updated successfully",
+  "data": { ...goals object }
+}
+```
+
+#### Get Goals
+```http
+GET /api/goals
+Authorization: Bearer <jwt>
+
+Response: 200 OK
+{
+  "success": true,
+  "data": { stepGoal: 10000, calorieGoal: 2000, ... }
+}
+```
+
+#### Update Goals (Partial)
+```http
+PUT /api/goals
+Authorization: Bearer <jwt>
+Content-Type: application/json
+
+{
+  "stepGoal": 12000
+}
+
+Response: 200 OK
+{
+  "success": true,
+  "message": "Goals updated successfully",
+  "data": { ...updated goals }
+}
+```
+
+#### Reset Goals
+```http
+DELETE /api/goals
+Authorization: Bearer <jwt>
+
+Response: 200 OK
+{
+  "success": true,
+  "message": "Goals reset to defaults",
+  "data": { ...default goals }
+}
+```
+
+#### Get Goal Progress
+```http
+GET /api/goals/progress
+Authorization: Bearer <jwt>
+
+Response: 200 OK
+{
+  "success": true,
+  "data": {
+    "goals": { ... },
+    "currentMetrics": { ... },
+    "progress": {
+      "steps": { "goal": 10000, "current": 7500, "percentage": 75, "achieved": false },
+      ...
+    }
+  }
+}
 ```
 
 ## 🤝 Contributing
@@ -552,6 +846,8 @@ This project is licensed under the MIT License.
 
 ---
 
-**Development Status**: 🚧 In Active Development - Week 1: Project Setup Complete
+**Development Status**: ✅ **Core Features Complete** - Backend API fully functional, Frontend authentication and UI foundation complete
 
-Last Updated: November 1, 2025
+**Next Steps**: Implement health metrics UI components, charts, and data visualization
+
+Last Updated: November 3, 2025
