@@ -8,6 +8,7 @@ import { errorHandler, notFound } from "./middleware/errorHandler.js";
 import authRoutes from "./routes/authRoutes.js";
 import healthMetricsRoutes from "./routes/healthMetricsRoutes.js";
 import goalsRoutes from "./routes/goalsRoutes.js";
+import googleFitRoutes from "./routes/googleFitRoutes.js";
 
 /**
  * ============================================
@@ -89,6 +90,9 @@ app.use("/api/metrics", healthMetricsRoutes);
 // Goals Routes
 app.use("/api/goals", goalsRoutes);
 
+// Google Fit OAuth Routes
+app.use("/api/googlefit", googleFitRoutes);
+
 /**
  * ============================================
  * ERROR HANDLING MIDDLEWARE
@@ -139,6 +143,11 @@ const server = app.listen(PORT, () => {
   console.log("    - Update Goals: PUT /api/goals");
   console.log("    - Reset Goals: DELETE /api/goals");
   console.log("    - Get Progress: GET /api/goals/progress");
+  console.log("\n  Google Fit OAuth:");
+  console.log("    - Initiate: GET /api/googlefit/connect");
+  console.log("    - Callback: GET /api/googlefit/callback");
+  console.log("    - Status: GET /api/googlefit/status");
+  console.log("    - Disconnect: POST /api/googlefit/disconnect");
   console.log("========================================\n");
 });
 

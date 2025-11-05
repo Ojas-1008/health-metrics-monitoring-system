@@ -1,0 +1,944 @@
+Health Metrics Monitoring System - Week 1 Detailed Roadmap
+Project Overview Summary
+A full-stack health tracking application integrating React, Node.js, MongoDB Atlas, Apache Spark analytics, and Google Fit API for real-time health metrics monitoring and predictive analysis.[1]
+
+Day 1: Environment Setup & Project Architecture Planning
+Morning Session (3-4 hours)
+Task 1.1: Development Environment Verification
+    • Sub-task 1.1.1: Verify Node.js installation (v18 or higher recommended)
+        ◦ Open terminal and run node --version and npm --version
+        ◦ If not installed, download from nodejs.org
+        ◦ Expected output: Node v18.x.x or higher, npm v9.x.x or higher
+    • Sub-task 1.1.2: Verify Git configuration
+        ◦ Run git --version to confirm installation
+        ◦ Verify GitHub SSH connection: ssh -T git@github.com
+        ◦ Expected: "Hi [username]! You've successfully authenticated"[1]
+    • Sub-task 1.1.3: Install Visual Studio Code extensions
+        ◦ ES7+ React/Redux/React-Native snippets
+        ◦ Prettier - Code formatter
+        ◦ ESLint
+        ◦ MongoDB for VS Code
+        ◦ Tailwind CSS IntelliSense
+        ◦ Thunder Client (for API testing)
+Task 1.2: Create Project Repository & Folder Structure
+    • Sub-task 1.2.1: Create GitHub repository
+        ◦ Name: health-metrics-monitoring-system
+        ◦ Initialize with README.md
+        ◦ Add .gitignore for Node.js
+        ◦ Clone to local machine
+    • Sub-task 1.2.2: Set up monorepo folder structure[2]
+health-metrics-monitoring-system/
+├── client/                    (React frontend)
+├── server/                    (Node.js backend)
+├── spark-analytics/           (Spark processing scripts)
+├── docs/                      (Documentation)
+├── .gitignore
+└── README.md
+
+    • Sub-task 1.2.3: Create main .gitignore file
+        ◦ Add common patterns: node_modules/, .env, .DS_Store, build/, dist/
+        ◦ Add IDE-specific patterns: .vscode/, .idea/
+        ◦ Add OS-specific patterns
+Deliverables:
+    • Verified development environment
+    • GitHub repository created and cloned
+    • Base folder structure established
+    • All tools and extensions installed
+Resources:
+    • Node.js documentation: nodejs.org/docs
+    • Git documentation: git-scm.com/doc
+
+Afternoon Session (3-4 hours)
+Task 1.3: Backend Project Initialization
+    • Sub-task 1.3.1: Initialize Node.js backend project
+        ◦ Navigate to server/ directory
+        ◦ Run npm init -y
+        ◦ Edit package.json: add "type": "module" for ES6 modules
+        ◦ Add project description and author details
+    • Sub-task 1.3.2: Install essential backend dependencies
+        ◦ Core: npm install express cors dotenv
+        ◦ Database: npm install mongoose
+        ◦ Authentication: npm install jsonwebtoken bcryptjs
+        ◦ OAuth: npm install googleapis
+        ◦ Validation: npm install express-validator
+        ◦ Development: npm install --save-dev nodemon
+    • Sub-task 1.3.3: Create backend folder structure[2]
+server/
+├── src/
+│   ├── config/           (Database, API configs)
+│   ├── controllers/      (Request handlers)
+│   ├── models/           (MongoDB schemas)
+│   ├── routes/           (API endpoints)
+│   ├── middleware/       (Authentication, validation)
+│   ├── services/         (Business logic, external APIs)
+│   ├── utils/            (Helper functions)
+│   └── server.js         (Main entry point)
+├── .env.example
+├── .gitignore
+└── package.json
+
+    • Sub-task 1.3.4: Configure package.json scripts
+        ◦ Add script: "start": "node src/server.js"
+        ◦ Add script: "dev": "nodemon src/server.js"
+        ◦ Add script: "test": "echo \"No tests yet\""
+Task 1.4: Frontend Project Initialization
+    • Sub-task 1.4.1: Initialize React project with Vite
+        ◦ Navigate to project root
+        ◦ Run npm create vite@latest client -- --template react
+        ◦ Navigate to client/ directory
+        ◦ Run npm install
+    • Sub-task 1.4.2: Install frontend dependencies
+        ◦ UI Framework: npm install react-router-dom
+        ◦ Styling: npm install -D tailwindcss postcss autoprefixer
+        ◦ Charts: npm install recharts
+        ◦ HTTP Client: npm install axios
+        ◦ State Management: npm install zustand (lightweight alternative to Redux)
+        ◦ Date handling: npm install date-fns
+    • Sub-task 1.4.3: Initialize Tailwind CSS
+        ◦ Run npx tailwindcss init -p
+        ◦ Configure tailwind.config.js content paths
+        ◦ Add Tailwind directives to src/index.css
+    • Sub-task 1.4.4: Create frontend folder structure[3][4]
+client/
+├── public/
+├── src/
+│   ├── components/       (Reusable UI components)
+│   │   ├── common/       (Buttons, Cards, Inputs)
+│   │   ├── layout/       (Header, Footer, Sidebar)
+│   │   └── dashboard/    (Dashboard-specific components)
+│   ├── pages/            (Route pages)
+│   ├── services/         (API calls)
+│   ├── hooks/            (Custom React hooks)
+│   ├── utils/            (Helper functions)
+│   ├── context/          (React Context for state)
+│   ├── assets/           (Images, icons)
+│   ├── App.jsx
+│   ├── main.jsx
+│   └── index.css
+├── .env.example
+├── .gitignore
+└── package.json
+
+Deliverables:
+    • Backend project initialized with all dependencies
+    • Frontend React project created with Vite
+    • Tailwind CSS configured
+    • Proper folder structures for both frontend and backend
+    • Package.json scripts configured
+Resources:
+    • Vite documentation: vitejs.dev
+    • Tailwind CSS docs: tailwindcss.com/docs
+
+Day 2: Database Design & MongoDB Atlas Setup
+Morning Session (3-4 hours)
+Task 2.1: MongoDB Atlas Account & Cluster Setup
+    • Sub-task 2.1.1: Create/access MongoDB Atlas account
+        ◦ Navigate to cloud.mongodb.com
+        ◦ Sign in with existing Google account
+        ◦ Verify account email if new account[2]
+    • Sub-task 2.1.2: Create a new cluster
+        ◦ Select "Build a Database"
+        ◦ Choose FREE M0 Shared cluster
+        ◦ Cloud Provider: AWS (or preferred)
+        ◦ Region: Select nearest to your location (India region for better latency)
+        ◦ Cluster Name: health-metrics-cluster
+    • Sub-task 2.1.3: Configure database access
+        ◦ Create database user with username and strong password
+        ◦ Note credentials in secure location (NOT in code)
+        ◦ Database User Privileges: "Atlas Admin" for development
+    • Sub-task 2.1.4: Configure network access
+        ◦ Add IP Address: Select "Allow Access from Anywhere" (0.0.0.0/0) for development
+        ◦ For production, you'll restrict this to specific IPs
+    • Sub-task 2.1.5: Get connection string
+        ◦ Click "Connect" on cluster
+        ◦ Choose "Connect your application"
+        ◦ Driver: Node.js, Version: Latest
+        ◦ Copy connection string
+- Format: `mongodb+srv://<username>:<password>@cluster.mongodb.net/<dbname>?retryWrites=true&w=majority`
+
+Task 2.2: Database Schema Design
+    • Sub-task 2.2.1: Design User Schema structure
+        ◦ Fields to include:
+            ▪ _id: ObjectId (auto-generated)
+            ▪ email: String, unique, required
+            ▪ password: String, hashed, required
+            ▪ name: String, required
+            ▪ googleId: String, optional (for OAuth)
+            ▪ profilePicture: String (URL), optional
+            ▪ googleFitConnected: Boolean, default false
+            ▪ goals: Object (weight goal, step goal, sleep goal)
+            ▪ createdAt: Date, default Date.now
+            ▪ updatedAt: Date, auto-update
+        ◦ Validations: Email format, password min length 8
+        ◦ Indexes: email (unique)
+    • Sub-task 2.2.2: Design Health Metrics Schema structure[1]
+        ◦ Fields to include:
+            ▪ _id: ObjectId
+            ▪ userId: ObjectId, reference to User, required
+            ▪ date: Date, required
+            ▪ metrics: Object containing:
+                • steps: Number, default 0
+                • calories: Number, default 0
+                • weight: Number, optional
+                • heartRate: Number, optional
+                • sleepHours: Number, optional
+                • activeMinutes: Number, default 0
+            ▪ source: String, enum ['manual', 'google_fit']
+            ▪ createdAt: Date
+            ▪ updatedAt: Date
+        ◦ Indexes: userId + date (compound, unique)
+    • Sub-task 2.2.3: Design Analytics Schema structure
+        ◦ Fields to include:
+            ▪ _id: ObjectId
+            ▪ userId: ObjectId, reference to User
+            ▪ analysisType: String, enum ['moving_average', 'trend', 'prediction']
+            ▪ metricType: String, enum ['weight', 'steps', 'calories', 'sleep']
+            ▪ timeRange: String, enum ['7days', '14days', '30days']
+            ▪ result: Object (flexible structure for Spark results)
+            ▪ calculatedAt: Date
+            ▪ expiresAt: Date (for cache invalidation)
+        ◦ Indexes: userId + analysisType + metricType (compound)
+    • Sub-task 2.2.4: Design Alerts Schema structure
+        ◦ Fields to include:
+            ▪ _id: ObjectId
+            ▪ userId: ObjectId, reference to User
+            ▪ alertType: String, enum ['low_activity', 'sleep_warning', 'goal_reminder']
+            ▪ message: String
+            ▪ severity: String, enum ['info', 'warning', 'critical']
+            ▪ read: Boolean, default false
+            ▪ createdAt: Date
+        ◦ Indexes: userId, read status
+Deliverables:
+    • MongoDB Atlas cluster created and configured
+    • Connection string obtained
+    • Complete database schema designs documented
+    • Schema relationships mapped
+Resources:
+    • MongoDB Atlas docs: docs.atlas.mongodb.com
+    • Mongoose schema guide: mongoosejs.com/docs/guide.html
+
+Afternoon Session (3-4 hours)
+Task 2.3: Backend Environment Configuration
+    • Sub-task 2.3.1: Create .env file in server directory
+        ◦ Add MongoDB connection string
+        ◦ Add JWT secret (generate random 64-character string)
+        ◦ Add port number (default 5000)
+        ◦ Add Node environment (development)
+        ◦ Example structure:
+PORT=5000
+NODE_ENV=development
+MONGODB_URI=your_connection_string
+JWT_SECRET=your_jwt_secret_key
+JWT_EXPIRE=7d
+
+    • Sub-task 2.3.2: Create .env.example file
+        ◦ Copy .env structure without actual values
+        ◦ Add placeholder comments for each variable
+        ◦ This serves as template for other developers
+    • Sub-task 2.3.3: Update .gitignore
+        ◦ Ensure .env is listed
+        ◦ Add any temporary files or logs
+Task 2.4: Implement Mongoose Models
+    • Sub-task 2.4.1: Create User model (server/src/models/User.js)
+        ◦ Import mongoose
+        ◦ Define schema with fields from design
+        ◦ Add pre-save middleware for password hashing
+        ◦ Add instance methods: comparePassword, generateAuthToken
+        ◦ Export model
+    • Sub-task 2.4.2: Create HealthMetric model (server/src/models/HealthMetric.js)
+        ◦ Define schema with nested metrics object
+        ◦ Add compound index for userId + date
+        ◦ Add validation for metric ranges (e.g., steps >= 0)
+        ◦ Export model
+    • Sub-task 2.4.3: Create Analytics model (server/src/models/Analytics.js)
+        ◦ Define schema with flexible result object
+        ◦ Add TTL index on expiresAt field for auto-deletion
+        ◦ Export model
+    • Sub-task 2.4.4: Create Alert model (server/src/models/Alert.js)
+        ◦ Define schema with alert types
+        ◦ Add methods for marking as read
+        ◦ Export model
+Task 2.5: Database Connection Configuration
+    • Sub-task 2.5.1: Create database config file (server/src/config/database.js)
+        ◦ Import mongoose and dotenv
+        ◦ Create connection function with proper error handling
+        ◦ Add connection event listeners (connected, error, disconnected)
+        ◦ Export connection function
+    • Sub-task 2.5.2: Test database connection
+        ◦ Import connection in server.js
+        ◦ Initialize connection before starting server
+        ◦ Run npm run dev and verify connection message
+        ◦ Check for any connection errors
+Deliverables:
+    • Environment variables configured
+    • All Mongoose models created with proper schemas
+    • Database connection established and tested
+    • Models properly exported and ready for use
+Resources:
+    • Mongoose documentation: mongoosejs.com/docs
+    • MongoDB data modeling: docs.mongodb.com/manual/data-modeling
+
+Day 3: Authentication System Implementation
+Morning Session (3-4 hours)
+Task 3.1: JWT Authentication Middleware Setup
+    • Sub-task 3.1.1: Create authentication middleware (server/src/middleware/auth.js)
+        ◦ Function to verify JWT token from request headers
+        ◦ Extract token from Authorization header (Bearer token)
+        ◦ Verify token using JWT secret
+        ◦ Attach user data to request object
+        ◦ Handle errors: missing token, invalid token, expired token
+        ◦ Export middleware function
+    • Sub-task 3.1.2: Create validation middleware (server/src/middleware/validator.js)
+        ◦ Use express-validator for input validation
+        ◦ Create validation chains for:
+            ▪ Email format validation
+            ▪ Password strength (min 8 chars, 1 uppercase, 1 number)
+            ▪ Required fields checking
+        ◦ Create validation result handler
+        ◦ Export validation functions
+    • Sub-task 3.1.3: Create error handling middleware (server/src/middleware/errorHandler.js)
+        ◦ Central error handler for all routes
+        ◦ Handle different error types: ValidationError, CastError, Duplicate Key
+        ◦ Format error responses consistently
+        ◦ Log errors appropriately
+        ◦ Export error handler
+Task 3.2: Authentication Controllers
+    • Sub-task 3.2.1: Create auth controller file (server/src/controllers/authController.js)
+        ◦ Import User model, bcrypt, and JWT utilities
+        ◦ Create controller structure with async/await
+    • Sub-task 3.2.2: Implement user registration controller
+        ◦ Function: registerUser
+        ◦ Extract email, password, name from request body
+        ◦ Check if user already exists
+        ◦ Hash password before saving
+        ◦ Create new user document
+        ◦ Generate JWT token
+        ◦ Return user data (without password) and token
+        ◦ Error handling for duplicate emails, validation errors
+    • Sub-task 3.2.3: Implement user login controller
+        ◦ Function: loginUser
+        ◦ Extract email and password from request body
+        ◦ Find user by email
+        ◦ Compare password using bcrypt
+        ◦ Generate JWT token
+        ◦ Return user data and token
+        ◦ Error handling for invalid credentials
+    • Sub-task 3.2.4: Implement get current user controller
+        ◦ Function: getCurrentUser
+        ◦ Extract user ID from authenticated request
+        ◦ Fetch user data from database
+        ◦ Return user profile (exclude password)
+        ◦ Error handling for user not found
+    • Sub-task 3.2.5: Implement update profile controller
+        ◦ Function: updateProfile
+        ◦ Extract updatable fields from request body
+        ◦ Validate changes (e.g., can't change email)
+        ◦ Update user document
+        ◦ Return updated user data
+        ◦ Error handling for validation errors
+Deliverables:
+    • Authentication middleware created and tested
+    • Validation middleware implemented
+    • All authentication controllers completed
+    • Error handling middleware configured
+Resources:
+    • JWT documentation: jwt.io/introduction
+    • Bcrypt documentation: npmjs.com/package/bcryptjs
+    • Express-validator guide: express-validator.github.io
+
+Afternoon Session (3-4 hours)
+Task 3.3: Authentication Routes Setup
+    • Sub-task 3.3.1: Create auth routes file (server/src/routes/authRoutes.js)
+        ◦ Import Express Router
+        ◦ Import auth controllers
+        ◦ Import validation middleware
+    • Sub-task 3.3.2: Define authentication endpoints
+        ◦ POST /api/auth/register - User registration
+            ▪ Apply validation middleware for email, password, name
+            ▪ Connect to registerUser controller
+        ◦ POST /api/auth/login - User login
+            ▪ Apply validation middleware for email, password
+            ▪ Connect to loginUser controller
+        ◦ GET /api/auth/me - Get current user
+            ▪ Apply authentication middleware
+            ▪ Connect to getCurrentUser controller
+        ◦ PUT /api/auth/profile - Update profile
+            ▪ Apply authentication middleware
+            ▪ Apply validation middleware for allowed fields
+            ▪ Connect to updateProfile controller
+    • Sub-task 3.3.3: Export router
+        ◦ Export configured router for use in main server file
+Task 3.4: Server Configuration & Integration
+    • Sub-task 3.4.1: Configure main server file (server/src/server.js)
+        ◦ Import required packages: express, cors, dotenv
+        ◦ Initialize express app
+        ◦ Configure dotenv for environment variables
+        ◦ Set up CORS with proper configuration
+        ◦ Add body parser middleware (express.json)
+        ◦ Connect to database using config function
+    • Sub-task 3.4.2: Mount routes
+        ◦ Import auth routes
+        ◦ Mount auth routes with /api/auth prefix
+        ◦ Create a basic health check endpoint: GET /api/health
+    • Sub-task 3.4.3: Add error handling
+        ◦ Import and apply error handling middleware
+        ◦ Add 404 handler for unknown routes
+        ◦ Add global error handler
+    • Sub-task 3.4.4: Start server
+        ◦ Listen on configured port
+        ◦ Add startup message with port number
+        ◦ Handle server errors
+Task 3.5: API Testing with Thunder Client
+    • Sub-task 3.5.1: Test health check endpoint
+        ◦ Create GET request to http://localhost:5000/api/health
+        ◦ Verify 200 status and response message
+    • Sub-task 3.5.2: Test user registration
+        ◦ Create POST request to http://localhost:5000/api/auth/register
+        ◦ Body (JSON):
+{
+  "email": "test@example.com",
+  "password": "Test123456",
+  "name": "Test User"
+}
+
+        ◦ Verify 201 status, user data, and token in response
+        ◦ Check MongoDB database for created user
+    • Sub-task 3.5.3: Test user login
+        ◦ Create POST request to http://localhost:5000/api/auth/login
+        ◦ Use same credentials from registration
+        ◦ Verify 200 status and token
+        ◦ Save token for subsequent requests
+    • Sub-task 3.5.4: Test protected route
+        ◦ Create GET request to http://localhost:5000/api/auth/me
+        ◦ Add Authorization header: Bearer [your_token]
+        ◦ Verify 200 status and user profile data
+    • Sub-task 3.5.5: Test validation errors
+        ◦ Try registering with invalid email
+        ◦ Try registering with weak password
+        ◦ Try login with wrong password
+        ◦ Verify appropriate error messages
+    • Sub-task 3.5.6: Document API endpoints
+        ◦ Create docs/API.md file
+        ◦ Document each endpoint with:
+            ▪ Method and URL
+            ▪ Request body format
+            ▪ Response format
+            ▪ Required headers
+            ▪ Possible error codes
+Deliverables:
+    • All authentication routes configured
+    • Server properly set up with middleware
+    • Complete authentication API tested
+    • API documentation created
+    • Backend authentication system fully functional
+Resources:
+    • Express routing guide: expressjs.com/en/guide/routing.html
+    • REST API best practices
+    • Thunder Client extension docs
+
+Day 4: Frontend Authentication UI
+Morning Session (3-4 hours)
+Task 4.1: Frontend Environment & API Configuration
+    • Sub-task 4.1.1: Create frontend .env file (client/.env)
+        ◦ Add API base URL: VITE_API_URL=http://localhost:5000/api
+        ◦ Add any other frontend environment variables
+        ◦ Create .env.example with placeholder values
+    • Sub-task 4.1.2: Create API service utility (client/src/services/api.js)
+        ◦ Import axios
+        ◦ Create axios instance with base URL from env
+        ◦ Configure request interceptor to add auth token
+        ◦ Configure response interceptor for error handling
+        ◦ Export configured instance
+    • Sub-task 4.1.3: Create auth service (client/src/services/authService.js)
+        ◦ Import API instance
+        ◦ Create functions:
+            ▪ register(email, password, name) - POST to /auth/register
+            ▪ login(email, password) - POST to /auth/login
+            ▪ getCurrentUser() - GET to /auth/me
+            ▪ updateProfile(data) - PUT to /auth/profile
+            ▪ logout() - Clear local storage
+        ◦ Handle token storage in localStorage
+        ◦ Export all functions
+Task 4.2: Authentication Context Setup
+    • Sub-task 4.2.1: Create auth context (client/src/context/AuthContext.jsx)
+        ◦ Import createContext, useState, useEffect
+        ◦ Create AuthContext
+        ◦ Define initial state: user, token, loading, error
+    • Sub-task 4.2.2: Implement AuthProvider component
+        ◦ Create state management for user and auth status
+        ◦ Implement login function that calls authService.login
+        ◦ Implement register function that calls authService.register
+        ◦ Implement logout function that clears state and storage
+        ◦ Check for existing token on mount and fetch user data
+        ◦ Provide context value with state and functions
+    • Sub-task 4.2.3: Create useAuth custom hook (client/src/hooks/useAuth.js)
+        ◦ Import useContext and AuthContext
+        ◦ Create hook that returns auth context
+        ◦ Export hook for use in components
+Task 4.3: Common UI Components
+    • Sub-task 4.3.1: Create Input component (client/src/components/common/Input.jsx)
+        ◦ Props: type, name, placeholder, value, onChange, error, label, required
+        ◦ Styled with Tailwind CSS
+        ◦ Display error message if provided
+        ◦ Support different input types: text, email, password, number
+    • Sub-task 4.3.2: Create Button component (client/src/components/common/Button.jsx)
+        ◦ Props: children, onClick, type, variant, disabled, loading
+        ◦ Variants: primary, secondary, danger
+        ◦ Loading state with spinner
+        ◦ Styled with Tailwind CSS
+    • Sub-task 4.3.3: Create Card component (client/src/components/common/Card.jsx)
+        ◦ Props: children, title, className
+        ◦ Reusable container with consistent styling
+        ◦ Responsive design
+    • Sub-task 4.3.4: Create Alert component (client/src/components/common/Alert.jsx)
+        ◦ Props: message, type, onClose
+        ◦ Types: success, error, warning, info
+        ◦ Dismissible with close button
+        ◦ Auto-hide option
+Deliverables:
+    • API service configured with axios
+    • Auth service functions implemented
+    • AuthContext and custom hook created
+    • Common UI components built
+    • Frontend ready for authentication pages
+Resources:
+    • Axios documentation: axios-http.com/docs
+    • React Context API: react.dev/reference/react/useContext
+    • Tailwind CSS components: tailwindcss.com
+
+Afternoon Session (3-4 hours)
+Task 4.4: Authentication Pages Implementation
+    • Sub-task 4.4.1: Create Register page (client/src/pages/Register.jsx)
+        ◦ Import necessary components and hooks
+        ◦ Create form state for name, email, password, confirmPassword
+        ◦ Implement form validation:
+            ▪ Email format validation
+            ▪ Password strength check
+            ▪ Password confirmation match
+        ◦ Handle form submission
+        ◦ Call auth context register function
+        ◦ Display success/error alerts
+        ◦ Add link to login page
+        ◦ Responsive design with Tailwind CSS
+    • Sub-task 4.4.2: Create Login page (client/src/pages/Login.jsx)
+        ◦ Import necessary components and hooks
+        ◦ Create form state for email and password
+        ◦ Implement basic validation
+        ◦ Handle form submission
+        ◦ Call auth context login function
+        ◦ Display success/error alerts
+        ◦ Add "Forgot Password" placeholder link
+        ◦ Add link to register page
+        ◦ Responsive design
+    • Sub-task 4.4.3: Create form validation utility (client/src/utils/validation.js)
+        ◦ Email validation regex
+        ◦ Password strength checker (min 8 chars, uppercase, number)
+        ◦ Field required checker
+        ◦ Export validation functions
+Task 4.5: Layout Components
+    • Sub-task 4.5.1: Create Header component (client/src/components/layout/Header.jsx)
+        ◦ Logo/brand name
+        ◦ Navigation menu (conditional based on auth state)
+        ◦ User profile dropdown (when authenticated)
+        ◦ Logout button
+        ◦ Responsive mobile menu
+        ◦ Styled with Tailwind CSS
+    • Sub-task 4.5.2: Create Layout component (client/src/components/layout/Layout.jsx)
+        ◦ Wrapper component for consistent page structure
+        ◦ Include Header
+        ◦ Main content area
+        ◦ Footer placeholder
+        ◦ Props: children
+    • Sub-task 4.5.3: Create PrivateRoute component (client/src/components/common/PrivateRoute.jsx)
+        ◦ Check authentication status
+        ◦ Redirect to login if not authenticated
+        ◦ Show loading spinner while checking auth
+        ◦ Allow access if authenticated
+Task 4.6: React Router Configuration
+    • Sub-task 4.6.1: Configure routes in App.jsx
+        ◦ Import BrowserRouter, Routes, Route
+        ◦ Wrap app with AuthProvider
+        ◦ Define route structure:
+            ▪ / - Landing/Home page (public)
+            ▪ /login - Login page (public)
+            ▪ /register - Register page (public)
+            ▪ /dashboard - Dashboard (protected)
+        ◦ Apply PrivateRoute wrapper for protected routes
+    • Sub-task 4.6.2: Create simple Home page (client/src/pages/Home.jsx)
+        ◦ Hero section with project description
+        ◦ Call-to-action buttons (Login, Register)
+        ◦ Basic styling with Tailwind
+        ◦ Placeholder content
+    • Sub-task 4.6.3: Create placeholder Dashboard page (client/src/pages/Dashboard.jsx)
+        ◦ Welcome message with user name
+        ◦ Placeholder for metrics (will implement later)
+        ◦ Use Layout component
+        ◦ Basic structure
+Task 4.7: Frontend Testing
+    • Sub-task 4.7.1: Test registration flow
+        ◦ Start frontend dev server: npm run dev
+        ◦ Navigate to register page
+        ◦ Test form validation (invalid email, weak password, etc.)
+        ◦ Submit valid registration
+        ◦ Verify redirect to dashboard
+        ◦ Check localStorage for token
+    • Sub-task 4.7.2: Test login flow
+        ◦ Navigate to login page
+        ◦ Test with wrong credentials (verify error)
+        ◦ Test with correct credentials
+        ◦ Verify redirect to dashboard
+        ◦ Check token storage
+    • Sub-task 4.7.3: Test protected routes
+        ◦ Try accessing dashboard without login (should redirect)
+        ◦ Login and access dashboard (should allow)
+        ◦ Refresh page (should maintain auth state)
+    • Sub-task 4.7.4: Test logout functionality
+        ◦ Click logout from dashboard
+        ◦ Verify redirect to home/login
+        ◦ Verify token removed from localStorage
+        ◦ Try accessing protected route (should be denied)
+Deliverables:
+    • Complete registration and login pages
+    • Working authentication flow
+    • Protected routes configured
+    • Layout components created
+    • Frontend authentication fully functional
+Resources:
+    • React Router documentation: reactrouter.com
+    • Form handling in React
+    • Tailwind UI components
+
+Day 5: Health Metrics Backend API
+Morning Session (3-4 hours)
+Task 5.1: Health Metrics Controllers
+    • Sub-task 5.1.1: Create health metrics controller file (server/src/controllers/healthMetricsController.js)
+        ◦ Import HealthMetric model
+        ◦ Import necessary utilities
+    • Sub-task 5.1.2: Implement add health metrics controller
+        ◦ Function: addHealthMetric
+        ◦ Extract userId from authenticated request
+        ◦ Extract date and metrics from request body
+        ◦ Check if entry already exists for that date
+        ◦ If exists, update; if not, create new
+        ◦ Validate metric values (non-negative numbers)
+        ◦ Save to database
+        ◦ Return saved metric
+        ◦ Error handling for validation errors
+    • Sub-task 5.1.3: Implement get metrics by date range controller
+        ◦ Function: getMetricsByDateRange
+        ◦ Extract userId from authenticated request
+        ◦ Extract startDate and endDate from query parameters
+        ◦ Default to last 30 days if not provided
+        ◦ Query database for metrics in date range
+        ◦ Sort by date descending
+        ◦ Return metrics array
+        ◦ Error handling for invalid dates
+    • Sub-task 5.1.4: Implement get specific day metrics controller
+        ◦ Function: getMetricsByDate
+        ◦ Extract userId and date from request
+        ◦ Query single metric for that date
+        ◦ Return metric or 404 if not found
+        ◦ Error handling
+    • Sub-task 5.1.5: Implement update metrics controller
+        ◦ Function: updateHealthMetric
+        ◦ Extract metric ID from params
+        ◦ Verify metric belongs to authenticated user
+        ◦ Update only provided fields
+        ◦ Validate updated values
+        ◦ Return updated metric
+        ◦ Error handling for unauthorized access
+    • Sub-task 5.1.6: Implement delete metrics controller
+        ◦ Function: deleteHealthMetric
+        ◦ Extract metric ID from params
+        ◦ Verify ownership
+        ◦ Delete metric
+        ◦ Return success message
+        ◦ Error handling
+    • Sub-task 5.1.7: Implement get metrics summary controller
+        ◦ Function: getMetricsSummary
+        ◦ Calculate aggregations:
+            ▪ Total steps this week/month
+            ▪ Average weight
+            ▪ Average sleep hours
+            ▪ Total calories burned
+        ◦ Return summary object
+        ◦ Use MongoDB aggregation pipeline
+Deliverables:
+    • All health metrics controllers implemented
+    • CRUD operations for health metrics
+    • Summary calculations working
+    • Proper error handling
+Resources:
+    • MongoDB aggregation: docs.mongodb.com/manual/aggregation
+    • Mongoose queries: mongoosejs.com/docs/queries.html
+
+Afternoon Session (3-4 hours)
+Task 5.2: Health Metrics Routes
+    • Sub-task 5.2.1: Create health metrics routes file (server/src/routes/healthMetricsRoutes.js)
+        ◦ Import Express Router
+        ◦ Import health metrics controllers
+        ◦ Import auth middleware
+    • Sub-task 5.2.2: Define health metrics endpoints
+        ◦ POST /api/metrics - Add new health metric
+            ▪ Apply auth middleware
+            ▪ Apply validation for required fields
+            ▪ Connect to addHealthMetric controller
+        ◦ GET /api/metrics - Get metrics by date range
+            ▪ Apply auth middleware
+            ▪ Query params: startDate, endDate
+            ▪ Connect to getMetricsByDateRange controller
+        ◦ GET /api/metrics/:date - Get metrics for specific date
+            ▪ Apply auth middleware
+            ▪ Connect to getMetricsByDate controller
+        ◦ PUT /api/metrics/:id - Update specific metric
+            ▪ Apply auth middleware
+            ▪ Connect to updateHealthMetric controller
+        ◦ DELETE /api/metrics/:id - Delete specific metric
+            ▪ Apply auth middleware
+            ▪ Connect to deleteHealthMetric controller
+        ◦ GET /api/metrics/summary/stats - Get metrics summary
+            ▪ Apply auth middleware
+            ▪ Connect to getMetricsSummary controller
+    • Sub-task 5.2.3: Mount routes in server
+        ◦ Import health metrics routes in server.js
+        ◦ Mount with /api/metrics prefix
+Task 5.3: Goals Management
+    • Sub-task 5.3.1: Create goals controller (server/src/controllers/goalsController.js)
+        ◦ Function: setGoals - Set user fitness goals
+            ▪ Update user document with goal values
+            ▪ Goals: target weight, daily steps, sleep hours
+        ◦ Function: getGoals - Get current user goals
+        ◦ Function: updateGoals - Update specific goals
+        ◦ Export all functions
+    • Sub-task 5.3.2: Create goals routes (server/src/routes/goalsRoutes.js)
+        ◦ POST /api/goals - Set goals
+        ◦ GET /api/goals - Get goals
+        ◦ PUT /api/goals - Update goals
+        ◦ All routes protected with auth middleware
+    • Sub-task 5.3.3: Mount goals routes
+        ◦ Import in server.js
+        ◦ Mount with /api/goals prefix
+Task 5.4: API Testing
+    • Sub-task 5.4.1: Test add health metrics
+        ◦ Create POST request to /api/metrics
+        ◦ Include auth token
+        ◦ Body with sample data:
+{
+  "date": "2025-10-18",
+  "metrics": {
+    "steps": 8500,
+    "calories": 2200,
+    "weight": 68.5,
+    "sleepHours": 7
+  }
+}
+
+        ◦ Verify response and database entry
+    • Sub-task 5.4.2: Test get metrics by date range
+        ◦ Create GET request to /api/metrics?startDate=2025-10-01&endDate=2025-10-18
+        ◦ Include auth token
+        ◦ Verify array of metrics returned
+    • Sub-task 5.4.3: Test update metrics
+        ◦ Create PUT request to /api/metrics/:id
+        ◦ Update specific fields
+        ◦ Verify changes in database
+    • Sub-task 5.4.4: Test delete metrics
+        ◦ Create DELETE request to /api/metrics/:id
+        ◦ Verify deletion from database
+    • Sub-task 5.4.5: Test metrics summary
+        ◦ Create GET request to /api/metrics/summary/stats
+        ◦ Verify calculated aggregations
+    • Sub-task 5.4.6: Test goals endpoints
+        ◦ Test setting goals
+        ◦ Test retrieving goals
+        ◦ Test updating goals
+    • Sub-task 5.4.7: Update API documentation
+        ◦ Add all new endpoints to docs/API.md
+        ◦ Include request/response examples
+        ◦ Document query parameters
+Deliverables:
+    • Complete health metrics CRUD API
+    • Goals management API
+    • All endpoints tested and working
+    • Updated API documentation
+    • Backend ready for frontend integration
+Resources:
+    • RESTful API design principles
+    • MongoDB date queries
+    • Express validation best practices
+
+Day 6: Frontend Health Metrics UI
+Morning Session (3-4 hours)
+Task 6.1: Health Metrics Service Layer
+    • Sub-task 6.1.1: Create metrics service (client/src/services/metricsService.js)
+        ◦ Import API instance
+        ◦ Create functions:
+            ▪ addMetric(date, metrics) - POST to /metrics
+            ▪ getMetrics(startDate, endDate) - GET /metrics with query params
+            ▪ getMetricByDate(date) - GET /metrics/:date
+            ▪ updateMetric(id, data) - PUT /metrics/:id
+            ▪ deleteMetric(id) - DELETE /metrics/:id
+            ▪ getMetricsSummary() - GET /metrics/summary/stats
+        ◦ Handle errors appropriately
+        ◦ Export all functions
+    • Sub-task 6.1.2: Create goals service (client/src/services/goalsService.js)
+        ◦ Functions for managing goals
+        ◦ setGoals(goals), getGoals(), updateGoals(goals)
+        ◦ Export functions
+Task 6.2: Metrics Input Form Component
+    • Sub-task 6.2.1: Create MetricsForm component (client/src/components/dashboard/MetricsForm.jsx)
+        ◦ Form fields:
+            ▪ Date picker (default today)
+            ▪ Steps input (number)
+            ▪ Calories input (number)
+            ▪ Weight input (number, optional)
+            ▪ Sleep hours input (number, optional)
+            ▪ Heart rate input (number, optional)
+        ◦ Form state management
+        ◦ Validation for each field (non-negative, reasonable ranges)
+        ◦ Submit handler calling metricsService
+        ◦ Success/error feedback
+        ◦ Reset form after submission
+        ◦ Styled with Tailwind CSS
+    • Sub-task 6.2.2: Create date utility functions (client/src/utils/dateUtils.js)
+        ◦ Format date for display
+        ◦ Parse date from input
+        ◦ Get date ranges (last 7 days, 30 days, etc.)
+        ◦ Export utility functions
+Task 6.3: Metrics Display Components
+    • Sub-task 6.3.1: Create MetricCard component (client/src/components/dashboard/MetricCard.jsx)
+        ◦ Props: title, value, unit, icon, trend
+        ◦ Display metric with large font
+        ◦ Optional trend indicator (up/down arrow with percentage)
+        ◦ Color coding for different metrics
+        ◦ Responsive card design
+    • Sub-task 6.3.2: Create MetricsList component (client/src/components/dashboard/MetricsList.jsx)
+        ◦ Display list of historical metrics
+        ◦ Group by date
+        ◦ Show all metrics for each date
+        ◦ Edit and delete buttons for each entry
+        ◦ Pagination or infinite scroll for large datasets
+        ◦ Loading state
+        ◦ Empty state when no data
+    • Sub-task 6.3.3: Create SummaryStats component (client/src/components/dashboard/SummaryStats.jsx)
+        ◦ Display aggregated statistics
+        ◦ Weekly/monthly averages
+        ◦ Total steps, calories
+        ◦ Visual progress indicators
+        ◦ Call metrics summary API
+        ◦ Responsive grid layout
+Deliverables:
+    • Metrics and goals service functions created
+    • Metrics input form component complete
+    • Display components for metrics built
+    • Date utility functions implemented
+Resources:
+    • React forms best practices
+    • Date handling with date-fns: date-fns.org
+    • Tailwind CSS grid system
+
+Afternoon Session (3-4 hours)
+Task 6.4: Enhanced Dashboard Page
+    • Sub-task 6.4.1: Update Dashboard page layout
+        ◦ Create dashboard grid structure
+        ◦ Header section with user greeting and date
+        ◦ Quick stats section (4 metric cards)
+        ◦ Main content area divided into sections:
+            ▪ Add metrics form (collapsible)
+            ▪ Summary statistics
+            ▪ Recent metrics list
+            ▪ Placeholder for charts (Day 7)
+        ◦ Sidebar for navigation (optional)
+        ◦ Responsive design
+    • Sub-task 6.4.2: Implement dashboard state management
+        ◦ Create useState hooks for:
+            ▪ Metrics data
+            ▪ Summary stats
+            ▪ Loading states
+            ▪ Selected date range
+        ◦ Create useEffect to fetch data on mount
+        ◦ Implement data refresh function
+    • Sub-task 6.4.3: Integrate MetricsForm component
+        ◦ Add form to dashboard
+        ◦ Handle form submission
+        ◦ Refresh metrics list after adding
+        ◦ Show success notification
+        ◦ Collapsible form section
+    • Sub-task 6.4.4: Integrate MetricCards for quick stats
+        ◦ Display today's metrics:
+            ▪ Steps taken
+            ▪ Calories burned
+            ▪ Weight
+            ▪ Sleep hours
+        ◦ Fetch today's data from API
+        ◦ Show "No data" state if not available
+        ◦ Add trend indicators comparing to previous day
+    • Sub-task 6.4.5: Integrate SummaryStats component
+        ◦ Display weekly and monthly summaries
+        ◦ Show progress toward goals
+        ◦ Visual progress bars
+        ◦ Highlight achievements
+    • Sub-task 6.4.6: Integrate MetricsList component
+        ◦ Show recent history (last 7 days default)
+        ◦ Add date range filter
+        ◦ Implement edit functionality
+            ▪ Click edit button
+            ▪ Open modal/form with current values
+            ▪ Update metric via API
+            ▪ Refresh list
+        ◦ Implement delete functionality
+            ▪ Confirmation dialog
+            ▪ Delete via API
+            ▪ Remove from list
+Task 6.5: Goals Management UI
+    • Sub-task 6.5.1: Create GoalsForm component (client/src/components/dashboard/GoalsForm.jsx)
+        ◦ Input fields for:
+            ▪ Target weight
+            ▪ Daily step goal
+            ▪ Sleep hours goal
+        ◦ Fetch current goals on mount
+        ◦ Submit to update goals
+        ◦ Success/error feedback
+    • Sub-task 6.5.2: Create Goals section in dashboard
+        ◦ Add goals card/section
+        ◦ Show current goals
+        ◦ Edit button to open GoalsForm
+        ◦ Display progress toward each goal
+Task 6.6: Frontend Testing
+    • Sub-task 6.6.1: Test adding metrics
+        ◦ Fill out metrics form
+        ◦ Submit and verify success message
+        ◦ Check metrics list updates
+        ◦ Verify data in database via backend
+    • Sub-task 6.6.2: Test metrics display
+        ◦ Verify quick stats show correct data
+        ◦ Check summary calculations
+        ◦ Test date range filter
+        ◦ Verify responsive design on different screen sizes
+    • Sub-task 6.6.3: Test edit functionality
+        ◦ Edit a metric
+        ◦ Verify update in list
+        ◦ Check database update
+    • Sub-task 6.6.4: Test delete functionality
+        ◦ Delete a metric
+        ◦ Confirm it's removed from list
+        ◦ Verify database deletion
+    • Sub-task 6.6.5: Test goals management
+        ◦ Set initial goals
+        ◦ Update goals
+        ◦ Verify persistence
+    • Sub-task 6.6.6: Test edge cases
+        ◦ Try submitting invalid data
+        ◦ Test with no metrics data
+        ◦ Test loading states
+        ◦ Test error states (disconnect backend)
+Deliverables:
+    • Fully functional dashboard with metrics management
+    • Add, view, edit, delete metrics working
+    • Goals management implemented
+    • Responsive design tested
+    • All frontend-backend integrations working
+Resources:
+    • React state management patterns
+    • Component composition techniques
+    • UX best practices for forms
