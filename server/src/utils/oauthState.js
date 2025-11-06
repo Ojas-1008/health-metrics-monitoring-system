@@ -56,7 +56,7 @@ export const generateOAuthState = (userId) => {
 
 /**
  * Validate state parameter from OAuth callback
- * Ensures state hasn't expired and matches stored value
+ * CRITICAL: Deletes state immediately after validation to prevent replay attacks
  * 
  * @param {string} userId - MongoDB user ID
  * @param {string} receivedState - State parameter from Google callback
@@ -66,6 +66,7 @@ export const generateOAuthState = (userId) => {
 export const validateOAuthState = (userId, receivedState) => {
   // Retrieve stored state
   const storedData = stateStore.get(userId);
+
   if (!storedData) {
     throw new Error("OAuth state not found. Please restart the OAuth flow.");
   }
@@ -74,16 +75,27 @@ export const validateOAuthState = (userId, receivedState) => {
   if (storedData.expiresAt < Date.now()) {
     stateStore.delete(userId); // Clean up expired state
     throw new Error(
-      "OAuth state has expired. Please restart the OAuth flow."
+      "OAuth state has expired (10-minute timeout). Please restart the OAuth flow."
     );
   }
 
   // Compare states using constant-time comparison
   // Prevents timing attacks that could reveal valid states
+  if (receivedState.length !== storedData.state.length) {
+    stateStore.delete(userId); // Clean up immediately
+    throw new Error(
+      "OAuth state mismatch. This may indicate a CSRF attack. Please try again."
+    );
+  }
+
   const isValid = crypto.timingSafeEqual(
     Buffer.from(storedData.state),
     Buffer.from(receivedState)
   );
+
+  // CRITICAL: Delete state IMMEDIATELY after validation
+  // This prevents replay attacks where the same callback URL is used twice
+  stateStore.delete(userId);
 
   if (!isValid) {
     throw new Error(
@@ -91,9 +103,8 @@ export const validateOAuthState = (userId, receivedState) => {
     );
   }
 
-  // Delete state after validation (one-time use)
-  stateStore.delete(userId);
-  console.log(`✅ OAuth state validated and cleaned up for user ${userId}`);
+  console.log(`✅ OAuth state validated and deleted for user ${userId} (one-time use enforced)`);
+
   return true;
 };
 

@@ -9,6 +9,14 @@ import { MongoMemoryServer } from "mongodb-memory-server";
 import User from "../models/User.js";
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "@jest/globals";
 
+// OAuth scope constant - must match User model exactly
+const GOOGLE_FIT_OAUTH_SCOPE =
+  "https://www.googleapis.com/auth/fitness.activity.read " +
+  "https://www.googleapis.com/auth/fitness.body.read " +
+  "https://www.googleapis.com/auth/fitness.nutrition.read " +
+  "https://www.googleapis.com/auth/fitness.sleep.read " +
+  "https://www.googleapis.com/auth/fitness.location.read";
+
 let mongoServer;
 
 describe("User Model - Google Fit OAuth Integration", () => {
@@ -53,11 +61,7 @@ describe("User Model - Google Fit OAuth Integration", () => {
           access_token: "test_access_token_1234567890_secure_value_here",
           refresh_token: "test_refresh_token_1234567890_secure_value_here",
           token_expiry: expiryDate,
-          scope:
-            "https://www.googleapis.com/auth/fitness.activity.read " +
-            "https://www.googleapis.com/auth/fitness.body.read " +
-            "https://www.googleapis.com/auth/fitness.nutrition.read " +
-            "https://www.googleapis.com/auth/fitness.sleep.read",
+          scope: GOOGLE_FIT_OAUTH_SCOPE,
         },
       });
 
@@ -85,11 +89,7 @@ describe("User Model - Google Fit OAuth Integration", () => {
           access_token: "test_access_token_1234567890_secure_value",
           refresh_token: "test_refresh_token_1234567890_secure_value",
           token_expiry: expiryDate,
-          scope:
-            "https://www.googleapis.com/auth/fitness.activity.read " +
-            "https://www.googleapis.com/auth/fitness.body.read " +
-            "https://www.googleapis.com/auth/fitness.nutrition.read " +
-            "https://www.googleapis.com/auth/fitness.sleep.read",
+          scope: GOOGLE_FIT_OAUTH_SCOPE,
         },
       });
 
@@ -116,11 +116,7 @@ describe("User Model - Google Fit OAuth Integration", () => {
             access_token: "token1_with_min_10_chars_validation",
             refresh_token: "refresh1_with_min_10_chars_validation",
             token_expiry: expiryDate,
-            scope:
-              "https://www.googleapis.com/auth/fitness.activity.read " +
-              "https://www.googleapis.com/auth/fitness.body.read " +
-              "https://www.googleapis.com/auth/fitness.nutrition.read " +
-              "https://www.googleapis.com/auth/fitness.sleep.read",
+            scope: GOOGLE_FIT_OAUTH_SCOPE,
           },
         },
         {
@@ -132,11 +128,7 @@ describe("User Model - Google Fit OAuth Integration", () => {
             access_token: "token2_with_min_10_chars_validation",
             refresh_token: "refresh2_with_min_10_chars_validation",
             token_expiry: expiryDate,
-            scope:
-              "https://www.googleapis.com/auth/fitness.activity.read " +
-              "https://www.googleapis.com/auth/fitness.body.read " +
-              "https://www.googleapis.com/auth/fitness.nutrition.read " +
-              "https://www.googleapis.com/auth/fitness.sleep.read",
+            scope: GOOGLE_FIT_OAUTH_SCOPE,
           },
         },
       ]);
@@ -194,11 +186,7 @@ describe("User Model - Google Fit OAuth Integration", () => {
           access_token: "test_access_token_1234567890",
           refresh_token: "test_refresh_token_1234567890",
           token_expiry: "not-a-date",  // Invalid date string
-          scope:
-            "https://www.googleapis.com/auth/fitness.activity.read " +
-            "https://www.googleapis.com/auth/fitness.body.read " +
-            "https://www.googleapis.com/auth/fitness.nutrition.read " +
-            "https://www.googleapis.com/auth/fitness.sleep.read",
+          scope: GOOGLE_FIT_OAUTH_SCOPE,
         },
       });
 
@@ -244,11 +232,7 @@ describe("User Model - Google Fit OAuth Integration", () => {
           access_token: "test_access_token_1234567890",
           refresh_token: "test_refresh_token_1234567890",
           token_expiry: expiryDate,
-          scope:
-            "https://www.googleapis.com/auth/fitness.activity.read " +
-            "https://www.googleapis.com/auth/fitness.body.read " +
-            "https://www.googleapis.com/auth/fitness.nutrition.read " +
-            "https://www.googleapis.com/auth/fitness.sleep.read",
+          scope: GOOGLE_FIT_OAUTH_SCOPE,
         },
       });
 
@@ -288,11 +272,7 @@ describe("User Model - Google Fit OAuth Integration", () => {
           access_token: "test_access_token_1234567890_valid_value",
           refresh_token: "test_refresh_token_1234567890_valid_value",
           token_expiry: futureDate,
-          scope:
-            "https://www.googleapis.com/auth/fitness.activity.read " +
-            "https://www.googleapis.com/auth/fitness.body.read " +
-            "https://www.googleapis.com/auth/fitness.nutrition.read " +
-            "https://www.googleapis.com/auth/fitness.sleep.read",
+          scope: GOOGLE_FIT_OAUTH_SCOPE,
         },
       });
 
@@ -323,11 +303,7 @@ describe("User Model - Google Fit OAuth Integration", () => {
         access_token: "test_access_token_1234567890",
         refresh_token: "test_refresh_token_1234567890",
         token_expiry: expiryDate,
-        scope:
-          "https://www.googleapis.com/auth/fitness.activity.read " +
-          "https://www.googleapis.com/auth/fitness.body.read " +
-          "https://www.googleapis.com/auth/fitness.nutrition.read " +
-          "https://www.googleapis.com/auth/fitness.sleep.read",
+        scope: GOOGLE_FIT_OAUTH_SCOPE,
       });
 
       await user.save();
@@ -371,11 +347,7 @@ describe("User Model - Google Fit OAuth Integration", () => {
           access_token: "test_access_token_1234567890",
           refresh_token: "test_refresh_token_1234567890",
           token_expiry: expiryDate,
-          scope:
-            "https://www.googleapis.com/auth/fitness.activity.read " +
-            "https://www.googleapis.com/auth/fitness.body.read " +
-            "https://www.googleapis.com/auth/fitness.nutrition.read " +
-            "https://www.googleapis.com/auth/fitness.sleep.read",
+          scope: GOOGLE_FIT_OAUTH_SCOPE,
         },
       });
 
