@@ -90,11 +90,12 @@ const GOOGLE_FIT_DATA_SOURCES = {
 
 /**
  * ============================================
- * HELPER: DETERMINE SYNC WINDOW
+ * HELPER: DETERMINE SYNC WINDOW (FIXED)
  * ============================================
- *
+ * 
  * Calculate start and end timestamps for Google Fit API queries
- *
+ * Ensures minimum window of 24 hours to capture meaningful data
+ * 
  * @param {Date|null} lastSyncAt - Last successful sync timestamp
  * @returns {Object} { startTimeMs, endTimeMs, startDate, endDate }
  */
@@ -106,15 +107,31 @@ const determineSyncWindow = (lastSyncAt) => {
     // First sync: fetch last 30 days
     startDate = new Date();
     startDate.setDate(startDate.getDate() - 30);
+    console.log(`    ℹ️  First sync: Fetching last 30 days`);
   } else {
     // Subsequent sync: fetch from lastSyncAt to now
     startDate = new Date(lastSyncAt);
+
+    // ⭐ CRITICAL FIX: Ensure minimum window of 24 hours
+    // Google Fit aggregates data and may not have data in very short windows
+    const hoursSinceLastSync = (now - startDate) / (1000 * 60 * 60);
+    
+    if (hoursSinceLastSync < 24) {
+      console.log(`    ⚠️  Last sync was ${hoursSinceLastSync.toFixed(1)} hours ago (< 24h)`);
+      console.log(`    📅 Expanding window to last 24 hours for better data coverage`);
+      
+      startDate = new Date();
+      startDate.setDate(startDate.getDate() - 1); // Last 24 hours
+    } else {
+      console.log(`    ✓ Sync window is ${hoursSinceLastSync.toFixed(1)} hours (good)`);
+    }
 
     // Cap sync window at 30 days to prevent excessive API calls
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     if (startDate < thirtyDaysAgo) {
+      console.log(`    ⚠️  Sync window exceeds 30 days, capping to 30 days`);
       startDate = thirtyDaysAgo;
     }
   }
@@ -122,6 +139,13 @@ const determineSyncWindow = (lastSyncAt) => {
   // Convert to nanoseconds (Google Fit API requirement)
   const startTimeMs = startDate.getTime();
   const endTimeMs = now.getTime();
+
+  const windowHours = ((endTimeMs - startTimeMs) / (1000 * 60 * 60)).toFixed(1);
+  const windowDays = (windowHours / 24).toFixed(1);
+  
+  console.log(`    📅 Final sync window: ${windowDays} days (${windowHours} hours)`);
+  console.log(`       From: ${startDate.toISOString()}`);
+  console.log(`       To:   ${now.toISOString()}`);
 
   return {
     startTimeMs,
@@ -139,13 +163,15 @@ const determineSyncWindow = (lastSyncAt) => {
  * ============================================
  *
  * Fetches data for a specific data source from Google Fit API
- * Handles 404 errors gracefully (data type not available for user)
+ * Enhanced error handling for 401 (invalid/insufficient scopes),
+ * 403 (permissions denied), 404 (data not available), and 429 (rate limit)
  *
  * @param {string} accessToken - Valid OAuth access token
  * @param {string} dataSourceId - Google Fit data source identifier
  * @param {number} startTimeNanos - Start time in nanoseconds
  * @param {number} endTimeNanos - End time in nanoseconds
- * @returns {Promise<Array>} Data points array or empty array if 404
+ * @returns {Promise<Array>} Data points array or empty array if 404/403
+ * @throws {Error} If 401 (invalid token) or 429 after retry
  */
 const fetchGoogleFitData = async (
   accessToken,
@@ -171,13 +197,47 @@ const fetchGoogleFitData = async (
       return [];
     }
 
+    // Handle 401: Invalid or insufficient token scopes
+    if (error.response && error.response.status === 401) {
+      console.error(`    🚨 401 UNAUTHORIZED for ${dataSourceId}`);
+      console.error(`       Token may be invalid or missing required scopes`);
+      console.error(`       User needs to reconnect Google Fit with all permissions`);
+      
+      // Throw error to trigger user disconnection
+      throw new Error(
+        `401 Unauthorized: Token invalid or missing fitness scopes. User must reconnect.`
+      );
+    }
+
+    // Handle 403: Forbidden (token valid but permissions denied)
+    if (error.response && error.response.status === 403) {
+      console.error(`    🚨 403 FORBIDDEN for ${dataSourceId}`);
+      console.error(`       Token is valid but user denied access to this data type`);
+      return [];
+    }
+
+    // Handle 429: Rate limit exceeded
+    if (error.response && error.response.status === 429) {
+      console.error(`    ⏰ 429 RATE LIMIT EXCEEDED`);
+      console.error(`       Too many requests. Retrying after delay...`);
+      
+      // Wait and retry once
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const retryResponse = await axios.get(url, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        timeout: API_TIMEOUT,
+      });
+      
+      return retryResponse.data.point || [];
+    }
+
     // Log detailed error for debugging
     console.error(`    ❌ API Error for ${dataSourceId}:`);
-    console.error(`       Status: ${error.response?.status}`);
+    console.error(`       Status: ${error.response?.status || 'Unknown'}`);
     console.error(`       Message: ${error.response?.data?.error?.message || error.message}`);
-    console.error(`       URL: ${url.substring(0, 100)}...`);
-
-    // Re-throw other errors
+    
+    // Re-throw error
     throw error;
   }
 };

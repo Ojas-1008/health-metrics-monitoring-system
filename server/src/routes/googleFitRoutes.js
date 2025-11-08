@@ -108,4 +108,46 @@ router.get("/status", protect, getGoogleFitStatus);
  */
 router.post("/disconnect", protect, disconnectGoogleFit);
 
+/**
+ * GET /api/googlefit/debug/token-scopes
+ * Debug route to check token scopes for a specific user
+ * 
+ * Returns scope information for debugging OAuth token validation
+ * 
+ * Response (200):
+ * {
+ *   "success": true,
+ *   "scopes": "https://www.googleapis.com/auth/fitness.activity.read https://...",
+ *   "scopeArray": ["https://www.googleapis.com/auth/fitness.activity.read", ...],
+ *   "hasActivityRead": true,
+ *   "hasBodyRead": true,
+ *   "hasSleepRead": true
+ * }
+ */
+router.get("/debug/token-scopes", async (req, res) => {
+  try {
+    const User = (await import("../models/User.js")).default;
+    const user = await User.findById("690b9449c3325e85f9ab7a0e").select("+googleFitTokens");
+    
+    if (!user) {
+      return res.status(404).json({ success: false, error: "User not found" });
+    }
+
+    if (!user.googleFitTokens || !user.googleFitTokens.scope) {
+      return res.status(400).json({ success: false, error: "No Google Fit tokens found for user" });
+    }
+
+    res.json({
+      success: true,
+      scopes: user.googleFitTokens.scope,
+      scopeArray: user.googleFitTokens.scope.split(" "),
+      hasActivityRead: user.googleFitTokens.scope.includes("fitness.activity.read"),
+      hasBodyRead: user.googleFitTokens.scope.includes("fitness.body.read"),
+      hasSleepRead: user.googleFitTokens.scope.includes("fitness.sleep.read"),
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 export default router;
