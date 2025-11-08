@@ -49,30 +49,6 @@ router.post(
  */
 router.get("/", protect, getMetricsByDateRange);
 
-// ----- Get Metrics for Specific Date -----
-/**
- * @route   GET /api/metrics/:date
- * @desc    Get metrics for a single date (date as YYYY-MM-DD)
- * @access  Private
- */
-router.get("/:date", protect, getMetricsByDate);
-
-// ----- Delete Metrics for Specific Date -----
-/**
- * @route   DELETE /api/metrics/:date
- * @desc    Delete metrics for a single date (date as YYYY-MM-DD)
- * @access  Private
- */
-router.delete("/:date", protect, deleteMetrics);
-
-// ----- Get Metrics Summary Stats (Week/Month/Year) -----
-/**
- * @route   GET /api/metrics/summary/:period
- * @desc    Get metrics summary (period = 'week' | 'month' | 'year')
- * @access  Private
- */
-router.get("/summary/:period", protect, getMetricsSummary);
-
 // ----- Get Latest Metrics Entry -----
 /**
  * @route   GET /api/metrics/latest
@@ -80,5 +56,13 @@ router.get("/summary/:period", protect, getMetricsSummary);
  * @access  Private
  */
 router.get("/latest", protect, getLatestMetrics);
+
+// ----- Get Metrics for Specific Date -----
+/**
+ * @route   GET /api/metrics/:date
+ * @desc    Get metrics for a single date (date as YYYY-MM-DD)
+ * @access  Private
+ */
+router.get("/:date", protect, getMetricsByDate);
 
 export default router;

@@ -490,8 +490,9 @@ userSchema.methods.updateGoogleFitTokens = function (tokenData) {
   // Mark as connected
   this.googleFitConnected = true;
 
-  // Record sync time
-  this.lastSyncAt = new Date();
+  // Don't set lastSyncAt here - let the sync worker set it on first successful sync
+  // This ensures the first sync fetches the full 30-day window
+  // this.lastSyncAt remains null until first sync completes
 
   return this; // For method chaining
 };
@@ -508,6 +509,7 @@ userSchema.methods.disconnectGoogleFit = function () {
     token_expiry: undefined,
     scope: undefined,
   };
+  this.lastSyncAt = null; // Reset lastSyncAt so next connection starts fresh
   return this;
 };
 

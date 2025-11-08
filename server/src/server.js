@@ -10,6 +10,10 @@ import healthMetricsRoutes from "./routes/healthMetricsRoutes.js";
 import goalsRoutes from "./routes/goalsRoutes.js";
 import googleFitRoutes from "./routes/googleFitRoutes.js";
 
+// Import Workers
+import { startSyncWorker } from "../workers/googleFitSyncWorker.js";
+import { triggerManualSync } from "../workers/googleFitSyncWorker.js";
+
 /**
  * ============================================
  * LOAD ENVIRONMENT VARIABLES
@@ -23,6 +27,16 @@ dotenv.config();
  * ============================================
  */
 connectDB();
+
+/**
+ * ============================================
+ * START GOOGLE FIT SYNC WORKER
+ * ============================================
+ *
+ * Initialize cron job for scheduled data synchronization
+ * Worker runs at SYNC_CRON_SCHEDULE interval
+ */
+startSyncWorker();
 
 /**
  * ============================================
@@ -80,6 +94,23 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+// Manual Sync Trigger Route (for testing)
+app.get("/api/sync/trigger", async (req, res) => {
+  try {
+    const results = await triggerManualSync();
+    res.status(200).json({
+      success: true,
+      message: "Sync completed",
+      results,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 
 // Authentication Routes
 app.use("/api/auth", authRoutes);
@@ -124,6 +155,7 @@ const server = app.listen(PORT, () => {
   console.log(`Base URL: http://localhost:${PORT}`);
   console.log("\n📍 Available Endpoints:");
   console.log("  • Health Check: GET /api/health");
+  console.log("  • Manual Sync: GET /api/sync/trigger");
   console.log("\n  Authentication:");
   console.log("    - Register: POST /api/auth/register");
   console.log("    - Login: POST /api/auth/login");

@@ -155,9 +155,7 @@ export const handleGoogleFitCallback = asyncHandler(
 
     // ===== STEP 1: CHECK FOR USER DENIAL OR OTHER ERRORS =====
     if (error) {
-      console.warn(
-        `❌ Google OAuth error for user ${req.user.email}: ${error}`
-      );
+      console.warn(`❌ Google OAuth error: ${error}`);
 
       // Specific error messages based on Google's error codes
       if (error === "access_denied") {
@@ -217,13 +215,35 @@ export const handleGoogleFitCallback = asyncHandler(
       );
     }
 
-    // ===== STEP 3: VALIDATE STATE PARAMETER (CSRF PROTECTION) =====
+    // ===== STEP 3: GET USER ID FROM STATE PARAMETER =====
+    const userId = getUserIdFromState(state);
+    if (!userId) {
+      return next(
+        new ErrorResponse(
+          "Invalid or expired state parameter. Please restart the OAuth flow.",
+          400
+        )
+      );
+    }
+
+    // ===== STEP 4: LOAD USER FROM DATABASE =====
+    const user = await User.findById(userId);
+    if (!user) {
+      return next(
+        new ErrorResponse(
+          "User not found. This may indicate an account deletion during OAuth flow.",
+          400
+        )
+      );
+    }
+
+    // ===== STEP 5: VALIDATE STATE PARAMETER (CSRF PROTECTION) =====
     try {
-      validateOAuthState(req.user._id.toString(), state);
-      console.log(`✅ CSRF state validated for user: ${req.user.email}`);
+      validateOAuthState(userId, state);
+      console.log(`✅ CSRF state validated for user: ${user.email}`);
     } catch (error) {
-      console.error(`🚨 CSRF state validation failed for user ${req.user.email}: ${error.message}`);
-      
+      console.error(`🚨 CSRF state validation failed for user ${user.email}: ${error.message}`);
+
       // State validation failed - possible CSRF attack
       return next(
         new ErrorResponse(
@@ -244,10 +264,10 @@ export const handleGoogleFitCallback = asyncHandler(
       tokens = receivedTokens;
 
       console.log(
-        `✅ Authorization code exchanged for tokens (user: ${req.user.email})`
+        `✅ Authorization code exchanged for tokens (user: ${user.email})`
       );
     } catch (error) {
-      console.error(`❌ Token exchange failed for user ${req.user.email}:`, error.message);
+      console.error(`❌ Token exchange failed for user ${user.email}:`, error.message);
 
       // Handle specific Google OAuth errors
       if (error.message && error.message.includes("invalid_grant")) {
@@ -286,7 +306,7 @@ export const handleGoogleFitCallback = asyncHandler(
       !tokens.expiry_date
     ) {
       console.error(
-        `❌ Incomplete tokens received for user ${req.user.email}`
+        `❌ Incomplete tokens received for user ${user.email}`
       );
       return next(
         new ErrorResponse(
@@ -329,7 +349,7 @@ export const handleGoogleFitCallback = asyncHandler(
 
     if (hasForbiddenScope) {
       console.error(
-        `🚨 SECURITY: Forbidden wearable scope detected for user ${req.user.email}`,
+        `🚨 SECURITY: Forbidden wearable scope detected for user ${user.email}`,
         `Received scopes: ${receivedScope}`
       );
 
@@ -357,7 +377,7 @@ export const handleGoogleFitCallback = asyncHandler(
 
     if (missingScopes.length > 0) {
       console.warn(
-        `⚠️  Missing required scopes for user ${req.user.email}: ${missingScopes.join(", ")}`
+        `⚠️  Missing required scopes for user ${user.email}: ${missingScopes.join(", ")}`
       );
 
       return next(
@@ -369,19 +389,9 @@ export const handleGoogleFitCallback = asyncHandler(
       );
     }
 
-    console.log(`✅ Scope validation passed for user: ${req.user.email}`);
+    console.log(`✅ Scope validation passed for user: ${user.email}`);
 
     // ===== STEP 7: STORE TOKENS IN USER DOCUMENT =====
-    const user = await User.findById(req.user._id).select(
-      "+googleFitTokens"
-    );
-
-    if (!user) {
-      return next(
-        new ErrorResponse("User not found. Account may have been deleted.", 404)
-      );
-    }
-
     // Use updateGoogleFitTokens method with validated tokens
     try {
       user.updateGoogleFitTokens({
@@ -397,7 +407,7 @@ export const handleGoogleFitCallback = asyncHandler(
       console.log(`✅ Google Fit tokens stored for user: ${user.email}`);
     } catch (error) {
       console.error(
-        `❌ Failed to store tokens for user ${req.user.email}:`,
+        `❌ Failed to store tokens for user ${user.email}:`,
         error.message
       );
       return next(
