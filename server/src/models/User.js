@@ -173,6 +173,31 @@ const userSchema = new mongoose.Schema(
           default: true,
           description: "Sync distance traveled",
         },
+        height: {
+          type: Boolean,
+          default: false,
+          description: "Sync height measurements (requires wearable)",
+        },
+        bloodPressure: {
+          type: Boolean,
+          default: false,
+          description: "Sync blood pressure readings (requires wearable)",
+        },
+        oxygenSaturation: {
+          type: Boolean,
+          default: false,
+          description: "Sync blood oxygen saturation (requires wearable)",
+        },
+        bodyTemperature: {
+          type: Boolean,
+          default: false,
+          description: "Sync body temperature readings (requires wearable)",
+        },
+        hydration: {
+          type: Boolean,
+          default: false,
+          description: "Sync hydration/water intake data (requires wearable)",
+        },
       },
     },
 
