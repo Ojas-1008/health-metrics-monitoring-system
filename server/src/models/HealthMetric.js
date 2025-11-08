@@ -67,8 +67,63 @@ const healthMetricSchema = new mongoose.Schema(
         max: [24, "Sleep hours cannot exceed 24"],
       },
 
-      // Note: Heart rate NOT included (requires wearable)
-      // Note: SpO2 NOT included (requires wearable)
+      // Height in centimeters (manually entered)
+      height: {
+        type: Number,
+        default: null,
+        min: [50, "Height must be at least 50 cm"],
+        max: [300, "Height cannot exceed 300 cm"],
+      },
+
+      // Blood pressure (systolic/diastolic in mmHg)
+      bloodPressure: {
+        systolic: {
+          type: Number,
+          default: null,
+          min: [60, "Systolic pressure too low"],
+          max: [250, "Systolic pressure too high"],
+        },
+        diastolic: {
+          type: Number,
+          default: null,
+          min: [40, "Diastolic pressure too low"],
+          max: [150, "Diastolic pressure too high"],
+        },
+      },
+
+      // Heart rate (average for the day, in bpm)
+      // Note: Requires wearable device, but some phones support it
+      heartRate: {
+        type: Number,
+        default: null,
+        min: [30, "Heart rate too low"],
+        max: [220, "Heart rate too high"],
+      },
+
+      // Blood oxygen saturation (SpO2, percentage)
+      // Note: Requires wearable device or compatible phone
+      oxygenSaturation: {
+        type: Number,
+        default: null,
+        min: [70, "SpO2 too low"],
+        max: [100, "SpO2 cannot exceed 100%"],
+      },
+
+      // Body temperature (in Celsius)
+      bodyTemperature: {
+        type: Number,
+        default: null,
+        min: [35, "Body temperature too low"],
+        max: [42, "Body temperature too high"],
+      },
+
+      // Hydration (water intake in liters)
+      hydration: {
+        type: Number,
+        default: null,
+        min: [0, "Hydration cannot be negative"],
+        max: [10, "Hydration value seems unrealistic"],
+      },
     },
 
     // Data source tracking

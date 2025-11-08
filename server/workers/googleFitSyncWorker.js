@@ -378,6 +378,16 @@ const syncUserGoogleFitData = async (user) => {
         sleepHours: fetchedData.sleep?.[dateStr]
           ? Math.round((fetchedData.sleep[dateStr] / 1000 / 60 / 60) * 10) / 10 // Convert ms to hours
           : null,
+        // Manual entry fields (not populated by Google Fit sync)
+        height: null,
+        bloodPressure: {
+          systolic: null,
+          diastolic: null,
+        },
+        heartRate: null,
+        oxygenSaturation: null,
+        bodyTemperature: null,
+        hydration: null,
       };
 
       // Upsert to HealthMetric collection
