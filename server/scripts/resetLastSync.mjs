@@ -36,13 +36,16 @@ const resetLastSync = async () => {
 
     console.log(`📋 Current lastSyncAt: ${user.lastSyncAt}`);
 
-    // Reset lastSyncAt to null
-    await User.findByIdAndUpdate(user._id, { $set: { lastSyncAt: null } });
+    // Reset lastSyncAt to 30 days ago (triggers 30-day sync window)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    console.log('✅ lastSyncAt reset to null');
-    console.log('\n🚀 Next sync will fetch 30 days of data!\n');
+    await User.findByIdAndUpdate(user._id, { 
+      $set: { lastSyncAt: thirtyDaysAgo } 
+    });
 
-    await mongoose.disconnect();
+    console.log(`✅ lastSyncAt set to 30 days ago: ${thirtyDaysAgo.toISOString()}`);
+    console.log('\n🚀 Next sync will fetch 30 days of data!\n');    await mongoose.disconnect();
     process.exit(0);
   } catch (error) {
     console.error('❌ Error:', error.message);
