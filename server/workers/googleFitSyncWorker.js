@@ -86,6 +86,50 @@ const GOOGLE_FIT_DATA_SOURCES = {
     unit: "milliseconds", // Will convert to hours
     aggregation: "sum",
   },
+  
+  // ⭐ NEW DATA SOURCES (Wearable Device Features) ⭐
+  
+  height: {
+    dataSourceId: "derived:com.google.height:com.google.android.gms:merge_height",
+    field: "fpVal",
+    unit: "meters", // Will convert to cm
+    aggregation: "last",
+  },
+  
+  bloodPressure: {
+    dataSourceId: "derived:com.google.blood_pressure:com.google.android.gms:merged",
+    field: "mapVal", // Blood pressure has multiple values (systolic/diastolic)
+    unit: "mmHg",
+    aggregation: "last",
+  },
+  
+  heartRate: {
+    dataSourceId: "derived:com.google.heart_rate.bpm:com.google.android.gms:merge_heart_rate_bpm",
+    field: "fpVal",
+    unit: "bpm",
+    aggregation: "average", // Average heart rate for the day
+  },
+  
+  oxygenSaturation: {
+    dataSourceId: "derived:com.google.oxygen_saturation:com.google.android.gms:merged",
+    field: "fpVal",
+    unit: "percentage",
+    aggregation: "average",
+  },
+  
+  bodyTemperature: {
+    dataSourceId: "derived:com.google.body.temperature:com.google.android.gms:merged",
+    field: "fpVal",
+    unit: "celsius",
+    aggregation: "average",
+  },
+  
+  hydration: {
+    dataSourceId: "derived:com.google.hydration:com.google.android.gms:merged",
+    field: "fpVal",
+    unit: "liters",
+    aggregation: "sum",
+  },
 };
 
 /**
@@ -244,15 +288,15 @@ const fetchGoogleFitData = async (
 
 /**
  * ============================================
- * HELPER: AGGREGATE DATA BY DAY
+ * HELPER: AGGREGATE DATA BY DAY (ENHANCED)
  * ============================================
  *
  * Groups raw Google Fit data points by day and aggregates values
- * Normalizes timestamps to midnight UTC for consistent day boundaries
+ * Enhanced to handle blood pressure (multiple values) and average aggregation
  *
  * @param {Array} dataPoints - Raw data points from Google Fit API
- * @param {string} field - Field name to extract (intVal or fpVal)
- * @param {string} aggregation - Aggregation method (sum or last)
+ * @param {string} field - Field name to extract (intVal, fpVal, or mapVal)
+ * @param {string} aggregation - Aggregation method (sum, last, or average)
  * @returns {Object} { date: aggregatedValue } map
  */
 const aggregateByDay = (dataPoints, field, aggregation = "sum") => {
@@ -265,17 +309,87 @@ const aggregateByDay = (dataPoints, field, aggregation = "sum") => {
     date.setUTCHours(0, 0, 0, 0);
     const dayKey = date.toISOString().split("T")[0]; // "YYYY-MM-DD"
 
-    // Extract value based on field type
-    const value = point.value && point.value[0] ? point.value[0][field] : 0;
+    // Handle different field types
+    let value;
+    if (field === "mapVal") {
+      // Blood pressure has multiple values (systolic/diastolic)
+      const mapData = point.value && point.value[0] ? point.value[0][field] : null;
+      if (mapData) {
+        // Extract systolic and diastolic values
+        value = {
+          systolic: mapData.find(item => item.key === "systolic")?.value?.fpVal || null,
+          diastolic: mapData.find(item => item.key === "diastolic")?.value?.fpVal || null,
+        };
+      } else {
+        value = { systolic: null, diastolic: null };
+      }
+    } else {
+      value = point.value && point.value[0] ? point.value[0][field] : 0;
+    }
 
     if (aggregation === "sum") {
-      // Sum all values for the day (steps, distance, calories, etc.)
-      dailyData[dayKey] = (dailyData[dayKey] || 0) + value;
+      // Sum all values for the day
+      if (typeof value === "object") {
+        // Handle blood pressure (sum each component)
+        if (!dailyData[dayKey]) {
+          dailyData[dayKey] = { systolic: 0, diastolic: 0 };
+        }
+        dailyData[dayKey].systolic += value.systolic || 0;
+        dailyData[dayKey].diastolic += value.diastolic || 0;
+      } else {
+        dailyData[dayKey] = (dailyData[dayKey] || 0) + value;
+      }
     } else if (aggregation === "last") {
-      // Use most recent value (weight)
+      // Use most recent value
       dailyData[dayKey] = value;
+    } else if (aggregation === "average") {
+      // Calculate average
+      if (typeof value === "object") {
+        // Handle blood pressure (average each component)
+        if (!dailyData[dayKey]) {
+          dailyData[dayKey] = { systolic: { sum: 0, count: 0 }, diastolic: { sum: 0, count: 0 } };
+        }
+        if (value.systolic !== null) {
+          dailyData[dayKey].systolic.sum += value.systolic;
+          dailyData[dayKey].systolic.count += 1;
+        }
+        if (value.diastolic !== null) {
+          dailyData[dayKey].diastolic.sum += value.diastolic;
+          dailyData[dayKey].diastolic.count += 1;
+        }
+      } else {
+        if (!dailyData[dayKey]) {
+          dailyData[dayKey] = { sum: 0, count: 0 };
+        }
+        dailyData[dayKey].sum += value;
+        dailyData[dayKey].count += 1;
+      }
     }
   });
+
+  // Finalize averages
+  if (aggregation === "average") {
+    Object.keys(dailyData).forEach((key) => {
+      if (typeof dailyData[key] === "object") {
+        // Handle blood pressure averages
+        if (dailyData[key].systolic) {
+          dailyData[key].systolic = dailyData[key].systolic.count > 0
+            ? Math.round(dailyData[key].systolic.sum / dailyData[key].systolic.count)
+            : null;
+        }
+        if (dailyData[key].diastolic) {
+          dailyData[key].diastolic = dailyData[key].diastolic.count > 0
+            ? Math.round(dailyData[key].diastolic.sum / dailyData[key].diastolic.count)
+            : null;
+        }
+      } else {
+        // Handle simple averages
+        dailyData[key] = dailyData[key].count > 0
+          ? Math.round(dailyData[key].sum / dailyData[key].count)
+          : 0;
+      }
+    });
+  }
 
   return dailyData;
 };
@@ -378,16 +492,27 @@ const syncUserGoogleFitData = async (user) => {
         sleepHours: fetchedData.sleep?.[dateStr]
           ? Math.round((fetchedData.sleep[dateStr] / 1000 / 60 / 60) * 10) / 10 // Convert ms to hours
           : null,
-        // Manual entry fields (not populated by Google Fit sync)
-        height: null,
-        bloodPressure: {
-          systolic: null,
-          diastolic: null,
-        },
-        heartRate: null,
-        oxygenSaturation: null,
-        bodyTemperature: null,
-        hydration: null,
+        
+        // ⭐ NEW METRICS (Wearable Device Data) ⭐
+        
+        height: fetchedData.height?.[dateStr]
+          ? Math.round(fetchedData.height[dateStr] * 100) // meters to cm
+          : null,
+        
+        bloodPressure: fetchedData.bloodPressure?.[dateStr]
+          ? {
+              systolic: fetchedData.bloodPressure[dateStr].systolic || null,
+              diastolic: fetchedData.bloodPressure[dateStr].diastolic || null,
+            }
+          : { systolic: null, diastolic: null },
+        
+        heartRate: fetchedData.heartRate?.[dateStr] || null,
+        
+        oxygenSaturation: fetchedData.oxygenSaturation?.[dateStr] || null,
+        
+        bodyTemperature: fetchedData.bodyTemperature?.[dateStr] || null,
+        
+        hydration: fetchedData.hydration?.[dateStr] || null,
       };
 
       // Upsert to HealthMetric collection
