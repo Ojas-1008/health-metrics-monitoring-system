@@ -81,6 +81,16 @@ const GOOGLE_FIT_DATA_SOURCES = {
     field: "fpVal",  // ✅ Changed from intVal to fpVal
     unit: "points",
     aggregation: "sum",
+    // ⭐ ADD FALLBACK
+    fallback: "derived:com.google.heart_minutes:com.google.android.gms",
+  },
+  
+  // ⭐ ADD: Move Minutes (alternative to Heart Points)
+  moveMinutes: {
+    dataSourceId: "derived:com.google.active_minutes:com.google.android.gms:from_activities",
+    field: "intVal",
+    unit: "minutes",
+    aggregation: "sum",
   },
   
   weight: {
@@ -94,6 +104,8 @@ const GOOGLE_FIT_DATA_SOURCES = {
     field: "intVal",
     unit: "milliseconds",
     aggregation: "sum",
+    // ⭐ ADD FALLBACK
+    fallback: "derived:com.google.sleep.segment:com.google.android.gms:merged",
   },
   height: {
     dataSourceId: "derived:com.google.height:com.google.android.gms:merge_height",
@@ -315,11 +327,19 @@ const aggregateByDay = (dataPoints, field, aggregation = "sum") => {
     if (field === "mapVal") {
       // Blood pressure has multiple values (systolic/diastolic)
       const mapData = point.value && point.value[0] ? point.value[0][field] : null;
+      
       if (mapData) {
-        // Extract systolic and diastolic values
+        // ⭐ FIX: Use correct key names from Google Fit API
+        const systolicItem = mapData.find(item => 
+          item.key === "blood_pressure_systolic" || item.key === "systolic"
+        );
+        const diastolicItem = mapData.find(item => 
+          item.key === "blood_pressure_diastolic" || item.key === "diastolic"
+        );
+        
         value = {
-          systolic: mapData.find(item => item.key === "systolic")?.value?.fpVal || null,
-          diastolic: mapData.find(item => item.key === "diastolic")?.value?.fpVal || null,
+          systolic: systolicItem?.value?.fpVal || null,
+          diastolic: diastolicItem?.value?.fpVal || null,
         };
       } else {
         value = { systolic: null, diastolic: null };
