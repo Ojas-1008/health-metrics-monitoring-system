@@ -145,58 +145,77 @@ const userSchema = new mongoose.Schema(
       enabledDataTypes: {
         steps: {
           type: Boolean,
-          default: true,
+          default: true,  // ✅ Already enabled
           description: "Sync step count data",
         },
         weight: {
           type: Boolean,
-          default: true,
+          default: true,  // ✅ Already enabled
           description: "Sync weight measurements",
         },
         heartRate: {
           type: Boolean,
-          default: false,
+          default: false,  // Keep disabled (requires wearable)
           description: "Sync heart rate (requires wearable, disabled for mobile-only)",
         },
         sleep: {
           type: Boolean,
-          default: true,
+          default: true,  // ✅ Already enabled
           description: "Sync sleep data",
         },
         calories: {
           type: Boolean,
-          default: true,
+          default: true,  // ✅ Already enabled
           description: "Sync calorie burn data",
         },
         distance: {
           type: Boolean,
-          default: true,
+          default: true,  // ✅ Already enabled
           description: "Sync distance traveled",
         },
+        
+        // ⭐ FIX: Enable these metrics
         height: {
           type: Boolean,
-          default: false,
-          description: "Sync height measurements (requires wearable)",
+          default: true,  // ✅ CHANGE FROM false TO true
+          description: "Sync height measurements",
         },
         bloodPressure: {
           type: Boolean,
-          default: false,
-          description: "Sync blood pressure readings (requires wearable)",
+          default: true,  // ✅ CHANGE FROM false TO true
+          description: "Sync blood pressure readings",
         },
         oxygenSaturation: {
           type: Boolean,
-          default: false,
+          default: false,  // Keep disabled (requires wearable)
           description: "Sync blood oxygen saturation (requires wearable)",
         },
         bodyTemperature: {
           type: Boolean,
-          default: false,
-          description: "Sync body temperature readings (requires wearable)",
+          default: true,  // ✅ CHANGE FROM false TO true
+          description: "Sync body temperature readings",
         },
         hydration: {
           type: Boolean,
-          default: false,
-          description: "Sync hydration/water intake data (requires wearable)",
+          default: true,  // ✅ CHANGE FROM false TO true
+          description: "Sync hydration/water intake data",
+        },
+        
+        // ⭐ ADD: Heart Points (missing entirely)
+        heartPoints: {
+          type: Boolean,
+          default: true,  // ✅ NEW METRIC
+          description: "Sync heart points (move minutes) from Google Fit",
+        },
+        moveMinutes: {
+          type: Boolean,
+          default: true,  // ✅ NEW METRIC
+          description: "Sync move minutes from Google Fit activities",
+        },
+        activeMinutes: {
+          type: Boolean,
+          default: true,  // ✅ Already enabled but make explicit
+          description: "Sync active minutes data",
         },
       },
     },

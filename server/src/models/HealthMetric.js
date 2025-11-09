@@ -51,6 +51,24 @@ const healthMetricSchema = new mongoose.Schema(
         max: [1440, "Active minutes cannot exceed 24 hours"],
       },
 
+      // ⭐ ADD: Heart Points
+      heartPoints: {
+        type: Number,
+        default: 0,
+        min: [0, "Heart points cannot be negative"],
+        max: [500, "Heart points value seems unrealistic"],
+        description: "Google Fit Heart Points (1 point = 1 minute moderate activity, 2 points = 1 minute vigorous activity)",
+      },
+
+      // ⭐ ADD: Move Minutes
+      moveMinutes: {
+        type: Number,
+        default: 0,
+        min: [0, "Move minutes cannot be negative"],
+        max: [1440, "Move minutes cannot exceed 24 hours"],
+        description: "Google Fit Move Minutes from activity segments",
+      },
+
       // Weight in kg (manually entered by user)
       weight: {
         type: Number,

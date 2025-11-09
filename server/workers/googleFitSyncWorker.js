@@ -59,7 +59,7 @@ const GOOGLE_FIT_DATA_SOURCES = {
   distance: {
     dataSourceId: "derived:com.google.distance.delta:com.google.android.gms",
     field: "fpVal",
-    unit: "meters", // Will convert to km
+    unit: "meters",
     aggregation: "sum",
   },
   calories: {
@@ -74,56 +74,57 @@ const GOOGLE_FIT_DATA_SOURCES = {
     unit: "minutes",
     aggregation: "sum",
   },
+  
+  // ⭐ FIXED: Heart Points now uses fpVal
+  heartPoints: {
+    dataSourceId: "derived:com.google.heart_minutes:com.google.android.gms:merge_heart_minutes",
+    field: "fpVal",  // ✅ Changed from intVal to fpVal
+    unit: "points",
+    aggregation: "sum",
+  },
+  
   weight: {
     dataSourceId: "derived:com.google.weight:com.google.android.gms:merge_weight",
     field: "fpVal",
     unit: "kg",
-    aggregation: "last", // Use most recent weight
+    aggregation: "last",
   },
   sleep: {
     dataSourceId: "derived:com.google.sleep.segment:com.google.android.gms",
     field: "intVal",
-    unit: "milliseconds", // Will convert to hours
+    unit: "milliseconds",
     aggregation: "sum",
   },
-  
-  // ⭐ NEW DATA SOURCES (Wearable Device Features) ⭐
-  
   height: {
     dataSourceId: "derived:com.google.height:com.google.android.gms:merge_height",
     field: "fpVal",
-    unit: "meters", // Will convert to cm
+    unit: "meters",
     aggregation: "last",
   },
-  
   bloodPressure: {
     dataSourceId: "derived:com.google.blood_pressure:com.google.android.gms:merged",
-    field: "mapVal", // Blood pressure has multiple values (systolic/diastolic)
+    field: "mapVal",
     unit: "mmHg",
     aggregation: "last",
   },
-  
   heartRate: {
     dataSourceId: "derived:com.google.heart_rate.bpm:com.google.android.gms:merge_heart_rate_bpm",
     field: "fpVal",
     unit: "bpm",
-    aggregation: "average", // Average heart rate for the day
+    aggregation: "average",
   },
-  
   oxygenSaturation: {
     dataSourceId: "derived:com.google.oxygen_saturation:com.google.android.gms:merged",
     field: "fpVal",
     unit: "percentage",
     aggregation: "average",
   },
-  
   bodyTemperature: {
     dataSourceId: "derived:com.google.body.temperature:com.google.android.gms:merged",
     field: "fpVal",
     unit: "celsius",
     aggregation: "average",
   },
-  
   hydration: {
     dataSourceId: "derived:com.google.hydration:com.google.android.gms:merged",
     field: "fpVal",
@@ -440,12 +441,28 @@ const syncUserGoogleFitData = async (user) => {
       const dataSource = GOOGLE_FIT_DATA_SOURCES[dataType];
 
       try {
-        const dataPoints = await fetchGoogleFitData(
+        let dataPoints = await fetchGoogleFitData(
           accessToken,
           dataSource.dataSourceId,
           syncWindow.startTimeNanos,
           syncWindow.endTimeNanos
         );
+
+        // If no data points and fallback exists, try fallback data source
+        if (dataPoints.length === 0 && dataSource.fallback) {
+          console.log(`      ℹ️  Primary data source empty for ${dataType}, trying fallback...`);
+          try {
+            dataPoints = await fetchGoogleFitData(
+              accessToken,
+              dataSource.fallback,
+              syncWindow.startTimeNanos,
+              syncWindow.endTimeNanos
+            );
+            console.log(`      ✓ ${dataType}: ${dataPoints.length} data points fetched from fallback`);
+          } catch (fallbackError) {
+            console.log(`      ℹ️  Fallback also failed for ${dataType}: ${fallbackError.message}`);
+          }
+        }
 
         console.log(
           `      ✓ ${dataType}: ${dataPoints.length} data points fetched`
@@ -488,6 +505,13 @@ const syncUserGoogleFitData = async (user) => {
           (fetchedData.distance?.[dateStr] || 0) / 1000, // Convert meters to km
         calories: Math.round(fetchedData.calories?.[dateStr] || 0),
         activeMinutes: fetchedData.activeMinutes?.[dateStr] || 0,
+        
+        // ⭐ ADD: Heart Points
+        heartPoints: fetchedData.heartPoints?.[dateStr] || 0,
+        
+        // ⭐ ADD: Move Minutes
+        moveMinutes: fetchedData.moveMinutes?.[dateStr] || 0,
+        
         weight: fetchedData.weight?.[dateStr] || null,
         sleepHours: fetchedData.sleep?.[dateStr]
           ? Math.round((fetchedData.sleep[dateStr] / 1000 / 60 / 60) * 10) / 10 // Convert ms to hours
