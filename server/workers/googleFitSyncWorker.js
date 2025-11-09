@@ -74,6 +74,13 @@ const GOOGLE_FIT_DATA_SOURCES = {
     unit: "minutes",
     aggregation: "sum",
   },
+  // Include Move Minutes directly from activity-derived source
+  moveMinutes: {
+    dataSourceId: "derived:com.google.active_minutes:com.google.android.gms:from_activities",
+    field: "intVal",
+    unit: "minutes",
+    aggregation: "sum",
+  },
   
   // ⭐ FIXED: Heart Points now uses fpVal
   heartPoints: {
@@ -93,7 +100,8 @@ const GOOGLE_FIT_DATA_SOURCES = {
     dataSourceId: "derived:com.google.sleep.segment:com.google.android.gms",
     field: "intVal",
     unit: "milliseconds",
-    aggregation: "sum",
+    // Sum durations of sleep segments (computed from timestamps)
+    aggregation: "duration",
   },
   height: {
     dataSourceId: "derived:com.google.height:com.google.android.gms:merge_height",
@@ -297,7 +305,7 @@ const fetchGoogleFitData = async (
  *
  * @param {Array} dataPoints - Raw data points from Google Fit API
  * @param {string} field - Field name to extract (intVal, fpVal, or mapVal)
- * @param {string} aggregation - Aggregation method (sum, last, or average)
+ * @param {string} aggregation - Aggregation method (sum, last, average, or duration)
  * @returns {Object} { date: aggregatedValue } map
  */
 const aggregateByDay = (dataPoints, field, aggregation = "sum") => {
@@ -306,13 +314,17 @@ const aggregateByDay = (dataPoints, field, aggregation = "sum") => {
   dataPoints.forEach((point) => {
     // Extract timestamp and normalize to midnight UTC
     const endTimeMs = parseInt(point.endTimeNanos) / 1000000;
+    const startTimeMs = parseInt(point.startTimeNanos) / 1000000;
     const date = new Date(endTimeMs);
     date.setUTCHours(0, 0, 0, 0);
     const dayKey = date.toISOString().split("T")[0]; // "YYYY-MM-DD"
 
     // Handle different field types
     let value;
-    if (field === "mapVal") {
+    if (aggregation === "duration") {
+      // For sleep segments: compute duration from timestamps
+      value = Math.max(0, endTimeMs - startTimeMs);
+    } else if (field === "mapVal") {
       // Blood pressure has multiple values (systolic/diastolic)
       const mapData = point.value && point.value[0] ? point.value[0][field] : null;
       if (mapData) {
@@ -343,7 +355,7 @@ const aggregateByDay = (dataPoints, field, aggregation = "sum") => {
     } else if (aggregation === "last") {
       // Use most recent value
       dailyData[dayKey] = value;
-    } else if (aggregation === "average") {
+  } else if (aggregation === "average") {
       // Calculate average
       if (typeof value === "object") {
         // Handle blood pressure (average each component)
@@ -365,6 +377,9 @@ const aggregateByDay = (dataPoints, field, aggregation = "sum") => {
         dailyData[dayKey].sum += value;
         dailyData[dayKey].count += 1;
       }
+    } else if (aggregation === "duration") {
+      // Sum durations per day (milliseconds)
+      dailyData[dayKey] = (dailyData[dayKey] || 0) + (value || 0);
     }
   });
 
@@ -501,8 +516,17 @@ const syncUserGoogleFitData = async (user) => {
       // Build metrics object for this day
       const metrics = {
         steps: fetchedData.steps?.[dateStr] || 0,
-        distance:
-          (fetchedData.distance?.[dateStr] || 0) / 1000, // Convert meters to km
+        distance: (() => {
+          const rawMeters = fetchedData.distance?.[dateStr] || 0;
+          if (rawMeters > 0) return rawMeters / 1000; // meters -> km
+          // Fallback: estimate distance from steps if distance missing
+          const steps = fetchedData.steps?.[dateStr] || 0;
+            // Estimate stride length: if height available use 0.415 * height (cm) converted to meters, else assume 0.75m
+          const heightMeters = fetchedData.height?.[dateStr] || null;
+          const strideMeters = heightMeters ? heightMeters * 0.415 : 0.75;
+          const estimatedMeters = steps * strideMeters;
+          return estimatedMeters / 1000; // km
+        })(),
         calories: Math.round(fetchedData.calories?.[dateStr] || 0),
         activeMinutes: fetchedData.activeMinutes?.[dateStr] || 0,
         
@@ -514,7 +538,7 @@ const syncUserGoogleFitData = async (user) => {
         
         weight: fetchedData.weight?.[dateStr] || null,
         sleepHours: fetchedData.sleep?.[dateStr]
-          ? Math.round((fetchedData.sleep[dateStr] / 1000 / 60 / 60) * 10) / 10 // Convert ms to hours
+          ? Math.round((fetchedData.sleep[dateStr] / 1000 / 60 / 60) * 10) / 10 // duration ms -> hours (1 decimal)
           : null,
         
         // ⭐ NEW METRICS (Wearable Device Data) ⭐
