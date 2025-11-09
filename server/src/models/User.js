@@ -115,15 +115,8 @@ const userSchema = new mongoose.Schema(
 
       scope: {
         type: String,
-        validate: {
-          validator: function (value) {
-            // Allow null/undefined
-            if (!value) return true;
-            // Must match exact OAuth scope requested from Google
-            return value === GOOGLE_FIT_OAUTH_SCOPE;
-          },
-          message: `Scope must match the exact OAuth scope: ${GOOGLE_FIT_OAUTH_SCOPE}`,
-        },
+        // ℹ️  No validation - Google controls the scope format
+        // Overly strict validation causes token refresh failures
       },
     },
 
@@ -470,12 +463,8 @@ userSchema.pre("save", function (next) {
       );
     }
 
-    // Scope must match exact string
-    if (scope !== GOOGLE_FIT_OAUTH_SCOPE) {
-      return next(
-        new Error(`Scope must match the exact OAuth scope: ${GOOGLE_FIT_OAUTH_SCOPE}`)
-      );
-    }
+    // ℹ️  Scope validation removed - Google controls scope format
+    // Overly strict validation was causing token refresh failures
   }
 
   next();
@@ -518,10 +507,8 @@ userSchema.methods.updateGoogleFitTokens = function (tokenData) {
     throw new Error("Token expiry must be a valid future date");
   }
 
-  // Validate scope matches expected OAuth scope
-  if (scope !== GOOGLE_FIT_OAUTH_SCOPE) {
-    throw new Error(`Scope must match the exact OAuth scope: ${GOOGLE_FIT_OAUTH_SCOPE}`);
-  }
+  // ℹ️  Scope validation removed - Google controls scope format
+  // Overly strict validation was causing token refresh failures
 
   // Update tokens
   this.googleFitTokens = {
