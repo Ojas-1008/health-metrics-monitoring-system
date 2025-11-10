@@ -9,7 +9,7 @@ import authRoutes from "./routes/authRoutes.js";
 import healthMetricsRoutes from "./routes/healthMetricsRoutes.js";
 import goalsRoutes from "./routes/goalsRoutes.js";
 import googleFitRoutes from "./routes/googleFitRoutes.js";
-import eventsRoutes from "./routes/eventsRoutes.js";
+import eventsRoutes from "./routes/eventsRoutes.js"; // ← NEW: SSE routes
 
 // Import Workers
 import { startSyncWorker } from "../workers/googleFitSyncWorker.js";
@@ -33,9 +33,7 @@ connectDB();
  * ============================================
  * START GOOGLE FIT SYNC WORKER
  * ============================================
- *
- * Initialize cron job for scheduled data synchronization
- * Worker runs at SYNC_CRON_SCHEDULE interval
+ * Automatically syncs Google Fit data every 15 minutes
  */
 startSyncWorker();
 
@@ -45,159 +43,157 @@ startSyncWorker();
  * ============================================
  */
 const app = express();
+const PORT = process.env.PORT || 5000;
+const NODE_ENV = process.env.NODE_ENV || "development";
+const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173";
 
 /**
  * ============================================
- * GLOBAL MIDDLEWARE
+ * CORS CONFIGURATION
  * ============================================
- *
- * Order matters! These run for every request.
+ * Allow requests from the React frontend
  */
-
-// 1. CORS - Enable Cross-Origin Resource Sharing
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:3000",
-    credentials: true,
+    origin: CLIENT_URL,
+    credentials: true, // Allow cookies and authorization headers
   })
 );
 
-// 2. Body Parser - Parse JSON request bodies
-app.use(express.json());
+/**
+ * ============================================
+ * BODY PARSING MIDDLEWARE
+ * ============================================
+ */
+app.use(express.json()); // Parse JSON payloads
+app.use(express.urlencoded({ extended: true })); // Parse URL-encoded payloads
 
-// 3. URL Encoded - Parse URL-encoded bodies
-app.use(express.urlencoded({ extended: true }));
-
-// 4. Request Logger (Development Only)
-if (process.env.NODE_ENV === "development") {
+/**
+ * ============================================
+ * REQUEST LOGGING MIDDLEWARE (Development only)
+ * ============================================
+ */
+if (NODE_ENV === "development") {
   app.use((req, res, next) => {
-    console.log(`${req.method} ${req.path} - ${new Date().toISOString()}`);
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
     next();
   });
 }
 
 /**
  * ============================================
- * API ROUTES
+ * HEALTH CHECK ROUTES
  * ============================================
- *
- * Mount all route modules here
- * Base path: /api/{resource}
  */
-
-// Health Check Route (useful for monitoring/deployment)
-app.get("/api/health", (req, res) => {
+app.get("/", (req, res) => {
   res.status(200).json({
     success: true,
-    message: "Server is running",
+    message: "Health Metrics API is running",
+    version: "1.0.0",
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV,
   });
 });
 
-// Manual Sync Trigger Route (for testing)
+app.get("/api/health", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Server is healthy",
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
+/**
+ * ============================================
+ * MANUAL SYNC TRIGGER (Development/Testing)
+ * ============================================
+ */
 app.get("/api/sync/trigger", async (req, res) => {
   try {
-    const results = await triggerManualSync();
+    console.log("[Manual Sync] Triggering immediate Google Fit sync...");
+    await triggerManualSync();
     res.status(200).json({
       success: true,
-      message: "Sync completed",
-      results,
+      message: "Manual sync triggered successfully",
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
+    console.error("[Manual Sync] Error:", error);
     res.status(500).json({
       success: false,
+      message: "Failed to trigger manual sync",
       error: error.message,
     });
   }
 });
 
-
-// Authentication Routes
+/**
+ * ============================================
+ * REGISTER API ROUTES
+ * ============================================
+ *
+ * Route Registration Order:
+ * 1. /api/auth - Authentication & user management
+ * 2. /api/metrics - Health metrics CRUD operations
+ * 3. /api/goals - Fitness goals management
+ * 4. /api/googlefit - Google Fit OAuth & sync
+ * 5. /api/events - Server-Sent Events (SSE) for real-time updates ← NEW
+ *
+ * IMPORTANT: Error handlers MUST be registered AFTER all routes
+ */
 app.use("/api/auth", authRoutes);
+console.log("✓ Registered route: /api/auth");
 
-// Health Metrics Routes
 app.use("/api/metrics", healthMetricsRoutes);
+console.log("✓ Registered route: /api/metrics");
 
-// Goals Routes
 app.use("/api/goals", goalsRoutes);
+console.log("✓ Registered route: /api/goals");
 
-// Google Fit OAuth Routes
 app.use("/api/googlefit", googleFitRoutes);
+console.log("✓ Registered route: /api/googlefit");
 
-// Real-time Events Routes (SSE)
+// ===== NEW: Register SSE Routes =====
 app.use("/api/events", eventsRoutes);
+console.log("✓ Registered route: /api/events (Server-Sent Events)");
 
 /**
  * ============================================
  * ERROR HANDLING MIDDLEWARE
  * ============================================
- *
  * MUST be registered AFTER all routes
- * Order: 404 handler → Error handler
  */
-
-// 404 Handler - Catches undefined routes
-app.use(notFound);
-
-// Centralized Error Handler - Catches all errors
-app.use(errorHandler);
+app.use(notFound); // 404 handler for undefined routes
+app.use(errorHandler); // Centralized error handler
 
 /**
  * ============================================
  * START SERVER
  * ============================================
  */
-const PORT = process.env.PORT || 5000;
-
 const server = app.listen(PORT, () => {
-  console.log("\n========================================");
-  console.log("🚀 SERVER STARTED SUCCESSFULLY");
-  console.log("========================================");
-  console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
-  console.log(`Port: ${PORT}`);
-  console.log(`Base URL: http://localhost:${PORT}`);
-  console.log("\n📍 Available Endpoints:");
-  console.log("  • Health Check: GET /api/health");
-  console.log("  • Manual Sync: GET /api/sync/trigger");
-  console.log("\n  Authentication:");
-  console.log("    - Register: POST /api/auth/register");
-  console.log("    - Login: POST /api/auth/login");
-  console.log("    - Get User: GET /api/auth/me");
-  console.log("    - Update Profile: PUT /api/auth/profile");
-  console.log("    - Logout: POST /api/auth/logout");
-  console.log("\n  Health Metrics:");
-  console.log("    - Add/Update Metrics: POST /api/metrics");
-  console.log("    - Get by Range: GET /api/metrics?startDate=...&endDate=...");
-  console.log("    - Get by Date: GET /api/metrics/:date");
-  console.log("    - Delete: DELETE /api/metrics/:date");
-  console.log("    - Summary: GET /api/metrics/summary/:period");
-  console.log("    - Latest: GET /api/metrics/latest");
-  console.log("\n  Goals:");
-  console.log("    - Set Goals: POST /api/goals");
-  console.log("    - Get Goals: GET /api/goals");
-  console.log("    - Update Goals: PUT /api/goals");
-  console.log("    - Reset Goals: DELETE /api/goals");
-  console.log("    - Get Progress: GET /api/goals/progress");
-  console.log("\n  Google Fit OAuth:");
-  console.log("    - Initiate: GET /api/googlefit/connect");
-  console.log("    - Callback: GET /api/googlefit/callback");
-  console.log("    - Status: GET /api/googlefit/status");
-  console.log("    - Disconnect: POST /api/googlefit/disconnect");
-  console.log("========================================\n");
+  console.log("\n" + "=".repeat(60));
+  console.log("🚀 HEALTH METRICS SERVER STARTED");
+  console.log("=".repeat(60));
+  console.log(`📍 Environment: ${NODE_ENV}`);
+  console.log(`📡 Server URL: http://localhost:${PORT}`);
+  console.log(`🌐 Client URL: ${CLIENT_URL}`);
+  console.log(`📊 MongoDB: Connected`);
+  console.log(`⏱️  Google Fit Sync: Every 15 minutes`);
+  console.log(`🔔 SSE Endpoint: /api/events/stream`); // ← NEW
+  console.log("=".repeat(60) + "\n");
 });
 
 /**
  * ============================================
- * GRACEFUL SHUTDOWN
+ * GRACEFUL SHUTDOWN HANDLER
  * ============================================
- *
- * Handle server shutdown gracefully
  */
 process.on("SIGTERM", () => {
-  console.log("👋 SIGTERM signal received: closing HTTP server");
+  console.log("\n[Server] SIGTERM signal received: closing HTTP server");
   server.close(() => {
-    console.log("HTTP server closed");
+    console.log("[Server] HTTP server closed");
+    process.exit(0);
   });
 });
 
