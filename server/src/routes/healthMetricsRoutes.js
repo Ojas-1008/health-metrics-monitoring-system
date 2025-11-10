@@ -3,6 +3,7 @@ import {
   addOrUpdateMetrics,
   getMetricsByDateRange,
   getMetricsByDate,
+  updateMetric,
   deleteMetrics,
   getMetricsSummary,
   getLatestMetrics,
@@ -18,12 +19,12 @@ const router = express.Router();
 
 /**
  * ============================================
- * HEALTH METRICS ROUTES
+ * HEALTH METRICS ROUTES (PHONE-ONLY ENFORCED)
  * ============================================
  *
  * Purpose: CRUD endpoints and analytics for user health metrics
- * Security: All endpoints protected by JWT middleware
- * Validation: Uses centralized express-validator chains
+ * Security: All endpoints protected by JWT middleware + phone-only validation
+ * Validation: Enhanced validation with wearable metric rejection
  */
 
 // ----- Add or Update Health Metrics Entry (Upsert) -----
@@ -31,13 +32,11 @@ const router = express.Router();
  * @route   POST /api/metrics
  * @desc    Add or update a health metric for a specific day for current user
  * @access  Private
+ * @body    { date: "YYYY-MM-DD", metrics: {...}, source: "manual|googlefit|import" }
  */
 router.post(
   "/",
   protect,
-  // Optionally validate here if you want per-field checking for steps, calories, etc.
-  // validateHealthMetric,
-  // handleValidationErrors,
   addOrUpdateMetrics
 );
 
@@ -46,6 +45,7 @@ router.post(
  * @route   GET /api/metrics
  * @desc    Get all metrics for a date range (query: startDate, endDate)
  * @access  Private
+ * @query   startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
  */
 router.get("/", protect, getMetricsByDateRange);
 
@@ -64,5 +64,30 @@ router.get("/latest", protect, getLatestMetrics);
  * @access  Private
  */
 router.get("/:date", protect, getMetricsByDate);
+
+// ----- Update Metrics for Specific Date -----
+/**
+ * @route   PATCH /api/metrics/:date
+ * @desc    Update metrics for a specific date (partial update)
+ * @access  Private
+ * @body    { metrics: {...} }
+ */
+router.patch("/:date", protect, updateMetric);
+
+// ----- Delete Metrics for Specific Date -----
+/**
+ * @route   DELETE /api/metrics/:date
+ * @desc    Delete metrics for a specific date
+ * @access  Private
+ */
+router.delete("/:date", protect, deleteMetrics);
+
+// ----- Get Metrics Summary -----
+/**
+ * @route   GET /api/metrics/summary/:period
+ * @desc    Get aggregated summary for period (week|month|year)
+ * @access  Private
+ */
+router.get("/summary/:period", protect, getMetricsSummary);
 
 export default router;

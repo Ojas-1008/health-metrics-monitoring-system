@@ -10,6 +10,7 @@ import NotFound from './pages/NotFound';
 
 // Components
 import PrivateRoute from './components/common/PrivateRoute';
+import GoogleFitTest from './components/test/GoogleFitTest';
 
 // Styles
 import './App.css';
@@ -128,6 +129,18 @@ function App() {
                 <h1 className="text-3xl font-bold">Settings Page</h1>
                 <p className="text-gray-600 mt-4">Coming soon!</p>
               </div>
+            </PrivateRoute>
+          }
+        />
+
+        {/* ===== TEST ROUTES ===== */}
+        
+        {/* Google Fit Test Page */}
+        <Route
+          path="/test/googlefit"
+          element={
+            <PrivateRoute>
+              <GoogleFitTest />
             </PrivateRoute>
           }
         />

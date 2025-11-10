@@ -1,26 +1,29 @@
 /**
  * ============================================
- * METRICS INPUT FORM COMPONENT
+ * METRICS INPUT FORM COMPONENT (PHONE-ONLY)
  * ============================================
  *
- * Purpose: Allows users to input/track daily health metrics
+ * Purpose: Allows users to input/track daily health metrics (PHONE DATA ONLY)
  *
  * Features:
  * - Date picker (defaults to today)
- * - Metric input fields with validation
+ * - Phone-supported metric input fields with validation
  * - Real-time error feedback
  * - Loading state during submission
  * - Success/error notifications
  * - Form reset after successful submission
  * - Responsive Tailwind design
+ * - ENFORCES PHONE-ONLY CONSTRAINTS (no wearable metrics)
  *
  * Integration:
  * - Uses metricsService for API calls
  * - Alerts for user feedback
  * - Tailwind CSS for styling
+ * - Backend validation ensures data integrity
  */
 
 import { useState } from 'react';
+import PropTypes from 'prop-types';
 import * as metricsService from '../../services/metricsService';
 import Button from '../common/Button';
 import Alert from '../common/Alert';
@@ -30,11 +33,10 @@ import Alert from '../common/Alert';
  * METRICS FORM COMPONENT
  * ============================================
  */
-
 const MetricsForm = ({ onSuccess, onError }) => {
   // ===== STATE MANAGEMENT =====
 
-  // Form data state
+  // Form data state (PHONE-ONLY METRICS)
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0], // Today's date (YYYY-MM-DD)
     steps: '',
@@ -43,7 +45,7 @@ const MetricsForm = ({ onSuccess, onError }) => {
     activeMinutes: '',
     weight: '',
     sleepHours: '',
-    heartRate: '',
+    // ⚠️ heartRate REMOVED - Not supported by phone sensors
   });
 
   // Form validation errors
@@ -60,8 +62,7 @@ const MetricsForm = ({ onSuccess, onError }) => {
     message: '',
   });
 
-  // ===== FIELD CONFIGURATION =====
-
+  // ===== FIELD CONFIGURATION (PHONE-ONLY) =====
   const metricFields = [
     {
       name: 'steps',
@@ -73,6 +74,7 @@ const MetricsForm = ({ onSuccess, onError }) => {
       max: 100000,
       required: true,
       icon: '👟',
+      description: 'Tracked by phone accelerometer',
     },
     {
       name: 'calories',
@@ -84,6 +86,7 @@ const MetricsForm = ({ onSuccess, onError }) => {
       max: 10000,
       required: true,
       icon: '🔥',
+      description: 'Estimated from activity',
     },
     {
       name: 'distance',
@@ -96,6 +99,7 @@ const MetricsForm = ({ onSuccess, onError }) => {
       max: 500,
       required: false,
       icon: '🏃',
+      description: 'Tracked via GPS',
     },
     {
       name: 'activeMinutes',
@@ -107,6 +111,7 @@ const MetricsForm = ({ onSuccess, onError }) => {
       max: 1440,
       required: false,
       icon: '⏱️',
+      description: 'Time spent moving',
     },
     {
       name: 'weight',
@@ -119,6 +124,7 @@ const MetricsForm = ({ onSuccess, onError }) => {
       max: 300,
       required: false,
       icon: '⚖️',
+      description: 'Manual entry',
     },
     {
       name: 'sleepHours',
@@ -128,21 +134,14 @@ const MetricsForm = ({ onSuccess, onError }) => {
       step: 0.5,
       unit: 'hours',
       min: 0,
-      max: 16,
+      max: 24, // ⭐ UPDATED: Changed from 16 to 24 to match backend
       required: false,
       icon: '😴',
+      description: 'Manual entry or phone tracking',
     },
-    {
-      name: 'heartRate',
-      label: 'Heart Rate',
-      type: 'number',
-      placeholder: 'e.g., 72',
-      unit: 'bpm',
-      min: 30,
-      max: 200,
-      required: false,
-      icon: '❤️',
-    },
+    // ⚠️ heartRate field COMPLETELY REMOVED
+    // Reason: Android phones do not have optical heart rate sensors
+    // Only available on smartwatches and fitness bands
   ];
 
   // ===== UTILITY FUNCTIONS =====
@@ -169,7 +168,7 @@ const MetricsForm = ({ onSuccess, onError }) => {
   };
 
   /**
-   * Validate form data
+   * Validate form data (UPDATED WITH EXACT BACKEND RANGES)
    */
   const validateForm = () => {
     const newErrors = {};
@@ -196,32 +195,43 @@ const MetricsForm = ({ onSuccess, onError }) => {
       newErrors.calories = 'Calories cannot exceed 10,000';
     }
 
-    // Validate optional fields (only if provided)
-    if (formData.distance && (isNaN(formData.distance) || formData.distance < 0 || formData.distance > 500)) {
+    // ⭐ UPDATED: Validate optional fields with EXACT backend schema ranges
+    if (
+      formData.distance &&
+      (isNaN(formData.distance) ||
+        formData.distance < 0 ||
+        formData.distance > 500)
+    ) {
       newErrors.distance = 'Distance must be between 0 and 500 km';
     }
 
     if (
       formData.activeMinutes &&
-      (isNaN(formData.activeMinutes) || formData.activeMinutes < 0 || formData.activeMinutes > 1440)
+      (isNaN(formData.activeMinutes) ||
+        formData.activeMinutes < 0 ||
+        formData.activeMinutes > 1440)
     ) {
       newErrors.activeMinutes = 'Active minutes must be between 0 and 1440';
     }
 
-    if (formData.weight && (isNaN(formData.weight) || formData.weight < 30 || formData.weight > 300)) {
+    if (
+      formData.weight &&
+      (isNaN(formData.weight) || formData.weight < 30 || formData.weight > 300)
+    ) {
       newErrors.weight = 'Weight must be between 30 and 300 kg';
     }
 
+    // ⭐ UPDATED: Sleep hours now 0-24 (matches backend schema)
     if (
       formData.sleepHours &&
-      (isNaN(formData.sleepHours) || formData.sleepHours < 0 || formData.sleepHours > 16)
+      (isNaN(formData.sleepHours) ||
+        formData.sleepHours < 0 ||
+        formData.sleepHours > 24)
     ) {
-      newErrors.sleepHours = 'Sleep hours must be between 0 and 16';
+      newErrors.sleepHours = 'Sleep hours must be between 0 and 24';
     }
 
-    if (formData.heartRate && (isNaN(formData.heartRate) || formData.heartRate < 30 || formData.heartRate > 200)) {
-      newErrors.heartRate = 'Heart rate must be between 30 and 200 bpm';
-    }
+    // ⚠️ heartRate validation COMPLETELY REMOVED
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -229,6 +239,7 @@ const MetricsForm = ({ onSuccess, onError }) => {
 
   /**
    * Build metrics object from form data (only non-empty fields)
+   * ⭐ UPDATED: heartRate explicitly excluded
    */
   const buildMetricsObject = () => {
     const metrics = {
@@ -253,15 +264,16 @@ const MetricsForm = ({ onSuccess, onError }) => {
       metrics.sleepHours = parseFloat(formData.sleepHours);
     }
 
-    // Note: heartRate is not in the backend HealthMetric schema
-    // It will be ignored by the backend validation
-    // Keeping it in the form for future extensibility
+    // ⭐ CRITICAL: heartRate is NEVER included in metrics object
+    // Backend will reject any request containing heartRate or oxygenSaturation
+    // This ensures phone-only constraint is enforced
 
     return metrics;
   };
 
   /**
    * Reset form to initial state
+   * ⭐ UPDATED: heartRate removed from reset
    */
   const resetForm = () => {
     setFormData({
@@ -272,7 +284,7 @@ const MetricsForm = ({ onSuccess, onError }) => {
       activeMinutes: '',
       weight: '',
       sleepHours: '',
-      heartRate: '',
+      // heartRate: '', // ⚠️ REMOVED
     });
     setErrors({});
   };
@@ -308,14 +320,18 @@ const MetricsForm = ({ onSuccess, onError }) => {
 
     // Validate form data
     if (!validateForm()) {
-      showAlert('error', 'Validation Error', 'Please fix the errors above and try again.');
+      showAlert(
+        'error',
+        'Validation Error',
+        'Please fix the errors above and try again.'
+      );
       return;
     }
 
     setIsLoading(true);
 
     try {
-      // Build metrics object
+      // Build metrics object (phone-only metrics)
       const metrics = buildMetricsObject();
 
       // Call metricsService to add metric
@@ -323,7 +339,12 @@ const MetricsForm = ({ onSuccess, onError }) => {
 
       if (result.success) {
         // Show success alert
-        showAlert('success', 'Success! 🎉', `Metrics recorded for ${formData.date}`, 4000);
+        showAlert(
+          'success',
+          'Success! 🎉',
+          `Metrics recorded for ${formData.date}`,
+          4000
+        );
 
         // Reset form
         resetForm();
@@ -334,7 +355,11 @@ const MetricsForm = ({ onSuccess, onError }) => {
         }
       } else {
         // Show error alert
-        showAlert('error', 'Error', result.message || 'Failed to save metrics');
+        showAlert(
+          'error',
+          'Error',
+          result.message || 'Failed to save metrics'
+        );
 
         // Call onError callback if provided
         if (onError && typeof onError === 'function') {
@@ -343,7 +368,11 @@ const MetricsForm = ({ onSuccess, onError }) => {
       }
     } catch (error) {
       // Show error alert
-      showAlert('error', 'Error', error.message || 'An error occurred while saving metrics');
+      showAlert(
+        'error',
+        'Error',
+        error.message || 'An error occurred while saving metrics'
+      );
 
       // Call onError callback if provided
       if (onError && typeof onError === 'function') {
@@ -359,7 +388,11 @@ const MetricsForm = ({ onSuccess, onError }) => {
    */
   const setDateToToday = () => {
     const today = new Date().toISOString().split('T')[0];
-    setFormData((prev) => ({ ...prev, date: today }));
+    setFormData((prev) => ({
+      ...prev,
+      date: today,
+    }));
+
     if (errors.date) {
       setErrors((prev) => {
         const newErrors = { ...prev };
@@ -370,187 +403,187 @@ const MetricsForm = ({ onSuccess, onError }) => {
   };
 
   // ===== RENDER =====
-
   return (
-    <div className="w-full">
-      {/* Alert Container */}
+    <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-lg">
+      {/* ===== HEADER ===== */}
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">
+          📊 Track Daily Metrics
+        </h2>
+        <p className="text-gray-600">
+          Track your daily health metrics to monitor progress
+        </p>
+      </div>
+
+      {/* ⭐ NEW: PHONE-ONLY INFORMATIONAL CALLOUT */}
+      <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-500 rounded-r-lg">
+        <div className="flex items-start">
+          <div className="flex-shrink-0">
+            <svg
+              className="h-5 w-5 text-blue-500 mt-0.5"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path
+                fillRule="evenodd"
+                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </div>
+          <div className="ml-3">
+            <h3 className="text-sm font-medium text-blue-800">
+              📱 Phone-Only Metrics Supported
+            </h3>
+            <div className="mt-1 text-sm text-blue-700">
+              <p>
+                Only metrics collected by your Android phone are supported.
+                Wearable-exclusive data like <strong>heart rate</strong> and{' '}
+                <strong>blood oxygen</strong> is not available without a
+                smartwatch or fitness band.
+              </p>
+              <p className="mt-2">
+                ✅ Supported: Steps, calories, distance, active minutes, weight,
+                sleep hours
+              </p>
+              <p className="mt-1">
+                ❌ Not supported: Heart rate, blood oxygen (requires wearable
+                device)
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ===== ALERT MESSAGE ===== */}
       {alert.visible && (
         <div className="mb-6">
-          <Alert type={alert.type} title={alert.title} message={alert.message} onClose={hideAlert} dismissible />
+          <Alert
+            type={alert.type}
+            title={alert.title}
+            message={alert.message}
+            onClose={hideAlert}
+          />
         </div>
       )}
 
-      {/* Form Card */}
-      <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-        {/* Form Header */}
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">Log Health Metrics</h2>
-          <p className="text-gray-600 mt-1">Track your daily health metrics to monitor progress</p>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Date Section */}
-          <div className="space-y-3">
-            <label className="block text-sm font-semibold text-gray-800">
-              Date <span className="text-red-500">*</span>
-            </label>
-
-            <div className="flex gap-3 items-end">
-              <div className="flex-1">
-                <input
-                  type="date"
-                  name="date"
-                  value={formData.date}
-                  onChange={handleInputChange}
-                  max={new Date().toISOString().split('T')[0]}
-                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition ${
-                    errors.date
-                      ? 'border-red-500 focus:ring-red-500'
-                      : 'border-gray-300 focus:ring-blue-500'
-                  }`}
-                />
-
-                {errors.date && <p className="text-red-500 text-sm mt-1">{errors.date}</p>}
-              </div>
-
-              <Button
-                type="button"
-                onClick={setDateToToday}
-                variant="secondary"
-                size="sm"
-                className="whitespace-nowrap"
-              >
-                Today
-              </Button>
-            </div>
-          </div>
-
-          {/* Required Fields Section */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-              <span className="text-red-500">*</span>Required Fields
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {metricFields
-                .filter((field) => field.required)
-                .map((field) => (
-                  <div key={field.name} className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                      <span>{field.icon}</span>
-                      {field.label}
-                      <span className="text-gray-500 text-xs">({field.unit})</span>
-                    </label>
-
-                    <input
-                      type={field.type}
-                      name={field.name}
-                      value={formData[field.name]}
-                      onChange={handleInputChange}
-                      placeholder={field.placeholder}
-                      min={field.min}
-                      max={field.max}
-                      step={field.step || 1}
-                      className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition ${
-                        errors[field.name]
-                          ? 'border-red-500 focus:ring-red-500'
-                          : 'border-gray-300 focus:ring-blue-500'
-                      }`}
-                    />
-
-                    {errors[field.name] && (
-                      <p className="text-red-500 text-sm">{errors[field.name]}</p>
-                    )}
-                  </div>
-                ))}
-            </div>
-          </div>
-
-          {/* Optional Fields Section */}
-          <div className="space-y-4">
-            <details className="group">
-              <summary className="cursor-pointer text-lg font-semibold text-gray-800 flex items-center gap-2 select-none hover:text-blue-600 transition">
-                <span className="group-open:rotate-90 transition duration-200">▶</span>
-                Optional Fields
-              </summary>
-
-              <div className="mt-4 pt-4 border-t border-gray-200 grid grid-cols-1 md:grid-cols-2 gap-4">
-                {metricFields
-                  .filter((field) => !field.required)
-                  .map((field) => (
-                    <div key={field.name} className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                        <span>{field.icon}</span>
-                        {field.label}
-                        <span className="text-gray-500 text-xs">({field.unit})</span>
-                      </label>
-
-                      <input
-                        type={field.type}
-                        name={field.name}
-                        value={formData[field.name]}
-                        onChange={handleInputChange}
-                        placeholder={field.placeholder}
-                        min={field.min}
-                        max={field.max}
-                        step={field.step || 1}
-                        className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition ${
-                          errors[field.name]
-                            ? 'border-red-500 focus:ring-red-500'
-                            : 'border-gray-300 focus:ring-blue-500'
-                        }`}
-                      />
-
-                      {errors[field.name] && (
-                        <p className="text-red-500 text-sm">{errors[field.name]}</p>
-                      )}
-                    </div>
-                  ))}
-              </div>
-            </details>
-          </div>
-
-          {/* Form Actions */}
-          <div className="flex gap-4 pt-6 border-t border-gray-200">
-            <Button
-              type="submit"
-              disabled={isLoading}
-              className="flex-1"
-            >
-              {isLoading ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Saving...
-                </>
-              ) : (
-                '✓ Save Metrics'
-              )}
-            </Button>
-
-            <Button
+      {/* ===== FORM ===== */}
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Date Picker */}
+        <div>
+          <label
+            htmlFor="date"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            Date <span className="text-red-500">*</span>
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="date"
+              id="date"
+              name="date"
+              value={formData.date}
+              onChange={handleInputChange}
+              max={new Date().toISOString().split('T')[0]}
+              className={`flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                errors.date ? 'border-red-500' : 'border-gray-300'
+              }`}
+              required
+            />
+            <button
               type="button"
-              variant="secondary"
-              onClick={resetForm}
-              disabled={isLoading}
+              onClick={setDateToToday}
+              className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-colors"
             >
-              Reset
-            </Button>
+              Today
+            </button>
           </div>
-        </form>
-
-        {/* Info Box */}
-        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-800">
-            <span className="font-semibold">💡 Tip:</span> Log your metrics daily for better health insights and progress tracking.
-          </p>
+          {errors.date && (
+            <p className="mt-1 text-sm text-red-600">{errors.date}</p>
+          )}
         </div>
+
+        {/* Metric Fields Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {metricFields.map((field) => (
+            <div key={field.name}>
+              <label
+                htmlFor={field.name}
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                {field.icon} {field.label}{' '}
+                {field.required && <span className="text-red-500">*</span>}
+                {field.unit && (
+                  <span className="text-gray-500 text-xs ml-1">
+                    ({field.unit})
+                  </span>
+                )}
+              </label>
+              {field.description && (
+                <p className="text-xs text-gray-500 mb-1">
+                  {field.description}
+                </p>
+              )}
+              <input
+                type={field.type}
+                id={field.name}
+                name={field.name}
+                value={formData[field.name]}
+                onChange={handleInputChange}
+                placeholder={field.placeholder}
+                step={field.step || 1}
+                min={field.min}
+                max={field.max}
+                required={field.required}
+                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  errors[field.name] ? 'border-red-500' : 'border-gray-300'
+                }`}
+              />
+              {errors[field.name] && (
+                <p className="mt-1 text-sm text-red-600">
+                  {errors[field.name]}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Form Actions */}
+        <div className="flex gap-4 pt-4">
+          <Button
+            type="submit"
+            variant="primary"
+            loading={isLoading}
+            disabled={isLoading}
+            className="flex-1"
+          >
+            {isLoading ? 'Saving...' : 'Save Metrics'}
+          </Button>
+          <button
+            type="button"
+            onClick={resetForm}
+            disabled={isLoading}
+            className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Reset
+          </button>
+        </div>
+      </form>
+
+      {/* ===== HELPFUL TIP ===== */}
+      <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+        <p className="text-sm text-gray-600">
+          💡 <strong>Tip:</strong> Log your metrics daily for better health
+          insights and progress tracking. Connect Google Fit for automatic sync!
+        </p>
       </div>
     </div>
   );
+};
+
+MetricsForm.propTypes = {
+  onSuccess: PropTypes.func,
+  onError: PropTypes.func,
 };
 
 export default MetricsForm;

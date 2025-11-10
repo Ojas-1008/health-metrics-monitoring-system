@@ -1,0 +1,113 @@
+[
+  {
+    "_id": "test-phone-constraints-invalid",
+    "name": "Test Phone-Only Constraints (Invalid - heartRate)",
+    "url": "http://localhost:5000/api/metrics",
+    "method": "POST",
+    "headers": [
+      {
+        "name": "Content-Type",
+        "value": "application/json"
+      },
+      {
+        "name": "Authorization",
+        "value": "Bearer YOUR_JWT_TOKEN"
+      }
+    ],
+    "body": {
+      "type": "json",
+      "raw": "{\n  \"date\": \"2025-11-09\",\n  \"metrics\": {\n    \"steps\": 5000,\n    \"heartRate\": 70\n  }\n}"
+    },
+    "tests": [
+      {
+        "name": "Should reject wearable-only metrics",
+        "expect": "statusCode == 400",
+        "type": "response"
+      },
+      {
+        "name": "Should contain phone-only constraint error",
+        "expect": "response.body.message.includes('Phone-only constraint violation')",
+        "type": "response"
+      }
+    ],
+    "auth": {
+      "type": "bearer",
+      "token": "YOUR_JWT_TOKEN"
+    },
+    "description": "Test that wearable-only metrics (heartRate) are rejected with phone-only constraint validation"
+  },
+  {
+    "_id": "test-phone-constraints-valid",
+    "name": "Test Phone-Only Constraints (Valid)",
+    "url": "http://localhost:5000/api/metrics",
+    "method": "POST",
+    "headers": [
+      {
+        "name": "Content-Type",
+        "value": "application/json"
+      },
+      {
+        "name": "Authorization",
+        "value": "Bearer YOUR_JWT_TOKEN"
+      }
+    ],
+    "body": {
+      "type": "json",
+      "raw": "{\n  \"date\": \"2025-11-09\",\n  \"metrics\": {\n    \"steps\": 8500,\n    \"distance\": 6.2,\n    \"calories\": 450,\n    \"activeMinutes\": 55,\n    \"heartPoints\": 15\n  }\n}"
+    },
+    "tests": [
+      {
+        "name": "Should accept phone-only metrics",
+        "expect": "statusCode == 200",
+        "type": "response"
+      },
+      {
+        "name": "Should contain success message",
+        "expect": "response.body.success == true",
+        "type": "response"
+      }
+    ],
+    "auth": {
+      "type": "bearer",
+      "token": "YOUR_JWT_TOKEN"
+    },
+    "description": "Test that valid phone-only metrics are accepted"
+  },
+  {
+    "_id": "test-phone-constraints-multiple-wearables",
+    "name": "Test Phone-Only Constraints (Multiple Wearables)",
+    "url": "http://localhost:5000/api/metrics",
+    "method": "POST",
+    "headers": [
+      {
+        "name": "Content-Type",
+        "value": "application/json"
+      },
+      {
+        "name": "Authorization",
+        "value": "Bearer YOUR_JWT_TOKEN"
+      }
+    ],
+    "body": {
+      "type": "json",
+      "raw": "{\n  \"date\": \"2025-11-09\",\n  \"metrics\": {\n    \"steps\": 5000,\n    \"heartRate\": 75,\n    \"oxygenSaturation\": 98,\n    \"bloodOxygen\": 95\n  }\n}"
+    },
+    "tests": [
+      {
+        "name": "Should reject multiple wearable metrics",
+        "expect": "statusCode == 400",
+        "type": "response"
+      },
+      {
+        "name": "Should trigger security warnings",
+        "expect": "response.body.message.includes('Wearable-only metrics not supported')",
+        "type": "response"
+      }
+    ],
+    "auth": {
+      "type": "bearer",
+      "token": "YOUR_JWT_TOKEN"
+    },
+    "description": "Test rejection of multiple wearable-only metrics and security warning logging"
+  }
+]

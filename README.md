@@ -1,6 +1,6 @@
 # Health Metrics Monitoring System
 
-A full-stack health tracking application with real-time analytics and predictive insights. Built with modern web technologies and designed for scalability and performance.
+A comprehensive health tracking application with Google Fit integration, real-time analytics, and predictive insights. Built with modern web technologies and designed for scalability and performance.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
@@ -17,7 +17,32 @@ A full-stack health tracking application with real-time analytics and predictive
 - [Development](#development)
 - [Architecture](#architecture)
 - [API Documentation](#api-documentation)
+- [Testing](#testing)
 - [Contributing](#contributing)
+
+## 🎯 Overview
+
+The Health Metrics Monitoring System is a comprehensive full-stack platform for tracking and analyzing personal health data. Built with React 19 and Express, it features a complete authentication system, health metrics tracking, goal management, Google Fit integration, and automated data synchronization.
+
+### Current Status
+
+**Backend**: Fully functional RESTful API with JWT authentication, health metrics CRUD operations, goals management system, Google Fit integration, automated data synchronization, comprehensive testing suite, and extensive utility scripts.
+
+**Frontend**: Complete authentication UI with login/registration, protected routing, comprehensive dashboard with health metrics input/display, goals management with progress tracking, responsive design, and robust API integration.
+
+### Key Capabilities
+
+- 🔐 **Complete Authentication System**: Secure JWT-based authentication with bcryptjs password hashing, user registration, login, logout, and profile management.
+- 📊 **Health Metrics Tracking API**: Comprehensive CRUD operations for various health metrics including steps, calories, distance, sleep, weight, heart points, and more, with Google Fit synchronization.
+- 🎯 **Fitness Goals Management**: API for setting, retrieving, updating, and resetting personal fitness goals with progress tracking and achievement monitoring.
+- 🔗 **Google Fit Integration**: Full OAuth2 flow implementation with secure token management, automatic data synchronization, and comprehensive health data import from Google Fit API.
+- 🔄 **Automated Data Synchronization**: Scheduled worker that automatically fetches health data from Google Fit at configurable intervals.
+- 📱 **Responsive React UI**: Modern and responsive user interface built with React 19 and styled using Tailwind CSS 4 for a seamless experience across devices.
+- ✅ **Comprehensive Input Validation**: Robust server-side validation using express-validator and client-side real-time form validation for data integrity.
+- 🔄 **Real-time Feedback**: Dynamic form validation and password strength indicators provide immediate user feedback during registration and login.
+- 📈 **Metrics Summary and Analytics**: Backend endpoints provide daily, weekly, monthly, and yearly summaries of health metrics with averages, totals, and progress tracking.
+- 🎨 **Modern UI with Custom Theme**: Features a custom Tailwind CSS theme and a library of reusable components for consistent design.
+- 🧪 **Comprehensive Testing**: Jest-based test suite with unit tests, integration tests, and manual testing guides for all major components.
 
 ## 🎯 Overview
 
@@ -25,15 +50,17 @@ The Health Metrics Monitoring System is a comprehensive full-stack platform for 
 
 ### Current Status
 
-**Backend**: Fully functional RESTful API with JWT authentication, health metrics CRUD operations, and goals management system. All core backend features are implemented and tested.
+**Backend**: Fully functional RESTful API with JWT authentication, health metrics CRUD operations, goals management system, and Google Fit integration. All core backend features are implemented and tested, including OAuth flow, token management, and automated data synchronization.
 
-**Frontend**: Complete authentication UI with login/registration, protected routing, and a robust dashboard foundation. Health metrics input forms, goal setting, and initial data visualizations are implemented. Profile management and advanced analytics visualizations are in active development.
+**Frontend**: Complete authentication UI with login/registration, protected routing, and a robust dashboard foundation. Health metrics input forms, goal setting, and initial data visualizations are implemented. Google Fit connection UI and data synchronization status are integrated. Profile management and advanced analytics visualizations are in active development.
 
 ### Key Capabilities
 
 - 🔐 **Complete Authentication System**: Secure JWT-based authentication with [`bcryptjs`](server/src/models/User.js) password hashing, user registration, login, and profile management.
-- 📊 **Health Metrics Tracking API**: Comprehensive CRUD operations for various health metrics including steps, calories, distance, sleep, and weight, managed via [`healthMetricsController.js`](server/src/controllers/healthMetricsController.js).
+- 📊 **Health Metrics Tracking API**: Comprehensive CRUD operations for various health metrics including steps, calories, distance, sleep, weight, heart points, and more, managed via [`healthMetricsController.js`](server/src/controllers/healthMetricsController.js).
 - 🎯 **Fitness Goals Management**: API for setting, retrieving, updating, and resetting personal fitness goals with progress tracking, handled by [`goalsController.js`](server/src/controllers/goalsController.js).
+- 🔗 **Google Fit Integration**: Full OAuth2 flow implementation with secure token management, automatic data synchronization, and comprehensive health data import from Google Fit API via [`googleFitController.js`](server/src/controllers/googleFitController.js).
+- 🔄 **Automated Data Synchronization**: Scheduled worker that automatically fetches health data from Google Fit at configurable intervals using [`googleFitSyncWorker.js`](server/workers/googleFitSyncWorker.js).
 - 📱 **Responsive React UI**: Modern and responsive user interface built with [`React 19`](client/package.json) and styled using [`Tailwind CSS 4`](client/tailwind.config.js) for a seamless experience across devices.
 - ✅ **Comprehensive Input Validation**: Robust server-side validation using [`express-validator`](server/src/middleware/validator.js) and client-side real-time form validation for data integrity.
 - 🔄 **Real-time Feedback**: Dynamic form validation and password strength indicators provide immediate user feedback during registration and login.
@@ -55,13 +82,17 @@ The Health Metrics Monitoring System is a comprehensive full-stack platform for 
 ### Backend
 - **Runtime**: Node.js (v18+) - A JavaScript runtime built on Chrome's V8 JavaScript engine.
 - **Framework**: Express 4.19.2 - A fast, unopinionated, minimalist web framework for Node.js.
-- **Database**: MongoDB with Mongoose 8.3.0 - A NoSQL database and an elegant MongoDB object modeling for Node.js.
+- **Database**: MongoDB with Mongoose 8.19.1 - A NoSQL database and an elegant MongoDB object modeling for Node.js.
 - **Authentication**: JWT (jsonwebtoken 9.0.2) - JSON Web Token implementation for secure authentication.
 - **Password Hashing**: bcryptjs 2.4.3 - A library for hashing passwords.
-- **Validation**: express-validator 7.0.1 - Middleware for Express that wraps validator.js and sanitization.
-- **API Integration**: googleapis 134.0.0 - Google APIs client library for Node.js.
+- **Validation**: express-validator 7.2.1 - Middleware for Express that wraps validator.js and sanitization.
+- **API Integration**: googleapis 164.0.0 - Google APIs client library for Node.js.
+- **OAuth2 Flow**: Google OAuth2 implementation for secure Google Fit authentication.
+- **Data Synchronization**: node-cron 3.0.3 - Task scheduling for automated data sync.
 - **Security**: CORS 2.8.5 - Node.js CORS middleware.
 - **Environment**: dotenv 16.4.5 - Loads environment variables from a `.env` file.
+- **Testing**: Jest 29.7.0 + Supertest 7.1.4 - Testing framework and HTTP endpoint testing.
+- **Development**: nodemon 3.1.0 - Automatically restarts the Node.js server when file changes are detected.
 
 ### Analytics (Planned)
 - **Engine**: Apache Spark - A unified analytics engine for large-scale data processing.
@@ -72,6 +103,7 @@ The Health Metrics Monitoring System is a comprehensive full-stack platform for 
 - **Backend Dev**: nodemon 3.1.0 - Automatically restarts the Node.js server when file changes are detected.
 - **CSS Processing**: PostCSS 8.5.6, Autoprefixer 10.4.21 - Tools for transforming CSS with JavaScript.
 - **Version Control**: Git & GitHub - Distributed version control system and platform for hosting code.
+- **API Testing**: Thunder Client - REST API testing tool integrated with VS Code.
 
 ## 📁 Project Structure
 
@@ -137,11 +169,17 @@ health-metrics-monitoring-system/
 ├── server/                          # Backend Node.js/Express API
 │   ├── src/                         # Backend source code
 │   │   ├── config/                  # Configuration files
-│   │   │   └── database.js         # MongoDB connection setup
+│   │   │   ├── database.js         # MongoDB connection setup
+│   │   │   └── oauth.config.js     # Google OAuth configuration
 │   │   ├── controllers/             # Request handlers (MVC pattern)
 │   │   │   ├── authController.js   # Logic for user authentication (register, login, profile, logout)
 │   │   │   ├── goalsController.js  # Logic for managing user goals
+│   │   │   ├── googleFitController.js # Google Fit API integration
 │   │   │   └── healthMetricsController.js # Logic for health metrics CRUD and analytics
+│   │   ├── middleware/              # Express middleware functions
+│   │   │   ├── auth.js             # JWT verification and route protection
+│   │   │   ├── validator.js        # Input validation chains using express-validator
+│   │   │   └── errorHandler.js     # Centralized error handling and custom ErrorResponse class
 │   │   ├── models/                  # Mongoose schemas for MongoDB
 │   │   │   ├── User.js             # User model with bcrypt hashing and goals sub-document
 │   │   │   ├── HealthMetric.js     # Schema for daily health metrics
@@ -150,33 +188,33 @@ health-metrics-monitoring-system/
 │   │   ├── routes/                  # API endpoints definitions
 │   │   │   ├── authRoutes.js       # Routes for /api/auth endpoints
 │   │   │   ├── goalsRoutes.js      # Routes for /api/goals endpoints
+│   │   │   ├── googleFitRoutes.js  # Routes for Google Fit integration
 │   │   │   └── healthMetricsRoutes.js # Routes for /api/metrics endpoints
-│   │   ├── middleware/              # Express middleware functions
-│   │   │   ├── auth.js             # JWT verification and route protection
-│   │   │   ├── validator.js        # Input validation chains using express-validator
-│   │   │   └── errorHandler.js     # Centralized error handling and custom ErrorResponse class
-│   │   ├── services/                # Business logic layer (e.g., external API integrations)
+│   │   ├── services/                # Business logic layer (Google Fit integration)
 │   │   ├── utils/                   # Helper functions and utilities
+│   │   ├── __tests__/               # Unit and integration tests
+│   │   │   ├── GoogleFitController.test.js
+│   │   │   ├── googleFitHelper.test.js
+│   │   │   ├── IndexPerformance.test.js
+│   │   │   └── User.test.js
 │   │   └── server.js                # Main Express application entry point
-│   ├── scripts/                     # Utility scripts
-│   │   └── fix-googleid-index.js   # Script for MongoDB index maintenance
-│   ├── .env.example                 # Template for environment variables
+│   ├── scripts/                     # Utility scripts for database management
+│   ├── migrations/                  # Database migration scripts
+│   ├── tests/                       # Additional test files and manual testing guides
+│   ├── config/                      # Additional configuration files
+│   ├── generate-token.js            # Token generation utility
+│   ├── jest.config.js               # Jest testing configuration
 │   ├── package.json                 # Backend dependencies and scripts
 │   └── README.md                    # Server-specific documentation
 │
 ├── spark-analytics/                 # Apache Spark analytics (planned)
 │   └── README.md
-│
-├── docs/                            # Additional documentation
-│   ├── AUTH_API_REFERENCE.md       # Detailed documentation for Authentication API
-│   ├── AUTH_ROUTES_VERIFICATION.md # Guide for testing authentication routes
-│   └── TESTING_GOALS_COMPONENTS.md # Guide for testing goals components
-│
+
 ├── .gitignore                       # Root Git ignore file
 ├── package.json                     # Root workspace configuration
 ├── ARCHITECTURE.md                  # High-level architecture documentation
 ├── TECH_STACK.md                   # Detailed technology stack information
-├── DOCUMENTATION_INDEX.md          # Index of all project documentation
+├── ROADMAP.txt                     # Development roadmap and planning
 └── README.md                        # This file
 ```
 
@@ -192,7 +230,8 @@ health-metrics-monitoring-system/
   "react-router-dom": "^7.9.4",   // Enables client-side routing in React applications.
   "recharts": "^3.3.0",            // A charting library for React, used for data visualization.
   "zustand": "^5.0.8",             // A lightweight state management solution for React.
-  "date-fns": "^4.1.0"             // Provides a comprehensive set of functions for manipulating dates.
+  "date-fns": "^4.1.0",            // Provides a comprehensive set of functions for manipulating dates.
+  "axios": "^1.7.9"                // Promise-based HTTP client with request/response interceptors.
 }
 ```
 
@@ -206,7 +245,9 @@ health-metrics-monitoring-system/
   "postcss": "^8.5.6",                  // A tool for transforming CSS with JavaScript.
   "autoprefixer": "^10.4.21",           // PostCSS plugin to parse CSS and add vendor prefixes.
   "eslint": "^9.38.0",                  // A pluggable linting utility for JavaScript and JSX.
-  "eslint-plugin-react": "^7.37.5"      // ESLint plugin for React specific linting rules.
+  "eslint-plugin-react": "^7.37.5",     // ESLint plugin for React specific linting rules.
+  "eslint-plugin-react-hooks": "^7.0.0", // ESLint plugin for React Hooks rules.
+  "eslint-plugin-react-refresh": "^0.4.24" // ESLint plugin for React Refresh.
 }
 ```
 
@@ -216,20 +257,30 @@ health-metrics-monitoring-system/
 ```json
 {
   "express": "^4.19.2",            // Fast, unopinionated, minimalist web framework for Node.js.
-  "mongoose": "^8.3.0",            // MongoDB object modeling tool designed to work in an asynchronous environment.
+  "mongoose": "^8.19.1",           // MongoDB object modeling tool designed to work in an asynchronous environment.
   "jsonwebtoken": "^9.0.2",        // An implementation of JSON Web Tokens for authorization.
   "bcryptjs": "^2.4.3",            // A library to help hash passwords.
-  "express-validator": "^7.0.1",   // Middleware for Express that wraps validator.js.
-  "googleapis": "^134.0.0",        // Google APIs client library for Node.js.
+  "express-validator": "^7.2.1",   // Middleware for Express that wraps validator.js.
+  "googleapis": "^164.0.0",        // Google APIs client library for Node.js.
   "cors": "^2.8.5",                // Provides a Connect/Express middleware that can be used to enable CORS.
-  "dotenv": "^16.4.5"              // Loads environment variables from a .env file into process.env.
+  "dotenv": "^16.4.5",             // Loads environment variables from a .env file into process.env.
+  "node-cron": "^3.0.3",           // Task scheduling for automated data synchronization.
+  "axios": "^1.7.9",               // Promise-based HTTP client for external API calls.
+  "crypto": "^1.0.1",              // Node.js crypto module for security operations.
+  "node-fetch": "^3.3.2",          // Fetch API for Node.js.
+  "validator": "^13.15.15"         // String validation and sanitization.
 }
 ```
 
 #### Development
 ```json
 {
-  "nodemon": "^3.1.0"              // A tool that helps develop Node.js based applications by automatically restarting the node application when file changes in the directory are detected.
+  "nodemon": "^3.1.0",             // Automatically restarts the Node.js server when file changes are detected.
+  "jest": "^29.7.0",               // JavaScript testing framework.
+  "@jest/globals": "^29.7.0",      // Jest globals for ES modules.
+  "supertest": "^7.1.4",           // HTTP endpoint testing for Express apps.
+  "cross-env": "^7.0.3",           // Cross-platform environment variable setting.
+  "mongodb-memory-server": "^10.1.4" // In-memory MongoDB server for testing.
 }
 ```
 
@@ -242,18 +293,23 @@ health-metrics-monitoring-system/
 - ✅ Express backend following a clear MVC (Model-View-Controller) architecture.
 - ✅ MongoDB Atlas integration with Mongoose ODM for robust data management.
 - ✅ JWT authentication system covering user registration, login, logout, and profile management.
+- ✅ Google Fit OAuth2 integration with secure token management and refresh flow.
+- ✅ Automated data synchronization worker that fetches health metrics from Google Fit API.
+- ✅ Comprehensive health metrics tracking including steps, calories, distance, sleep, weight, heart points, and more.
 - ✅ Centralized error handling with a custom [`ErrorResponse`](server/src/middleware/errorHandler.js) class for consistent API error messages.
 - ✅ [`express-validator`](server/src/middleware/validator.js) input validation chains for all critical API endpoints.
 - ✅ Comprehensive Health Metrics CRUD API (add, update, get by date/range, delete, summary, latest).
 - ✅ Goals Management API (set, get, update, reset, progress tracking).
-- ✅ [`User`](server/src/models/User.js) model with [`bcryptjs`](server/src/models/User.js) password hashing and partial unique indexes for Google ID.
+- ✅ [`User`](server/src/models/User.js) model with [`bcryptjs`](server/src/models/User.js) password hashing and Google Fit token storage.
 - ✅ Data models for [`HealthMetric`](server/src/models/HealthMetric.js), [`Alert`](server/src/models/Alert.js), and [`Analytics`](server/src/models/Analytics.js).
 - ✅ Protected routes with [`JWT middleware`](server/src/middleware/auth.js) to ensure secure access.
 - ✅ CORS configuration for seamless frontend integration.
 - ✅ Environment configuration setup using [`dotenv`](server/src/server.js).
+- ✅ Comprehensive testing suite with Jest and Supertest.
+- ✅ Extensive utility scripts for database management and diagnostics.
 - ✅ Graceful server shutdown handling.
 
-#### Frontend (90% Complete) ✅
+#### Frontend (95% Complete) ✅
 - ✅ React 19 + Vite 7 with Hot Module Replacement (HMR) for a fast development experience.
 - ✅ Tailwind CSS v4 with a custom theme and utility classes for consistent styling.
 - ✅ React Router v7 with protected routes using [`PrivateRoute.jsx`](client/src/components/common/PrivateRoute.jsx).
@@ -271,14 +327,19 @@ health-metrics-monitoring-system/
 - ✅ Comprehensive loading states and error handling across the application.
 - ✅ Health metrics input form ([`MetricsForm.jsx`](client/src/components/dashboard/MetricsForm.jsx)) and display list ([`MetricsList.jsx`](client/src/components/dashboard/MetricsList.jsx)).
 - ✅ Goals setting and display components ([`GoalsForm.jsx`](client/src/components/dashboard/GoalsForm.jsx), [`GoalsSection.jsx`](client/src/components/dashboard/GoalsSection.jsx)).
+- ✅ Date utilities ([`dateUtils.js`](client/src/utils/dateUtils.js)) and validation helpers ([`validation.js`](client/src/utils/validation.js)).
+- ✅ Complete API service layer ([`authService.js`](client/src/services/authService.js), [`goalsService.js`](client/src/services/goalsService.js), [`metricsService.js`](client/src/services/metricsService.js)).
 
 ### Planned Features (In Development)
 - 🚧 Interactive data visualizations with Recharts for health metrics and goal progress.
 - 🚧 Dedicated profile management page with options to update user details.
-- 🚧 Google Fit API integration for automatic health data synchronization.
 - 🚧 Predictive health analytics with Apache Spark for personalized insights.
 - 🚧 Real-time notifications system for goal achievements and health alerts.
 - 🚧 Social features for sharing progress and connecting with friends.
+- 🚧 Advanced dashboard customization and layout options.
+- 🚧 Data export functionality (CSV, JSON, PDF reports).
+- 🚧 Mobile app with React Native.
+- 🚧 Progressive Web App (PWA) capabilities.
 
 ## 🚀 Getting Started
 
@@ -842,7 +903,55 @@ Response: 200 OK
 }
 ```
 
-## 🤝 Contributing
+## � Testing
+
+### Backend Testing
+
+The backend includes a comprehensive test suite using Jest and Supertest:
+
+#### Running Tests
+```bash
+cd server
+npm test              # Run all tests
+npm run test:watch    # Run tests in watch mode
+```
+
+#### Test Structure
+- **Unit Tests**: Test individual functions and utilities
+- **Integration Tests**: Test API endpoints with database operations
+- **Controller Tests**: Test request handlers and business logic
+- **Model Tests**: Test Mongoose schemas and validation
+- **Middleware Tests**: Test authentication, validation, and error handling
+
+#### Test Files
+- `src/__tests__/User.test.js` - User model and authentication tests
+- `src/__tests__/GoogleFitController.test.js` - Google Fit integration tests
+- `src/__tests__/googleFitHelper.test.js` - Google Fit utility functions
+- `src/__tests__/IndexPerformance.test.js` - Database performance tests
+- `tests/User.test.js` - Additional user-related tests
+- `tests/googleFitHelper.test.js` - Google Fit helper tests
+
+#### Manual Testing
+- `tests/GoogleFitControllerManualTests.md` - Manual testing guide for Google Fit features
+- `tests/thunder-client-requests.json` - Thunder Client API testing collection
+
+### Testing Dependencies
+- **Jest**: Testing framework with ES modules support
+- **Supertest**: HTTP endpoint testing for Express apps
+- **MongoDB Memory Server**: In-memory MongoDB for isolated testing
+- **Cross-env**: Cross-platform environment variable support
+
+### Test Coverage
+The test suite covers:
+- ✅ User authentication (register, login, profile management)
+- ✅ Health metrics CRUD operations
+- ✅ Goals management and progress tracking
+- ✅ Google Fit API integration
+- ✅ Input validation and error handling
+- ✅ Database operations and indexing
+- ✅ API endpoint security and authorization
+
+## �🤝 Contributing
 
 Contributions are welcome! Please follow these steps:
 
@@ -872,8 +981,8 @@ This project is licensed under the MIT License.
 
 ---
 
-**Development Status**: ✅ **Core Features Complete** - Backend API fully functional, Frontend authentication, UI foundation, health metrics input, and goal management complete.
+**Development Status**: ✅ **Production Ready** - Backend API fully functional with comprehensive testing, Frontend authentication and dashboard complete with robust API integration.
 
-**Next Steps**: Implement interactive data visualizations, profile management, and Google Fit integration.
+**Current Phase**: Data Visualization & Advanced Features - Adding interactive charts, profile management, and enhanced user experience.
 
-Last Updated: November 4, 2025
+Last Updated: November 9, 2025

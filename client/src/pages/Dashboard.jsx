@@ -27,6 +27,7 @@ import MetricCard from '../components/dashboard/MetricCard';
 import MetricsList from '../components/dashboard/MetricsList';
 import SummaryStats from '../components/dashboard/SummaryStats';
 import GoalsSection from '../components/dashboard/GoalsSection';
+import GoogleFitConnection from '../components/dashboard/GoogleFitConnection';
 import Button from '../components/common/Button';
 import Alert from '../components/common/Alert';
 
@@ -981,6 +982,11 @@ const Dashboard = () => {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* ⭐ NEW: GOOGLE FIT CONNECTION SECTION */}
+          <div className="mb-8">
+            <GoogleFitConnection />
           </div>
 
           {/* ===== ADVANCED COLLAPSIBLE FORM SECTION ===== */}

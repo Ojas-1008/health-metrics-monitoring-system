@@ -24,11 +24,11 @@ Backend API for Health Metrics Monitoring System - A RESTful API built with Node
 **Core Technologies:**
 - **Runtime:** Node.js v18+ (ES Modules only - `"type": "module"`)
 - **Framework:** Express.js 4.19.2 - Fast, unopinionated web framework
-- **Database:** MongoDB Atlas with Mongoose ODM 8.3.0
-- **Authentication:** JWT (jsonwebtoken 9.0.2) + bcrypt 5.1.1 for password hashing
+- **Database:** MongoDB Atlas with Mongoose ODM 8.19.1
+- **Authentication:** JWT (jsonwebtoken 9.0.2) + bcryptjs 2.4.3 for password hashing
 
 **Validation & Security:**
-- **Input Validation:** express-validator 7.0.1 with comprehensive validation chains
+- **Input Validation:** express-validator 7.2.1 with comprehensive validation chains
 - **CORS:** cors 2.8.5 for cross-origin resource sharing (frontend integration)
 - **Security:** helmet (planned) for HTTP headers, partial unique indexes for optional fields
 - **Password Policy:** Min 8 chars, 1 uppercase, 1 number, 1 special character
@@ -36,12 +36,15 @@ Backend API for Health Metrics Monitoring System - A RESTful API built with Node
 
 **Development Tools:**
 - **Hot Reload:** nodemon 3.1.0 - Auto-restart server on file changes
-- **Testing:** Jest 29.7.0 + Supertest 6.3.4 (configured, tests planned)
+- **Testing:** Jest 29.7.0 + Supertest 7.1.4 + mongodb-memory-server 10.1.4 (comprehensive test suite implemented)
 - **Environment:** dotenv 16.4.5 for environment variable management
 
 **External Integrations:**
-- **Google APIs:** googleapis 134.0.0 (Google Fit integration - planned)
+- **Google APIs:** googleapis 164.0.0 (Google Fit integration - fully implemented)
+- **HTTP Client:** axios 1.7.9 for external API calls
+- **Scheduling:** node-cron 3.0.3 for automated sync tasks
 - **Date Handling:** Native JavaScript Date + ISO 8601 format
+- **Validation:** validator 13.15.15 for additional input validation
 
 **Important Notes:**
 - ⚠️ **ES Modules Only:** All code uses `import/export` syntax. No CommonJS `require()`.
@@ -101,7 +104,7 @@ Backend API for Health Metrics Monitoring System - A RESTful API built with Node
   - **Activity:** steps, calories burned, distance (km), active minutes
   - **Sleep:** sleep hours
   - **Body:** weight (kg)
-- Support for manual entry and Google Fit sync (prepared for integration)
+- Support for manual entry and Google Fit automatic sync
 - Optional activities array (e.g., "running", "cycling")
 
 **Data Retrieval:**
@@ -325,12 +328,14 @@ server/
 ├── src/
 │   ├── config/
 │   │   ├── database.js                 # ✅ MongoDB connection with Atlas + event listeners
+│   │   ├── oauth.config.js             # ✅ Google OAuth configuration
 │   │   └── README.md
 │   │
 │   ├── controllers/                    # Request handlers (business logic)
 │   │   ├── authController.js           # ✅ Auth: register, login, getCurrentUser, updateProfile, logout
 │   │   ├── healthMetricsController.js  # ✅ Metrics: add, get, getByDate, delete, summary, latest
 │   │   ├── goalsController.js          # ✅ Goals: set, get, update, reset, getProgress
+│   │   ├── googleFitController.js      # ✅ Google Fit: OAuth, sync, disconnect, status
 │   │   └── README.md
 │   │
 │   ├── middleware/
@@ -349,19 +354,71 @@ server/
 │   │   ├── authRoutes.js               # ✅ /api/auth/* (5 endpoints)
 │   │   ├── healthMetricsRoutes.js      # ✅ /api/metrics/* (6 endpoints)
 │   │   ├── goalsRoutes.js              # ✅ /api/goals/* (5 endpoints)
+│   │   ├── googleFitRoutes.js          # ✅ /api/googlefit/* (4 endpoints)
 │   │   └── README.md
 │   │
 │   ├── services/                       # Business logic layer
-│   │   └── README.md                   # ⏳ Google Fit integration (planned)
+│   │   └── README.md                   # ⏳ Additional services (planned)
 │   │
 │   ├── utils/                          # Helper functions
-│   │   └── README.md                   # ⏳ Date helpers, formatters (planned)
+│   │   ├── googleFitHelper.js          # ✅ Google Fit API helpers and data transformation
+│   │   ├── oauthState.js               # ✅ OAuth state management utilities
+│   │   └── README.md
+│   │
+│   ├── __tests__/                      # Unit and integration tests
+│   │   ├── GoogleFitController.test.js # ✅ Google Fit controller tests
+│   │   ├── googleFitHelper.test.js     # ✅ Google Fit helper tests
+│   │   ├── IndexPerformance.test.js    # ✅ Database index performance tests
+│   │   ├── User.test.js                # ✅ User model tests
+│   │   └── README.md
 │   │
 │   └── server.js                       # ✅ Express app + CORS + routes + error handlers
 │
-├── scripts/                            # Maintenance and utility scripts
-│   ├── fix-googleid-index.js           # ✅ Fix MongoDB partial unique index for googleId
-│   └── verify-metrics.js               # ✅ Database verification script for metrics
+├── scripts/                            # Maintenance and utility scripts (23 files)
+│   ├── check-latest-sync.mjs           # ✅ Sync status verification
+│   ├── check-oauth-scopes.mjs          # ✅ OAuth scope validation
+│   ├── checkDates.mjs                  # ✅ Date validation utilities
+│   ├── checkHeartPoints.mjs            # ✅ Heart points data checking
+│   ├── checkLastSync.mjs               # ✅ Last sync timestamp verification
+│   ├── checkRecentMetrics.mjs          # ✅ Recent metrics validation
+│   ├── checkScope.mjs                  # ✅ OAuth scope checking
+│   ├── checkUserPreferences.mjs        # ✅ User preferences validation
+│   ├── debug-wearable-api.mjs          # ✅ Wearable API debugging
+│   ├── diagnoseSync.mjs                # ✅ Sync diagnostics
+│   ├── displayAllMetrics.mjs           # ✅ Metrics display utility
+│   ├── fix-googleid-index.js           # ✅ MongoDB partial unique index fix
+│   ├── mongoHelper.mjs                 # ✅ MongoDB utility functions
+│   ├── refreshTokenTest.mjs            # ✅ Token refresh testing
+│   ├── resetLastSync.mjs               # ✅ Sync reset utility
+│   ├── setupTestUser.mjs               # ✅ Test user setup
+│   ├── simulateSync.mjs                # ✅ Sync simulation
+│   ├── testAggregation.mjs             # ✅ Aggregation testing
+│   ├── testAllDataSources.mjs          # ✅ Data source testing
+│   ├── testFullSync.mjs                # ✅ Full sync testing
+│   ├── testGoogleFitDataSources.mjs    # ✅ Google Fit data source testing
+│   ├── testRawWeight.mjs               # ✅ Raw weight data testing
+│   ├── testRevokedToken.mjs            # ✅ Revoked token testing
+│   ├── testWeightHeight.mjs            # ✅ Weight/height testing
+│   ├── verify-metrics.js               # ✅ Database verification script for metrics
+│   └── README.md
+│
+├── workers/                            # Background workers
+│   └── googleFitSyncWorker.js          # ✅ Cron-based Google Fit synchronization
+│
+├── migrations/                         # Database migrations
+│   └── create-sync-indexes.js          # ✅ Sync-related index creation
+│
+├── tests/                              # Additional test files
+│   ├── GoogleFitControllerManualTests.md # ✅ Manual testing guide
+│   ├── googleFitHelper.test.js         # ✅ Additional helper tests
+│   ├── thunder-client-requests.json    # ✅ API testing collection
+│   ├── User.test.js                    # ✅ Additional user model tests
+│   └── README.md
+│
+├── config/                             # Configuration files
+│   ├── index.js                        # ✅ Main configuration
+│   ├── oauth.config.js                 # ✅ OAuth configuration
+│   └── README.md
 │
 ├── .env                                # Environment variables (local, not in git)
 ├── .env.example                        # Environment template with all required vars
@@ -1013,6 +1070,73 @@ Authorization: Bearer <token>
 
 ---
 
+### Google Fit Routes (`/api/googlefit`)
+
+#### 1. Initiate Google Fit Connection
+```http
+GET /api/googlefit/connect
+Authorization: Bearer <token>
+```
+
+**Response (302 Redirect):**
+- Redirects to Google OAuth consent screen
+- User grants permission for fitness data access
+- Returns to callback URL after authorization
+
+**Notes:**
+- Requires Google OAuth credentials in environment variables
+- Stores OAuth state for security
+
+#### 2. OAuth Callback (Google Redirects Here)
+```http
+GET /api/googlefit/callback?code=<auth_code>&state=<state>
+```
+
+**Response (302 Redirect):**
+- Processes authorization code
+- Exchanges for access/refresh tokens
+- Updates user with Google Fit connection
+- Redirects to frontend success page
+
+#### 3. Check Connection Status
+```http
+GET /api/googlefit/status
+Authorization: Bearer <token>
+```
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "connected": true,
+    "lastSync": "2025-11-03T10:30:00.000Z",
+    "googleFitConnected": true
+  }
+}
+```
+
+#### 4. Disconnect Google Fit
+```http
+POST /api/googlefit/disconnect
+Authorization: Bearer <token>
+```
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Google Fit disconnected successfully"
+}
+```
+
+**Notes:**
+- Removes Google Fit connection from user profile
+- Stops automatic sync for this user
+- Manual sync can still be triggered if needed
+
+---
+
 ## 🔐 Environment Variables
 
 | Variable | Description | Example |
@@ -1082,6 +1206,12 @@ Base URL: http://localhost:5000
   - Update Goals: PUT /api/goals
   - Reset Goals: DELETE /api/goals
   - Get Progress: GET /api/goals/progress
+
+  Google Fit:
+  - Connect: GET /api/googlefit/connect
+  - OAuth Callback: GET /api/googlefit/callback
+  - Connection Status: GET /api/googlefit/status
+  - Disconnect: POST /api/googlefit/disconnect
 ========================================
 ```
 
@@ -1750,7 +1880,7 @@ describe('Auth Controller', () => {
 |--------|---------|---------|
 | `dev` | `nodemon src/server.js` | Development server with auto-reload on file changes |
 | `start` | `node src/server.js` | Production server (no hot reload) |
-| `test` | `jest` | Run Jest test suite (tests planned) |
+| `test` | `jest` | Run Jest test suite (comprehensive tests implemented) |
 | `test:watch` | `jest --watch` | Run tests in watch mode for development |
 
 ### Maintenance Scripts
@@ -2170,9 +2300,9 @@ MIT License - see [LICENSE](../LICENSE) file for details.
 
 ---
 
-**Last Updated:** November 4, 2025
+**Last Updated:** November 5, 2025
 
-**Development Phase:** ✅ Core Backend Complete | ⏳ Testing & Google Fit Integration In Progress
+**Development Phase:** ✅ Core Backend Complete | ✅ Google Fit Integration Complete | ⏳ Testing & Analytics In Progress
 
 **Status:** 🟢 Production Ready (Core Features) | 🟡 Active Development (Advanced Features)
 
@@ -2254,14 +2384,26 @@ MIT License - see [LICENSE](../LICENSE) file for details.
 - ✅ Overall progress percentage
 - ✅ Validation for all goal types with ranges
 
+**Google Fit Integration (100%)**
+- ✅ OAuth 2.0 authentication flow with Google
+- ✅ Google Fit API data source mapping and fetching
+- ✅ Automatic sync worker (cron-based scheduling)
+- ✅ Manual sync trigger endpoint
+- ✅ Connection status checking
+- ✅ Disconnect Google Fit functionality
+- ✅ Data transformation and storage
+- ✅ Error handling for API failures and rate limits
+- ✅ OAuth state management for security
+- ✅ Comprehensive testing for all Google Fit features
+
 **Testing Infrastructure (90%)**
 - ✅ Jest configuration (ESM support)
 - ✅ Supertest integration
 - ✅ Manual testing workflows documented
 - ✅ Thunder Client collections created
 - ✅ Database verification script (`verify-metrics.js`)
-- ⏳ Automated unit tests (planned)
-- ⏳ Integration tests (planned)
+- ✅ Comprehensive unit tests implemented (4 test files)
+- ⏳ Additional integration tests (in progress)
 
 **Documentation (100%)**
 - ✅ Comprehensive README with all endpoints
@@ -2278,7 +2420,7 @@ MIT License - see [LICENSE](../LICENSE) file for details.
 - ✅ Production server script
 - ✅ GoogleId index fix script
 - ✅ Metrics verification script
-- ✅ Jest test scripts (ready for tests)
+- ✅ Jest test scripts (comprehensive tests implemented)
 
 ---
 
@@ -2301,11 +2443,11 @@ MIT License - see [LICENSE](../LICENSE) file for details.
 ### 📋 Planned Features
 
 **Google Fit Integration**
-- ⏳ OAuth 2.0 authentication flow
-- ⏳ Fetch activity data from Google Fit API
-- ⏳ Sync metrics automatically
-- ⏳ Google Fit service layer (`services/googleFitService.js`)
-- ⏳ Webhook for real-time updates
+- ✅ OAuth 2.0 authentication flow
+- ✅ Fetch activity data from Google Fit API
+- ✅ Sync metrics automatically (cron-based worker)
+- ✅ Google Fit service layer (controllers, helpers, workers)
+- ⏳ Webhook for real-time updates (planned)
 
 **Alert System**
 - ⏳ Alert model implementation
@@ -2393,12 +2535,14 @@ MIT License - see [LICENSE](../LICENSE) file for details.
 - [ ] Integration tests for complete flows
 - [ ] Achieve 80%+ test coverage
 
-**Milestone 2: Google Fit Integration**
-- [ ] Set up Google OAuth 2.0
-- [ ] Implement Google Fit service
-- [ ] Create sync endpoints
-- [ ] Test with real Google Fit data
-- [ ] Handle rate limiting
+**Milestone 2: Google Fit Integration ✅ COMPLETED**
+- [x] Set up Google OAuth 2.0
+- [x] Implement Google Fit service (controllers, helpers, workers)
+- [x] Create sync endpoints
+- [x] Test with real Google Fit data
+- [x] Handle rate limiting and error cases
+
+**Milestone 3: Alert System**
 
 **Milestone 3: Alert System**
 - [ ] Implement Alert model
