@@ -624,12 +624,47 @@ export const getLatestMetrics = asyncHandler(async (req, res, next) => {
   });
 });
 
+/**
+ * ============================================
+ * DELETE METRICS BY DATE
+ * ============================================
+ * Deletes all health metrics for the authenticated user on a specific date
+ * 
+ * @route DELETE /api/metrics?date=YYYY-MM-DD
+ * @access Private (requires authentication)
+ * @param {string} req.query.date - Date in YYYY-MM-DD format
+ * @returns {object} JSON response with deletion count
+ */
+export const deleteMetricsByDate = asyncHandler(async (req, res, next) => {
+  const { date } = req.query;
+  const userId = req.user._id; // From protect middleware
+
+  // Delete all metrics for the user on the specified date
+  const result = await HealthMetric.deleteMany({
+    userId,
+    date: {
+      $gte: new Date(date + 'T00:00:00.000Z'), // Start of day (UTC)
+      $lt: new Date(date + 'T23:59:59.999Z')   // End of day (UTC)
+    }
+  });
+
+  // Respond with success and count
+  res.status(200).json({
+    success: true,
+    message: `Successfully deleted ${result.deletedCount} health metric(s) for date ${date}`,
+    deletedCount: result.deletedCount,
+    date,
+    timestamp: new Date().toISOString()
+  });
+});
+
 export default {
   addOrUpdateMetrics,
   getMetricsByDateRange,
   getMetricsByDate,
   updateMetric,
   deleteMetrics,
+  deleteMetricsByDate,
   getMetricsSummary,
   getLatestMetrics,
 };

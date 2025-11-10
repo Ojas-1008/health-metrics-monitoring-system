@@ -1,4 +1,4 @@
-import { body, validationResult } from "express-validator";
+import { body, validationResult, query } from "express-validator";
 import User from "../models/User.js";
 
 /**
@@ -344,6 +344,19 @@ const validateHealthMetric = [
 
 /**
  * ============================================
+ * VALIDATE DELETE METRICS BY DATE
+ * ============================================
+ * Validates query parameters for deleting health metrics by date
+ */
+const validateDeleteMetrics = [
+  query('date')
+    .isISO8601({ strict: true, strictSeparator: true })
+    .withMessage('Date must be in YYYY-MM-DD format (ISO 8601)'),
+  handleValidationErrors
+];
+
+/**
+ * ============================================
  * EMAIL VALIDATION (Standalone)
  * ============================================
  *
@@ -397,6 +410,7 @@ export {
 
   // Health metrics validations
   validateHealthMetric,
+  validateDeleteMetrics,
 
   // Utility validations
   validateEmail,

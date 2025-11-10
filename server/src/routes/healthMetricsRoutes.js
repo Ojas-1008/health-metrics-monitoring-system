@@ -5,6 +5,7 @@ import {
   getMetricsByDate,
   updateMetric,
   deleteMetrics,
+  deleteMetricsByDate,
   getMetricsSummary,
   getLatestMetrics,
 } from "../controllers/healthMetricsController.js";
@@ -12,6 +13,7 @@ import {
 import { protect } from "../middleware/auth.js";
 import {
   validateHealthMetric,
+  validateDeleteMetrics,
   handleValidationErrors,
 } from "../middleware/validator.js";
 
@@ -64,6 +66,15 @@ router.get("/latest", protect, getLatestMetrics);
  * @access  Private
  */
 router.get("/:date", protect, getMetricsByDate);
+
+// ----- Delete Metrics by Date (Query Parameter) -----
+/**
+ * @route   DELETE /api/metrics?date=YYYY-MM-DD
+ * @desc    Delete all metrics for a specific date
+ * @access  Private
+ * @query   date=YYYY-MM-DD
+ */
+router.delete("/", protect, validateDeleteMetrics, deleteMetricsByDate);
 
 // ----- Update Metrics for Specific Date -----
 /**
