@@ -22,6 +22,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import * as metricsService from '../services/metricsService';
 import * as dateUtils from '../utils/dateUtils';
+import { getAuthToken } from '../api/axiosConfig';
+import { connectSSE, disconnectSSE } from '../services/sseService';
 import MetricsForm from '../components/dashboard/MetricsForm';
 import MetricCard from '../components/dashboard/MetricCard';
 import MetricsList from '../components/dashboard/MetricsList';
@@ -597,8 +599,44 @@ const Dashboard = () => {
     loadMetricsRange();
     loadSummaryStats('week');
 
+    // Connect to SSE for real-time updates
+    const token = getAuthToken();
+    if (token) {
+      connectSSE(token, {
+        onConnect: () => {
+          console.log('[Dashboard] SSE connected for real-time updates');
+        },
+        onConnected: (data) => {
+          console.log('[Dashboard] SSE authenticated and ready:', data);
+        },
+        onMetricsUpdate: (data) => {
+          console.log('[Dashboard] Real-time metrics update:', data);
+          // Refresh metrics data when updated via SSE
+          loadTodayMetrics();
+          loadMetricsRange();
+        },
+        onGoalsUpdate: (data) => {
+          console.log('[Dashboard] Real-time goals update:', data);
+          // GoalsSection component handles its own data loading
+          // No need to refresh here as component will reload when needed
+        },
+        onGoogleFitSync: (data) => {
+          console.log('[Dashboard] Google Fit sync completed:', data);
+          // Refresh all data after sync
+          loadTodayMetrics();
+          loadMetricsRange();
+          loadSummaryStats(summaryPeriod);
+        },
+        onError: (error) => {
+          console.error('[Dashboard] SSE connection error:', error);
+        }
+      });
+    }
+
     return () => {
       trackAction('DASHBOARD_UNMOUNTED');
+      // Disconnect SSE on unmount
+      disconnectSSE();
       if (refreshTimeoutRef.current) {
         clearTimeout(refreshTimeoutRef.current);
       }

@@ -21,6 +21,7 @@ import User from "../src/models/User.js";
 import HealthMetric from "../src/models/HealthMetric.js";
 import oauthConfig from "../src/config/oauth.config.js";
 import { refreshGoogleFitToken, getValidAccessToken } from "../src/utils/googleFitHelper.js";
+import { emitToUser } from "../src/utils/eventEmitter.js";
 
 /**
  * ============================================
@@ -596,6 +597,19 @@ const syncUserGoogleFitData = async (user) => {
     upsertedCount = allDates.size;
 
     console.log(`    ✅ Upserted ${upsertedCount} health metric documents`);
+
+    // ===== BROADCAST: Notify connected clients of Google Fit sync =====
+    if (upsertedCount > 0) {
+      emitToUser(user._id, 'googlefit:synced', {
+        syncedDates: Array.from(allDates).sort(),
+        totalDays: upsertedCount,
+        syncedAt: new Date(),
+        syncWindow: {
+          startDate: syncWindow.startDate,
+          endDate: syncWindow.endDate
+        }
+      });
+    }
 
     // ===== STEP 5: UPDATE USER lastSyncAt ATOMICALLY =====
     // Use findByIdAndUpdate to ensure atomic update

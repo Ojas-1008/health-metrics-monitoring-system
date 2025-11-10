@@ -28,6 +28,7 @@
 
 import HealthMetric from "../models/HealthMetric.js";
 import { asyncHandler, ErrorResponse } from "../middleware/errorHandler.js";
+import { emitToUser } from "../utils/eventEmitter.js";
 
 /**
  * ============================================
@@ -246,6 +247,14 @@ export const addOrUpdateMetrics = asyncHandler(async (req, res, next) => {
     }
   );
 
+  // ===== BROADCAST: Notify connected clients of metrics update =====
+  emitToUser(req.user._id, 'metrics:updated', {
+    date: healthMetric.date,
+    metrics: healthMetric.metrics,
+    source: healthMetric.source,
+    lastUpdated: healthMetric.lastUpdated
+  });
+
   res.status(200).json({
     success: true,
     message: "Health metrics saved successfully",
@@ -411,6 +420,14 @@ export const updateMetric = asyncHandler(async (req, res, next) => {
   existingMetric.metrics = updatedMetrics;
   await existingMetric.save();
 
+  // ===== BROADCAST: Notify connected clients of metrics update =====
+  emitToUser(req.user._id, 'metrics:updated', {
+    date: existingMetric.date,
+    metrics: existingMetric.metrics,
+    source: existingMetric.source,
+    lastUpdated: existingMetric.lastUpdated
+  });
+
   res.status(200).json({
     success: true,
     message: "Health metrics updated successfully",
@@ -450,6 +467,12 @@ export const deleteMetrics = asyncHandler(async (req, res, next) => {
       new ErrorResponse(`No health metrics found for date: ${date}`, 404)
     );
   }
+
+  // ===== BROADCAST: Notify connected clients of metrics deletion =====
+  emitToUser(req.user._id, 'metrics:deleted', {
+    date: healthMetric.date,
+    deletedAt: new Date()
+  });
 
   res.status(200).json({
     success: true,

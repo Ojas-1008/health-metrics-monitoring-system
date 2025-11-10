@@ -9,6 +9,7 @@ import authRoutes from "./routes/authRoutes.js";
 import healthMetricsRoutes from "./routes/healthMetricsRoutes.js";
 import goalsRoutes from "./routes/goalsRoutes.js";
 import googleFitRoutes from "./routes/googleFitRoutes.js";
+import eventsRoutes from "./routes/eventsRoutes.js";
 
 // Import Workers
 import { startSyncWorker } from "../workers/googleFitSyncWorker.js";
@@ -123,6 +124,9 @@ app.use("/api/goals", goalsRoutes);
 
 // Google Fit OAuth Routes
 app.use("/api/googlefit", googleFitRoutes);
+
+// Real-time Events Routes (SSE)
+app.use("/api/events", eventsRoutes);
 
 /**
  * ============================================

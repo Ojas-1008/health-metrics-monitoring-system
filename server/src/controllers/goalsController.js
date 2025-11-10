@@ -23,6 +23,7 @@
 
 import User from "../models/User.js";
 import { asyncHandler, ErrorResponse } from "../middleware/errorHandler.js";
+import { emitToUser } from "../utils/eventEmitter.js";
 
 /**
  * ============================================
@@ -73,6 +74,12 @@ export const setGoals = asyncHandler(async (req, res, next) => {
 
   // ===== SAVE USER: Mongoose Validation Runs Automatically =====
   await user.save();
+
+  // ===== BROADCAST: Notify connected clients of goals update =====
+  emitToUser(req.user._id, 'goals:updated', {
+    goals: user.goals,
+    updatedAt: new Date()
+  });
 
   // ===== RESPONSE =====
   res.status(200).json({
@@ -151,6 +158,12 @@ export const updateGoals = asyncHandler(async (req, res, next) => {
 
   // ===== SAVE USER: Run Validators =====
   await user.save();
+
+  // ===== BROADCAST: Notify connected clients of goals update =====
+  emitToUser(req.user._id, 'goals:updated', {
+    goals: user.goals,
+    updatedAt: new Date()
+  });
 
   // ===== RESPONSE =====
   res.status(200).json({

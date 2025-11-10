@@ -23,66 +23,247 @@ React 19 frontend application for Health Metrics Monitoring System - A modern, r
 
 ## 🛠 Tech Stack
 
-- **Framework:** React 19.2.0
-- **Build Tool:** Vite 7.1.7
-- **Styling:** Tailwind CSS 4.1.14
-- **Routing:** React Router DOM 7.9.4
-- **State Management:** Context API (AuthContext)
-- **HTTP Client:** Axios 1.12.2 (with interceptors)
-- **Charts:** Recharts 3.3.0
-- **Date Utilities:** date-fns 4.1.0
-- **Dev Server:** Vite with HMR
+**Framework & Build:**
+- **React 19.2.0** - Latest React with latest hooks and features
+- **Vite 7.1.7** - Lightning-fast build tool with HMR (Hot Module Replacement)
+- **Node 18+** - JavaScript runtime
+
+**Styling & UI:**
+- **Tailwind CSS 4.1.14** - Utility-first CSS framework with v4 @tailwindcss/postcss plugin
+- **Custom Tailwind Config** - Extended with primary color palette (50-900 range)
+- **Responsive Design** - Mobile-first approach with breakpoints
+
+**Routing & Navigation:**
+- **React Router DOM 7.9.4** - Latest version with modern routing patterns
+- **Protected Routes** - PrivateRoute component for auth-only pages
+- **Route Guards** - AuthRoute for preventing authenticated users accessing auth pages
+
+**State Management:**
+- **React Context API** - AuthContext for authentication state
+- **localStorage** - Persistent JWT token storage
+- **React Hooks** - useState, useEffect, useCallback, useRef for component state
+- **Zustand 5.0.8** - Lightweight store management (installed for future use)
+
+**HTTP & API:**
+- **Axios 1.12.2** - HTTP client with request/response interceptors
+- **JWT Token Handling** - Automatic token attachment to protected requests
+- **Error Handling** - Centralized error handling with 401 redirect
+
+**Data & Visualization:**
+- **Recharts 3.3.0** - React chart library for metrics visualization
+- **date-fns 4.1.0** - Modern date utility library (installed)
+- **Custom Date Utils** - 717 lines of date handling utilities
+
+**Development Tools:**
+- **ESLint** - Code quality and style enforcement
+- **Vite Dev Server** - Port 5173 with API proxy to localhost:5000
 
 ---
 
 ## ✨ Features
 
-### ✅ **Implemented Features**
+### ✅ **Fully Implemented Features**
 
-**Authentication System**
-- Complete JWT-based authentication with AuthContext
-- Login and registration with form validation
-- Password strength indicator
-- Protected routes with PrivateRoute component
-- Automatic token attachment via Axios interceptors
-- Persistent authentication with localStorage
+#### **1. Complete JWT Authentication System** (696 lines)
+- **File:** `src/services/authService.js`
+- **Features:**
+  - User registration with comprehensive validation (name, email, password, confirmation)
+  - Login with email/password credentials
+  - Get current authenticated user profile
+  - Update user profile (name, picture, goals)
+  - Logout functionality
+  - Automatic token storage/retrieval from localStorage
+  - Client-side password strength validation (8+ chars, 1 uppercase, 1 number, 1 special char)
+  - Email format validation
+  - Input sanitization before API calls
+  - Standardized error response handling
+  - Integration with Axios interceptors for token attachment
 
-**Dashboard**
-- Comprehensive health metrics dashboard
-- Health metrics input form with validation
-- Metrics list display with date filtering
-- Summary statistics (weekly, monthly, yearly)
-- Goals section with progress tracking
-- Trend analysis and progress bars
-- Real-time data refresh
+#### **2. Authentication Context & State Management** (447 lines)
+- **File:** `src/context/AuthContext.jsx`
+- **Features:**
+  - Global authentication state using React Context API
+  - Auto-initialization on app load (checks for existing token)
+  - Login state management with loading/error states
+  - Register state management
+  - Logout clearing local state
+  - Profile update functionality
+  - User object with structure: `{ id, name, email, profilePicture, googleFitConnected, goals, createdAt }`
+  - Initialized flag to prevent auth flashing
+  - Custom `useAuth()` hook for component consumption
+  - Development console logging for debugging
 
-**Health Metrics Management**
-- Add daily health metrics (steps, calories, distance, sleep, weight, heart rate, active minutes)
-- View metrics history with date range filtering
-- Edit and delete metrics
-- Automatic progress calculation
-- Visual progress indicators
+#### **3. Route Protection & Private Routes** (139 lines)
+- **File:** `src/components/common/PrivateRoute.jsx`
+- **Features:**
+  - Protects routes requiring authentication
+  - Shows loading spinner during auth check (prevents flash)
+  - Redirects unauthenticated users to login
+  - Preserves intended destination for post-login redirect
+  - Prevents flash of protected content during initialization
+  - Works seamlessly with React Router v7
 
-**Goals Management**
-- Set fitness goals (weight, steps, sleep, calories, distance)
-- Track goal progress with visual indicators
-- Edit and update goals
-- Achievement badges for completed goals
-- Progress bars for each goal type
+#### **4. API Configuration & Interceptors** (285 lines)
+- **File:** `src/api/axiosConfig.js`
+- **Features:**
+  - Configured Axios instance with base URL and timeout
+  - Request interceptor: Automatic JWT token attachment to Authorization header
+  - Response interceptor: Centralized error handling
+  - 401 error handling: Clears token and redirects to login
+  - 400/403/404/500 error handling with user-friendly messages
+  - Network error detection and messaging
+  - Development console logging for all requests/responses
+  - Environment variable support (VITE_API_URL, VITE_API_TIMEOUT, VITE_TOKEN_KEY)
 
-**UI Components**
-- Reusable component library (Button, Input, Card, Alert)
-- Responsive layouts for mobile and desktop
-- Custom Tailwind utility classes
-- Loading states and error handling
-- Modal dialogs for forms
+#### **5. Health Metrics Management** (643 lines)
+- **File:** `src/services/metricsService.js`
+- **Features:**
+  - Add/update daily metrics (upsert by date)
+  - Get metrics by date range with query parameters
+  - Get metrics for specific date
+  - Delete metrics by date
+  - Get latest metrics entry
+  - Calculate summaries (week, month, year) with aggregations
+  - Validation: Date format, metrics object validation, date range validation
+  - Supported metrics: steps, distance, calories, activeMinutes, weight, sleepHours
+  - Source tracking (manual vs. googlefit)
+  - Optional activities array for activities performed
+  - Error handling for all operations
+  - Response format: `{ success, message, count, data }`
 
-**Routing**
-- React Router v7 with protected routes
-- Public routes: Home, Login, Register
-- Protected routes: Dashboard
-- 404 Not Found page
-- Automatic redirects based on auth status
+#### **6. Fitness Goals Management** (562 lines)
+- **File:** `src/services/goalsService.js`
+- **Features:**
+  - Set/update user fitness goals (create or update)
+  - Get current user goals
+  - Partial goal updates (modify only specified goals)
+  - Reset goals to default values
+  - Get goal progress with achievement tracking
+  - 5 goal types with validation ranges:
+    - **Weight Goal:** 30-300 kg
+    - **Step Goal:** 1000-50000 steps/day
+    - **Sleep Goal:** 4-12 hours/night
+    - **Calorie Goal:** 500-5000 calories/day
+    - **Distance Goal:** 0.5-100 km/day
+  - Progress calculation: percentage completion, remaining amount, achievement status
+  - Overall progress percentage across all goals
+  - Default values applied on registration: steps: 10000, sleep: 8, calories: 2000, distance: 5, weight: null
+
+#### **7. Google Fit Integration** (450 lines)
+- **File:** `src/services/googleFitService.js`
+- **Features:**
+  - Initiate Google Fit OAuth flow
+  - Get connection status (connected, lastSync timestamp)
+  - Disconnect Google Fit account
+  - Manual sync trigger
+  - User-friendly error handling
+  - OAuth state token validation
+  - Integration with backend OAuth flow
+
+#### **8. Dashboard & Metrics Display** (1376 lines)
+- **File:** `src/pages/Dashboard.jsx`
+- **Features:**
+  - Comprehensive state management for metrics, goals, summary stats
+  - Today's metrics display with card-based layout
+  - Previous day metrics for trend comparison
+  - Metrics form for adding/updating daily data
+  - Metrics list with date range filtering
+  - Date range selection (last 7/30/90/365 days, custom)
+  - Summary statistics (week, month, year)
+  - Goals section with progress tracking
+  - Google Fit connection status
+  - Auto-refresh after data changes
+  - Loading states and error handling
+  - Real-time data updates
+
+#### **9. Authentication Pages** (368 lines + 465 lines)
+- **Files:** `src/pages/Login.jsx`, `src/pages/Register.jsx`
+- **Features:**
+  - Complete login page with form validation
+  - Complete registration page with password strength indicator
+  - Real-time field validation with error messages
+  - Touch-based validation (validate on blur, show on touch)
+  - Loading states during API calls
+  - Error and success alerts
+  - Remember me functionality
+  - Links to alternate auth page
+  - Auto-redirect if already authenticated
+  - Responsive design for mobile/desktop
+  - Password strength meter with color indicators (weak/fair/good/strong)
+
+#### **10. Date Utilities & Formatting** (717 lines)
+- **File:** `src/utils/dateUtils.js`
+- **Features:**
+  - Multiple date formatting functions:
+    - Short format: `"Nov 04, 2025"`
+    - Long format: `"Monday, November 4, 2025"`
+    - ISO format: `"2025-11-04"`
+    - Custom pattern format
+  - Date range calculation functions:
+    - Last 7/30/90/365 days
+    - Current week/month/year
+    - Custom date ranges
+  - Date arithmetic (add/subtract days)
+  - Date validation and parsing
+  - Relative date labels ("Today", "Yesterday", "Last week", etc.)
+  - Date comparison utilities
+  - UTC midnight normalization (matches backend convention)
+  - Date parsing from various inputs
+
+#### **11. Client-Side Validation** (333 lines)
+- **File:** `src/utils/validation.js`
+- **Features:**
+  - Email validation (format check)
+  - Password validation (strength requirements matching backend)
+  - Name validation (length, character type)
+  - Password confirmation matching
+  - Password strength calculation with feedback
+  - Metrics value validation (ranges, types)
+  - Goals value validation (ranges, types)
+  - All validations match backend requirements exactly
+  - Real-time validation feedback
+  - Detailed error messages
+
+#### **12. Reusable UI Components** 
+- **Directory:** `src/components/common/`
+- **Components:**
+  - **Button.jsx** - Customizable button with variants, loading state, disabled state
+  - **Input.jsx** - Text input with label, placeholder, error display, optional icons
+  - **Card.jsx** - Container component with flexible styling
+  - **Alert.jsx** - Alert/notification component with types (success, error, warning, info)
+  - **PrivateRoute.jsx** - Route protection wrapper
+
+#### **13. Page Components**
+- **Home Page** (`pages/Home.jsx`) - Landing page
+- **Dashboard Page** (`pages/Dashboard.jsx`) - Main application interface
+- **Login Page** (`pages/Login.jsx`) - Authentication
+- **Register Page** (`pages/Register.jsx`) - User registration
+- **Not Found Page** (`pages/NotFound.jsx`) - 404 handling
+
+#### **14. Application Routing** (170+ lines)
+- **File:** `App.jsx`
+- **Routes:**
+  - Public: `/`, `/home`
+  - Auth (redirect if logged in): `/login`, `/register`
+  - Protected: `/dashboard`, `/profile`, `/settings`
+  - Test: `/test/googlefit`
+  - Catch-all: `*` (404)
+- **Route Guards:**
+  - AuthRoute: Redirects authenticated users from auth pages
+  - PrivateRoute: Protects app routes
+- **Features:**
+  - Router-level loading states
+  - Automatic auth status checks
+  - Clean URL structure
+
+#### **15. Development Utilities**
+- **Window Exposure** - Services available in console during development
+  - `window.authService`
+  - `window.metricsService`
+  - `window.goalsService`
+  - `window.dateUtils`
+- **Development Logging** - Comprehensive console logging with emojis
+- **Debug Component** - `src/debug.js` for console utilities
 
 ---
 
@@ -90,31 +271,106 @@ React 19 frontend application for Health Metrics Monitoring System - A modern, r
 
 ```
 client/
-├── public/                          # Static assets (vite.svg)
+├── public/                          # Static assets
+│   └── vite.svg                    # Vite logo
+│
 ├── src/
-│   ├── api/                         # API configuration
-│   │   └── axiosConfig.js          # Configured Axios instance with interceptors
-│   ├── assets/                      # Images, icons, fonts
-│   │   └── README.md
-│   ├── components/                  # Reusable UI components
-│   │   ├── auth/                   # Authentication components (empty)
-│   │   ├── charts/                 # Chart wrapper components (empty)
-│   │   ├── common/                 # Shared UI components
-│   │   │   ├── Alert.jsx           # Alert/notification component
-│   │   │   ├── Button.jsx          # Reusable button with variants
-│   │   │   ├── Card.jsx            # Card container component
-│   │   │   ├── Input.jsx           # Form input with validation
-│   │   │   └── PrivateRoute.jsx    # Protected route wrapper
+│   ├── api/                         # API configuration layer (285 lines)
+│   │   └── axiosConfig.js          # ✅ Axios instance, interceptors, error handling (285 lines)
+│   │
+│   ├── context/                     # React Context for state management
+│   │   └── AuthContext.jsx         # ✅ Global auth state, login/register/logout (447 lines)
+│   │
+│   ├── services/                    # API service layer (3001 lines total)
+│   │   ├── authService.js          # ✅ Auth operations: register, login, getCurrentUser, logout (696 lines)
+│   │   ├── metricsService.js       # ✅ Metrics CRUD: add, get, delete, summary (643 lines)
+│   │   ├── goalsService.js         # ✅ Goals management: set, get, update, reset, progress (562 lines)
+│   │   ├── googleFitService.js     # ✅ Google Fit OAuth: connect, status, disconnect (450 lines)
+│   │   └── README.md               # Service layer documentation
+│   │
+│   ├── utils/                       # Utility functions (1050 lines total)
+│   │   ├── dateUtils.js            # ✅ Date formatting, ranges, arithmetic (717 lines)
+│   │   ├── validation.js           # ✅ Client-side validation matching backend (333 lines)
+│   │   └── README.md               # Utilities documentation
+│   │
+│   ├── components/                  # Reusable React components
+│   │   ├── common/                 # ✅ Reusable UI components
+│   │   │   ├── Button.jsx          # ✅ Customizable button component
+│   │   │   ├── Input.jsx           # ✅ Form input with validation display
+│   │   │   ├── Card.jsx            # ✅ Container/card component
+│   │   │   ├── Alert.jsx           # ✅ Alert/notification component
+│   │   │   ├── PrivateRoute.jsx    # ✅ Route protection wrapper (139 lines)
+│   │   │   └── README.md           # Component documentation
+│   │   │
+│   │   ├── auth/                   # Authentication components (future)
+│   │   │   └── (empty - future use)
+│   │   │
 │   │   ├── dashboard/              # Dashboard-specific components
-│   │   │   ├── GoalsForm.jsx       # Form for setting/editing goals
-│   │   │   ├── GoalsSection.jsx    # Goals display with progress
-│   │   │   ├── MetricCard.jsx      # Individual metric display card
-│   │   │   ├── MetricsForm.jsx     # Form for adding health metrics
-│   │   │   ├── MetricsList.jsx     # List of health metrics
-│   │   │   └── SummaryStats.jsx    # Summary statistics display
+│   │   │   ├── MetricsForm.jsx     # Health metrics input form
+│   │   │   ├── MetricCard.jsx      # Single metric card display
+│   │   │   ├── MetricsList.jsx     # List of metrics with filtering
+│   │   │   ├── SummaryStats.jsx    # Summary statistics display
+│   │   │   ├── GoalsSection.jsx    # Goals display and management
+│   │   │   ├── GoogleFitConnection.jsx # Google Fit status
+│   │   │   └── (additional dashboard components)
+│   │   │
+│   │   ├── metrics/                # Metrics-specific components (future)
+│   │   │   └── (organized for metrics features)
+│   │   │
+│   │   ├── charts/                 # Chart components using Recharts
+│   │   │   └── (chart visualizations)
+│   │   │
 │   │   ├── layout/                 # Layout components
-│   │   │   ├── Header.jsx          # App header/navigation
-│   │   │   └── Layout.jsx          # Main layout wrapper
+│   │   │   └── (app layout structure)
+│   │   │
+│   │   ├── test/                   # Test/debug components
+│   │   │   └── GoogleFitTest.jsx   # Google Fit testing component
+│   │   │
+│   │   └── README.md               # Components documentation
+│   │
+│   ├── pages/                       # Page-level components (2400+ lines total)
+│   │   ├── Home.jsx                # Landing page
+│   │   ├── Login.jsx               # ✅ Login page with form (368 lines)
+│   │   ├── Register.jsx            # ✅ Registration page with strength meter (465 lines)
+│   │   ├── Dashboard.jsx           # ✅ Main app dashboard (1376 lines)
+│   │   ├── NotFound.jsx            # 404 page
+│   │   ├── auth/                   # Auth-related pages (future)
+│   │   ├── dashboard/              # Dashboard variations (future)
+│   │   └── README.md               # Pages documentation
+│   │
+│   ├── hooks/                       # Custom React hooks (future)
+│   │   └── README.md               # Hooks documentation
+│   │
+│   ├── layouts/                     # Layout wrapper components (future)
+│   │   └── README.md               # Layouts documentation
+│   │
+│   ├── stores/                      # Zustand stores (future)
+│   │   └── README.md               # Stores documentation
+│   │
+│   ├── assets/                      # Images, icons, fonts
+│   │   └── README.md               # Assets documentation
+│   │
+│   ├── App.jsx                      # ✅ Main app component with routing (170 lines)
+│   ├── App.css                      # Application styles
+│   ├── main.jsx                     # ✅ App entry point with service exposure (45 lines)
+│   ├── index.css                    # Global styles
+│   ├── debug.js                     # Debug utilities
+│   └── README.md                    # (This file)
+│
+├── App.css                          # Global application styles
+├── App.jsx                          # Main app component with React Router
+├── main.jsx                         # Application entry point
+├── index.css                        # Tailwind CSS imports
+├── debug.js                         # Debugging utilities
+├── vite.config.js                   # ✅ Vite configuration with API proxy
+├── tailwind.config.js               # ✅ Tailwind CSS config with primary colors
+├── postcss.config.js                # PostCSS configuration with Tailwind
+├── index.html                       # HTML entry point
+├── package.json                     # ✅ Dependencies and scripts
+├── package-lock.json                # Locked dependency versions
+├── eslint.config.js                 # ESLint configuration
+├── .gitignore                       # Git ignore rules
+└── README.md                        # Frontend README
 │   │   ├── metrics/                # Metrics-specific components (empty)
 │   │   └── README.md
 │   ├── context/                     # React Context providers
@@ -1396,6 +1652,446 @@ Main dependencies:
 - Backend server: `5000`
 - MongoDB: `27017` (local) or Atlas (cloud)
 
+---
+
+## 🚀 Setup Instructions
+
+### Prerequisites
+
+- Node.js v18+ installed
+- npm or yarn
+- Backend server running on `http://localhost:5000`
+
+### Installation Steps
+
+**1. Install Dependencies**
+```bash
+cd client
+npm install
+```
+
+**2. Start Development Server**
+```bash
+npm run dev
+```
+
+**Expected Output:**
+```
+  VITE v7.1.7  ready in 123 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  press h + enter to show help
+```
+
+**3. Open in Browser**
+- Navigate to `http://localhost:5173`
+- Login or register to access the dashboard
+
+### Environment Configuration
+
+Create `.env.local` in `client/` directory:
+
+```env
+# API Configuration
+VITE_API_URL=http://localhost:5000/api
+VITE_API_TIMEOUT=10000
+
+# Authentication
+VITE_TOKEN_KEY=health_metrics_token
+
+# Environment
+VITE_NODE_ENV=development
+```
+
+---
+
+## 💻 Development Workflow
+
+**1. Start Development Server**
+```bash
+npm run dev
+```
+
+**2. Make Changes**
+- Edit files in `src/`
+- Vite auto-reloads (HMR) immediately
+- Check browser console for errors
+
+**3. Test Components**
+- Use browser DevTools
+- Services exposed in console (development only)
+- Import and test in browser console
+
+### Code Quality Standards
+
+**ES Modules Syntax (Required):**
+```javascript
+// ✅ Correct
+import React from 'react';
+export const MyComponent = () => {};
+
+// ❌ Wrong - NOT supported
+const React = require('react');
+module.exports = MyComponent;
+```
+
+**Component Structure:**
+```jsx
+/**
+ * ComponentName Component
+ * @description Purpose of this component
+ */
+function ComponentName({ prop1, prop2 }) {
+  const [state, setState] = useState(null);
+
+  useEffect(() => {
+    // Effect logic
+  }, []);
+
+  const handleEvent = () => {
+    // Handler logic
+  };
+
+  return (
+    <div>
+      {/* JSX */}
+    </div>
+  );
+}
+
+export default ComponentName;
+```
+
+**Naming Conventions:**
+- Components: PascalCase (`MetricsForm`, `DashboardPage`)
+- Functions: camelCase (`handleSubmit`, `fetchMetrics`)
+- Constants: SCREAMING_SNAKE_CASE (`MAX_METRICS`, `API_TIMEOUT`)
+- Variables: camelCase (`userData`, `isLoading`)
+- CSS classes: kebab-case (from Tailwind)
+
+### Debugging Tips
+
+**View Console Services (Dev Only):**
+```javascript
+// Services available as window properties
+window.authService
+window.metricsService
+window.goalsService
+window.dateUtils
+
+// Test in console
+window.authService.register({...})
+window.metricsService.addMetric(...)
+```
+
+**Check localStorage:**
+```javascript
+// View token
+localStorage.getItem('health_metrics_token')
+
+// Clear storage
+localStorage.clear()
+```
+
+**Common Issues:**
+
+| Issue | Solution |
+|-------|----------|
+| `VITE_API_URL not found` | Restart dev server after editing .env.local |
+| `Cannot find module` | Run `npm install` and restart dev server |
+| `Port 5173 in use` | Use `npm run dev -- --port 5174` |
+| `API calls fail` | Verify backend running on port 5000 |
+| `Blank screen` | Check browser console, verify token in localStorage |
+
+---
+
+## 🎨 Styling System
+
+### Tailwind CSS v4 Setup
+
+Custom primary color palette:
+
+```javascript
+// tailwind.config.js
+colors: {
+  primary: {
+    50: '#eff6ff',   // Lightest
+    500: '#3b82f6',  // Main
+    900: '#1e3a8a'   // Darkest
+  }
+}
+```
+
+**Usage:**
+```jsx
+<p className="text-primary-600">Primary text</p>
+<div className="bg-primary-50">Light background</div>
+<button className="bg-primary-500 hover:bg-primary-600">Button</button>
+```
+
+### Common Utility Patterns
+
+```jsx
+// Spacing
+<div className="p-4 m-2 space-y-4">
+
+// Typography
+<h1 className="text-3xl font-bold">Heading</h1>
+
+// Layout
+<div className="flex items-center justify-between">
+
+// Responsive
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+
+// States
+<button className="hover:bg-gray-100 disabled:opacity-50">
+```
+
+---
+
+## 🔄 State Management Patterns
+
+### Using AuthContext
+
+```jsx
+import { useAuth } from '../context/AuthContext';
+
+function MyComponent() {
+  const { user, login, logout, loading, isAuthenticated } = useAuth();
+
+  const handleLogin = async () => {
+    const result = await login({ email, password });
+    if (result.success) {
+      // Success
+    }
+  };
+
+  if (!isAuthenticated) return <div>Please login</div>;
+  return <div>Welcome, {user.name}</div>;
+}
+```
+
+### Component State Pattern
+
+```jsx
+// For metrics
+const [todayMetrics, setTodayMetrics] = useState(null);
+const [isLoadingMetrics, setIsLoadingMetrics] = useState(false);
+
+// For UI
+const [showForm, setShowForm] = useState(false);
+const [alert, setAlert] = useState({ show: false, type: 'info' });
+```
+
+---
+
+## 📡 API Integration
+
+### Service Layer Pattern
+
+All API calls go through `src/services/`:
+
+```javascript
+export const login = async (email, password) => {
+  try {
+    // 1. Validate input
+    if (!email || !password) {
+      return { success: false, message: 'Fields required' };
+    }
+    
+    // 2. Make API call
+    const response = await axiosInstance.post('/auth/login', {
+      email, password
+    });
+    
+    // 3. Handle response
+    const { success, token, user } = response.data;
+    if (success && token) {
+      localStorage.setItem('health_metrics_token', token);
+      return { success: true, user };
+    }
+    
+    return { success: false };
+  } catch (error) {
+    return { success: false, message: error.message };
+  }
+};
+```
+
+### API Endpoints Used
+
+**Authentication:**
+- `POST /api/auth/register` - Register user
+- `POST /api/auth/login` - Login user
+- `GET /api/auth/me` - Get current user
+- `PUT /api/auth/profile` - Update profile
+- `POST /api/auth/logout` - Logout
+
+**Metrics:**
+- `POST /api/metrics` - Add/update metrics
+- `GET /api/metrics` - Get by date range
+- `GET /api/metrics/:date` - Get specific date
+- `DELETE /api/metrics/:date` - Delete metrics
+- `GET /api/metrics/summary/:period` - Summary stats
+- `GET /api/metrics/latest` - Latest entry
+
+**Goals:**
+- `POST /api/goals` - Set/update goals
+- `GET /api/goals` - Get goals
+- `PUT /api/goals` - Partial update
+- `DELETE /api/goals` - Reset to defaults
+- `GET /api/goals/progress` - Get progress
+
+---
+
+## 🧪 Building for Production
+
+### Build Command
+```bash
+npm run build
+```
+
+Creates optimized bundle in `dist/` directory.
+
+### Preview Production Build
+```bash
+npm run preview
+```
+
+Tests the built version locally.
+
+### Production Checklist
+- [ ] Environment variables configured
+- [ ] Backend API URL correct
+- [ ] Remove console.log statements
+- [ ] Test all features
+- [ ] Verify on mobile
+- [ ] Check CORS settings
+
+---
+
+## 📊 Code Statistics
+
+**Frontend Codebase:**
+- **Total Lines:** 7,600+
+- **Services:** 3,001 lines
+  - authService: 696 lines
+  - metricsService: 643 lines
+  - goalsService: 562 lines
+  - googleFitService: 450 lines
+- **Pages:** 2,400+ lines
+  - Dashboard: 1,376 lines
+  - Register: 465 lines
+  - Login: 368 lines
+- **Utilities:** 1,050+ lines
+  - dateUtils: 717 lines
+  - validation: 333 lines
+- **Context:** 447 lines
+- **API Config:** 285 lines
+
+**Files:** 40+ total
+**Components:** 10+ implemented
+**Routes:** 8 total
+
+---
+
+## 🏗 Architecture Overview
+
+### Component Hierarchy
+
+```
+App
+├── AuthProvider
+│   ├── AuthRoute
+│   │   ├── Login
+│   │   └── Register
+│   ├── PrivateRoute
+│   │   ├── Dashboard (with metrics, goals, forms)
+│   │   └── Profile/Settings (placeholders)
+│   ├── Home
+│   └── NotFound (404)
+```
+
+### Data Flow
+
+```
+Component → Service Layer → Axios → Backend API
+                              ↓
+                        Response Interceptor
+                              ↓
+                        Format & Return
+                              ↓
+                        Component State
+                              ↓
+                        UI Re-render
+```
+
+---
+
+## 📋 Development Status
+
+### ✅ Completed (95%)
+
+- [x] React 19 + Vite 7 setup
+- [x] Tailwind CSS v4 configuration
+- [x] Authentication system
+- [x] AuthContext for global state
+- [x] Private routes with protection
+- [x] Axios configuration with interceptors
+- [x] Health metrics service (643 lines)
+- [x] Goals management service (562 lines)
+- [x] Google Fit integration service (450 lines)
+- [x] Date utilities (717 lines)
+- [x] Validation utilities (333 lines)
+- [x] Reusable UI components
+- [x] Dashboard page
+- [x] Login/Register pages
+- [x] React Router v7 setup
+- [x] API error handling
+- [x] localStorage token persistence
+- [x] Password strength indicator
+- [x] Form validation
+
+### ⏳ In Progress
+
+- [ ] Chart components refinement
+- [ ] Component optimization
+
+### 📋 Planned
+
+- [ ] Custom hooks (useMetrics, useGoals)
+- [ ] Zustand store implementation
+- [ ] Advanced charting
+- [ ] Dark mode support
+- [ ] Offline support
+- [ ] Real-time updates
+
+---
+
+## 🔗 Related Documentation
+
+- [Server API Documentation](../../server/README.md)
+- [Architecture Documentation](../../ARCHITECTURE.md)
+- [Tech Stack Details](../../TECH_STACK.md)
+- [Main README](../../README.md)
+
+---
+
+## 🤝 Contributing
+
+When adding features:
+
+1. Follow existing patterns and code style
+2. Update README with new features
+3. Add JSDoc comments for functions
+4. Test on mobile and desktop (320px, 768px, 1024px)
+5. Validate forms (client and server-side)
+6. Handle errors gracefully
+7. Use meaningful commit messages
+
+---
+
 ### Common Gotchas
 
 1. **JWT Token Expiry:**
@@ -1425,31 +2121,8 @@ Main dependencies:
 
 ---
 
-## 🔗 Related Documentation
+**Last Updated:** November 10, 2025
 
-- [Server API Documentation](../../server/README.md)
-- [Architecture Documentation](../../ARCHITECTURE.md)
-- [Tech Stack Details](../../TECH_STACK.md)
-- [Testing Guide](../../TESTING_METRICS_FLOW.md)
+**Development Phase:** ✅ Core Features Complete | ⏳ Ready for Data Visualization
 
----
-
-## 🤝 Contributing
-
-When adding new features:
-
-1. **Follow existing patterns** - Match code style and structure
-2. **Update README** - Document new components and features
-3. **Add comments** - Explain complex logic
-4. **Test thoroughly** - Verify on mobile and desktop
-5. **Check responsiveness** - Test at 320px, 768px, 1024px, 1920px
-6. **Validate forms** - Both client and server-side
-7. **Handle errors** - Graceful error messages and fallbacks
-
----
-
-**Last Updated:** November 9, 2025
-
-**Development Phase:** Core Features Complete - Ready for Data Visualization
-
-**Status:** 🟢 Production Ready (Authentication & Dashboard) | 🟡 Ready for Development (Charts & Advanced Features)
+**Status:** 🟢 Production Ready (Auth & Dashboard) | 🟡 Ready for Development (Charts & Advanced)
