@@ -28,7 +28,7 @@
 
 import HealthMetric from "../models/HealthMetric.js";
 import { asyncHandler, ErrorResponse } from "../middleware/errorHandler.js";
-import { emitToUser } from "../utils/eventEmitter.js";
+import { emitToUser, getConnectionCount } from "../utils/eventEmitter.js";
 
 /**
  * ============================================
@@ -247,13 +247,19 @@ export const addOrUpdateMetrics = asyncHandler(async (req, res, next) => {
     }
   );
 
-  // ===== BROADCAST: Notify connected clients of metrics update =====
-  emitToUser(req.user._id, 'metrics:updated', {
-    date: healthMetric.date,
-    metrics: healthMetric.metrics,
-    source: healthMetric.source,
-    lastUpdated: healthMetric.lastUpdated
-  });
+  // ===== EMIT REAL-TIME UPDATE =====
+  const connectionCount = getConnectionCount(req.user._id);
+  if (connectionCount > 0) {
+    console.log(`[healthMetricsController] User has ${connectionCount} active connection(s), emitting update`);
+    
+    emitToUser(req.user._id, 'metrics:updated', {
+      date: healthMetric.date,
+      metrics: healthMetric.metrics,
+      lastUpdated: healthMetric.lastUpdated
+    });
+  } else {
+    console.log(`[healthMetricsController] User offline, skipping real-time update`);
+  }
 
   res.status(200).json({
     success: true,
