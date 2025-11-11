@@ -24,6 +24,7 @@ import * as metricsService from '../services/metricsService';
 import * as dateUtils from '../utils/dateUtils';
 import { getAuthToken } from '../api/axiosConfig';
 import { connectSSE, disconnectSSE } from '../services/sseService';
+import { useAuth } from '../context/AuthContext.jsx';
 import MetricsForm from '../components/dashboard/MetricsForm';
 import MetricCard from '../components/dashboard/MetricCard';
 import MetricsList from '../components/dashboard/MetricsList';
@@ -32,6 +33,7 @@ import GoalsSection from '../components/dashboard/GoalsSection';
 import GoogleFitConnection from '../components/dashboard/GoogleFitConnection';
 import Button from '../components/common/Button';
 import Alert from '../components/common/Alert';
+import TestSSEComponent from '../components/test/TestSSEComponent';
 
 /**
  * ============================================
@@ -81,6 +83,9 @@ const INITIAL_STATE = {
  */
 
 const Dashboard = () => {
+  // ===== HOOKS =====
+  const { connectionStatus } = useAuth();
+
   // ===== STATE MANAGEMENT =====
 
   // Metrics State
@@ -682,6 +687,26 @@ const Dashboard = () => {
         </div>
       )}
 
+      {/* Connection Status Indicator - Top Left */}
+      <div className={`fixed top-4 left-4 z-40 px-3 py-2 rounded-full text-sm font-medium ${
+        connectionStatus.connected
+          ? 'bg-green-100 text-green-800 border border-green-200'
+          : 'bg-red-100 text-red-800 border border-red-200'
+      }`}>
+        {connectionStatus.connected ? (
+          <>
+            <span className="inline-block w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
+            Live
+          </>
+        ) : (
+          <>
+            <span className="inline-block w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+            {connectionStatus.reason === 'reconnecting' ? 'Reconnecting' : 'Offline'}
+            {connectionStatus.retryCount > 0 && ` (${connectionStatus.retryCount})`}
+          </>
+        )}
+      </div>
+
       <div className="flex flex-col lg:flex-row min-h-screen">
         {/* ===== SIDEBAR ===== */}
         {showSidebar && (
@@ -786,6 +811,9 @@ const Dashboard = () => {
               </div>
             </div>
           </div>
+
+          {/* ===== SSE TEST COMPONENT ===== */}
+          <TestSSEComponent />
 
           {/* ===== ADVANCED QUICK STATS SECTION ===== */}
           <div className="mb-8">

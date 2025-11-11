@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
+import PropTypes from 'prop-types';
 
 // Pages
 import Home from './pages/Home';
@@ -11,6 +12,7 @@ import NotFound from './pages/NotFound';
 // Components
 import PrivateRoute from './components/common/PrivateRoute';
 import GoogleFitTest from './components/test/GoogleFitTest';
+import ConnectionStatusTest from './components/test/ConnectionStatusTest';
 
 // Styles
 import './App.css';
@@ -59,6 +61,10 @@ function AuthRoute({ children }) {
   // Not authenticated, show login/register page
   return children;
 }
+
+AuthRoute.propTypes = {
+  children: PropTypes.node.isRequired,
+};
 
 /**
  * Main App Component
@@ -141,6 +147,16 @@ function App() {
           element={
             <PrivateRoute>
               <GoogleFitTest />
+            </PrivateRoute>
+          }
+        />
+
+        {/* Connection Status Test Page */}
+        <Route
+          path="/test/connection-status"
+          element={
+            <PrivateRoute>
+              <ConnectionStatusTest />
             </PrivateRoute>
           }
         />
