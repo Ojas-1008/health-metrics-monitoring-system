@@ -247,18 +247,31 @@ export const addOrUpdateMetrics = asyncHandler(async (req, res, next) => {
     }
   );
 
-  // ===== EMIT REAL-TIME UPDATE =====
+  // ===== ENHANCED: EMIT REAL-TIME UPDATE WITH SOURCE =====
   const connectionCount = getConnectionCount(req.user._id);
+  
   if (connectionCount > 0) {
-    console.log(`[healthMetricsController] User has ${connectionCount} active connection(s), emitting update`);
+    console.log(
+      `[healthMetricsController] User has ${connectionCount} active connection(s), emitting metrics:change event`
+    );
     
-    emitToUser(req.user._id, 'metrics:updated', {
+    // Emit with operation type and source for frontend differentiation
+    emitToUser(req.user._id, 'metrics:change', {
+      operation: 'upsert',
       date: healthMetric.date,
       metrics: healthMetric.metrics,
-      lastUpdated: healthMetric.lastUpdated
+      source: healthMetric.source || 'manual',
+      lastUpdated: healthMetric.lastUpdated,
+      timestamp: new Date().toISOString()
     });
+    
+    console.log(
+      `[healthMetricsController] ✓ Emitted metrics:change (upsert) for ${healthMetric.date}`
+    );
   } else {
-    console.log(`[healthMetricsController] User offline, skipping real-time update`);
+    console.log(
+      `[healthMetricsController] User offline (0 connections), skipping real-time update`
+    );
   }
 
   res.status(200).json({
@@ -426,13 +439,28 @@ export const updateMetric = asyncHandler(async (req, res, next) => {
   existingMetric.metrics = updatedMetrics;
   await existingMetric.save();
 
-  // ===== BROADCAST: Notify connected clients of metrics update =====
-  emitToUser(req.user._id, 'metrics:updated', {
-    date: existingMetric.date,
-    metrics: existingMetric.metrics,
-    source: existingMetric.source,
-    lastUpdated: existingMetric.lastUpdated
-  });
+  // ===== ENHANCED: EMIT WITH OPERATION AND SOURCE =====
+  const connectionCount = getConnectionCount(req.user._id);
+  
+  if (connectionCount > 0) {
+    console.log(
+      `[healthMetricsController] Emitting metrics:change (update) for ${existingMetric.date}`
+    );
+    
+    emitToUser(req.user._id, 'metrics:change', {
+      operation: 'update',
+      date: existingMetric.date,
+      metrics: existingMetric.metrics,
+      source: existingMetric.source || 'manual',
+      lastUpdated: existingMetric.lastUpdated,
+      updatedFields: Object.keys(metrics), // Which fields were updated
+      timestamp: new Date().toISOString()
+    });
+    
+    console.log(
+      `[healthMetricsController] ✓ Emitted metrics:change (update) to ${connectionCount} connection(s)`
+    );
+  }
 
   res.status(200).json({
     success: true,
@@ -474,11 +502,29 @@ export const deleteMetrics = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // ===== BROADCAST: Notify connected clients of metrics deletion =====
-  emitToUser(req.user._id, 'metrics:deleted', {
-    date: healthMetric.date,
-    deletedAt: new Date()
-  });
+  // ===== ENHANCED: EMIT DELETE EVENT WITH MORE CONTEXT =====
+  const connectionCount = getConnectionCount(req.user._id);
+  
+  if (connectionCount > 0) {
+    console.log(
+      `[healthMetricsController] Emitting metrics:change (delete) for ${healthMetric.date}`
+    );
+    
+    emitToUser(req.user._id, 'metrics:change', {
+      operation: 'delete',
+      date: healthMetric.date,
+      deletedAt: new Date().toISOString(),
+      // Include minimal metric info for undo functionality (optional)
+      deletedMetrics: {
+        steps: healthMetric.metrics.steps,
+        calories: healthMetric.metrics.calories
+      }
+    });
+    
+    console.log(
+      `[healthMetricsController] ✓ Emitted metrics:change (delete) to ${connectionCount} connection(s)`
+    );
+  }
 
   res.status(200).json({
     success: true,
@@ -647,6 +693,28 @@ export const deleteMetricsByDate = asyncHandler(async (req, res, next) => {
       $lt: new Date(date + 'T23:59:59.999Z')   // End of day (UTC)
     }
   });
+
+  // ===== EMIT DELETE EVENT =====
+  if (result.deletedCount > 0) {
+    const connectionCount = getConnectionCount(userId);
+    
+    if (connectionCount > 0) {
+      console.log(
+        `[healthMetricsController] Emitting metrics:change (bulk delete) for ${date}`
+      );
+      
+      emitToUser(userId, 'metrics:change', {
+        operation: 'bulk_delete',
+        date: date,
+        deletedCount: result.deletedCount,
+        deletedAt: new Date().toISOString()
+      });
+      
+      console.log(
+        `[healthMetricsController] ✓ Emitted bulk delete event to ${connectionCount} connection(s)`
+      );
+    }
+  }
 
   // Respond with success and count
   res.status(200).json({

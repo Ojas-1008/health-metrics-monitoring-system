@@ -21,7 +21,7 @@ import User from "../src/models/User.js";
 import HealthMetric from "../src/models/HealthMetric.js";
 import oauthConfig from "../src/config/oauth.config.js";
 import { refreshGoogleFitToken, getValidAccessToken } from "../src/utils/googleFitHelper.js";
-import { emitToUser } from "../src/utils/eventEmitter.js";
+import { emitToUser, getConnectionCount } from "../src/utils/eventEmitter.js";
 
 /**
  * ============================================
@@ -503,115 +503,139 @@ const syncUserGoogleFitData = async (user) => {
       }
     }
 
-    // ===== STEP 4: TRANSFORM AND UPSERT DAILY METRICS =====
-    const allDates = new Set();
+// ===== STEP 4: TRANSFORM AND UPSERT DAILY METRICS =====
+const allDates = new Set();
 
-    // Collect all unique dates across all data types
-    Object.values(fetchedData).forEach((dailyData) => {
-      Object.keys(dailyData).forEach((date) => allDates.add(date));
+// Collect all unique dates across all data types
+Object.values(fetchedData).forEach((dailyData) => {
+  Object.keys(dailyData).forEach((date) => allDates.add(date));
+});
+
+console.log(`    💾 Upserting ${allDates.size} days of metrics...`);
+
+let upsertedCount = 0;
+const upsertPromises = [];
+const upsertedMetrics = []; // ← NEW: Track upserted data for SSE
+
+for (const dateStr of allDates) {
+  const dayDate = new Date(dateStr);
+
+  // Build metrics object for this day
+  const metrics = {
+    steps: fetchedData.steps?.[dateStr] || 0,
+    distance: (fetchedData.distance?.[dateStr] || 0) / 1000,
+    calories: Math.round(fetchedData.calories?.[dateStr] || 0),
+    activeMinutes: fetchedData.activeMinutes?.[dateStr] || 0,
+    heartPoints: fetchedData.heartPoints?.[dateStr] || 0,
+    moveMinutes: fetchedData.moveMinutes?.[dateStr] || 0,
+    weight: fetchedData.weight?.[dateStr] || null,
+    sleepHours: fetchedData.sleep?.[dateStr]
+      ? Math.round((fetchedData.sleep[dateStr] / 1000 / 60 / 60) * 10) / 10
+      : null,
+    height: fetchedData.height?.[dateStr]
+      ? Math.round(fetchedData.height[dateStr] * 100)
+      : null,
+    bloodPressure: fetchedData.bloodPressure?.[dateStr]
+      ? {
+          systolic: fetchedData.bloodPressure[dateStr].systolic || null,
+          diastolic: fetchedData.bloodPressure[dateStr].diastolic || null,
+        }
+      : { systolic: null, diastolic: null },
+    heartRate: fetchedData.heartRate?.[dateStr] || null,
+    oxygenSaturation: fetchedData.oxygenSaturation?.[dateStr] || null,
+    bodyTemperature: fetchedData.bodyTemperature?.[dateStr] || null,
+    hydration: fetchedData.hydration?.[dateStr] || null,
+  };
+
+  // Smart upsert: only update non-null fields
+  const setFields = {
+    source: "googlefit",
+    syncedAt: new Date(),
+  };
+
+  Object.entries(metrics).forEach(([key, value]) => {
+    if (value !== null && value !== undefined) {
+      setFields[`metrics.${key}`] = value;
+    }
+  });
+
+  const upsertPromise = HealthMetric.findOneAndUpdate(
+    {
+      userId: user._id,
+      date: dayDate,
+    },
+    {
+      $set: setFields,
+    },
+    {
+      upsert: true,
+      new: true,
+      runValidators: true,
+    }
+  ).then((doc) => {
+    // ← NEW: Store upserted document for SSE emission
+    upsertedMetrics.push({
+      date: doc.date,
+      metrics: doc.metrics,
+      source: doc.source
     });
+    return doc;
+  });
 
-    console.log(`    💾 Upserting ${allDates.size} days of metrics...`);
+  upsertPromises.push(upsertPromise);
+}
 
-    let upsertedCount = 0;
-    const upsertPromises = [];
+// Execute all upserts in parallel
+await Promise.all(upsertPromises);
+upsertedCount = allDates.size;
 
-    for (const dateStr of allDates) {
-      const dayDate = new Date(dateStr);
+console.log(`    ✅ Upserted ${upsertedCount} health metric documents`);
 
-      // Build metrics object for this day
-      const metrics = {
-        steps: fetchedData.steps?.[dateStr] || 0,
-        distance:
-          (fetchedData.distance?.[dateStr] || 0) / 1000, // Convert meters to km
-        calories: Math.round(fetchedData.calories?.[dateStr] || 0),
-        activeMinutes: fetchedData.activeMinutes?.[dateStr] || 0,
-        
-        // ⭐ ADD: Heart Points
-        heartPoints: fetchedData.heartPoints?.[dateStr] || 0,
-        
-        // ⭐ ADD: Move Minutes
-        moveMinutes: fetchedData.moveMinutes?.[dateStr] || 0,
-        
-        weight: fetchedData.weight?.[dateStr] || null,
-        sleepHours: fetchedData.sleep?.[dateStr]
-          ? Math.round((fetchedData.sleep[dateStr] / 1000 / 60 / 60) * 10) / 10 // Convert ms to hours
-          : null,
-        
-        // ⭐ NEW METRICS (Wearable Device Data) ⭐
-        
-        height: fetchedData.height?.[dateStr]
-          ? Math.round(fetchedData.height[dateStr] * 100) // meters to cm
-          : null,
-        
-        bloodPressure: fetchedData.bloodPressure?.[dateStr]
-          ? {
-              systolic: fetchedData.bloodPressure[dateStr].systolic || null,
-              diastolic: fetchedData.bloodPressure[dateStr].diastolic || null,
-            }
-          : { systolic: null, diastolic: null },
-        
-        heartRate: fetchedData.heartRate?.[dateStr] || null,
-        
-        oxygenSaturation: fetchedData.oxygenSaturation?.[dateStr] || null,
-        
-        bodyTemperature: fetchedData.bodyTemperature?.[dateStr] || null,
-        
-        hydration: fetchedData.hydration?.[dateStr] || null,
-      };
-
-      // Smart upsert: only update non-null fields to preserve historical data
-      // Build update operations
-      const setFields = {
-        source: "googlefit",
-        syncedAt: new Date(),
-      };
-      
-      // Only set metrics that have non-null values
-      Object.entries(metrics).forEach(([key, value]) => {
-        if (value !== null && value !== undefined) {
-          setFields[`metrics.${key}`] = value;
-        }
+// ===== ENHANCED: BROADCAST DETAILED SYNC UPDATE =====
+if (upsertedCount > 0) {
+  const connectionCount = getConnectionCount(user._id);
+  
+  if (connectionCount > 0) {
+    console.log(
+      `    🔔 User has ${connectionCount} active connection(s), emitting sync:update events`
+    );
+    
+    // Emit individual metric updates for real-time UI refresh
+    upsertedMetrics.forEach((metricData) => {
+      emitToUser(user._id, 'metrics:change', {
+        operation: 'sync',
+        date: metricData.date,
+        metrics: metricData.metrics,
+        source: 'googlefit',
+        syncedAt: new Date().toISOString()
       });
-
-      const upsertPromise = HealthMetric.findOneAndUpdate(
-        {
-          userId: user._id,
-          date: dayDate,
-        },
-        {
-          $set: setFields,
-        },
-        {
-          upsert: true,
-          new: true,
-          runValidators: true,
-        }
-      );
-
-      upsertPromises.push(upsertPromise);
-    }
-
-    // Execute all upserts in parallel
-    await Promise.all(upsertPromises);
-    upsertedCount = allDates.size;
-
-    console.log(`    ✅ Upserted ${upsertedCount} health metric documents`);
-
-    // ===== BROADCAST: Notify connected clients of Google Fit sync =====
-    if (upsertedCount > 0) {
-      emitToUser(user._id, 'googlefit:synced', {
-        syncedDates: Array.from(allDates).sort(),
-        totalDays: upsertedCount,
-        syncedAt: new Date(),
-        syncWindow: {
-          startDate: syncWindow.startDate,
-          endDate: syncWindow.endDate
-        }
-      });
-    }
-
-    // ===== STEP 5: UPDATE USER lastSyncAt ATOMICALLY =====
+    });
+    
+    // Also emit a summary event for batch processing
+    emitToUser(user._id, 'sync:update', {
+      syncedDates: Array.from(allDates).sort(),
+      totalDays: upsertedCount,
+      syncedAt: new Date(),
+      syncWindow: {
+        startDate: syncWindow.startDate.toISOString(),
+        endDate: syncWindow.endDate.toISOString()
+      },
+      summary: {
+        totalSteps: upsertedMetrics.reduce((sum, m) => sum + (m.metrics.steps || 0), 0),
+        totalCalories: upsertedMetrics.reduce((sum, m) => sum + (m.metrics.calories || 0), 0),
+        avgSteps: Math.round(
+          upsertedMetrics.reduce((sum, m) => sum + (m.metrics.steps || 0), 0) / upsertedCount
+        )
+      }
+    });
+    
+    console.log(
+      `    ✅ Emitted ${upsertedCount} metrics:change events + 1 sync:update summary`
+    );
+  } else {
+    console.log(`    ℹ️ User offline (0 connections), skipping SSE emission`);
+  }
+}    // ===== STEP 5: UPDATE USER lastSyncAt ATOMICALLY =====
     // Use findByIdAndUpdate to ensure atomic update
     // This prevents incorrect lastSyncAt if crash occurs mid-sync
     // IMPORTANT: Set to syncWindow.endDate (not new Date()) so next sync continues from where this one ended
