@@ -18,7 +18,7 @@ export const connectSSE = (token, callbacks = {}) => {
   // SECURITY NOTE: Passing JWT in query parameter
   // The server accepts tokens via query param for EventSource compatibility
   // Token is validated server-side before establishing SSE connection
-  const url = `${import.meta.env.VITE_API_URL}/api/events/stream?token=${encodeURIComponent(token)}`;
+  const url = `${import.meta.env.VITE_API_URL}/events/stream?token=${encodeURIComponent(token)}`;
 
   eventSource = new EventSource(url);
 

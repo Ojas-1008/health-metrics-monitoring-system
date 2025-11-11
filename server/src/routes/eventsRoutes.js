@@ -1,4 +1,6 @@
 import express from 'express';
+import jwt from "jsonwebtoken";
+import User from "../models/User.js";
 import { protect } from '../middleware/auth.js';
 import {
   addConnection,
@@ -27,7 +29,8 @@ const router = express.Router();
  * - Real-time events: Instant updates for metrics, goals, and syncs
  *
  * AUTHENTICATION:
- * - Uses protect middleware which validates JWT from Authorization header
+ * - Supports token via Authorization header (for testing with curl)
+ * - Supports token via query parameter (for browser EventSource)
  * - Connection is user-specific (isolated per userId)
  *
  * EVENT TYPES RECEIVED:
@@ -42,71 +45,130 @@ const router = express.Router();
  * TESTING (curl):
  * curl -N -H "Authorization: Bearer <your-jwt-token>" \
  *   http://localhost:5000/api/events/stream
+ *
+ * BROWSER (EventSource):
+ * const eventSource = new EventSource('/api/events/stream?token=<jwt-token>');
  */
-router.get('/stream', protect, (req, res) => {
-  const userId = req.user._id.toString();
+router.get('/stream', async (req, res, next) => {
+  try {
+    // ===== AUTHENTICATION: Query Parameter OR Header =====
+    let token = null;
 
-  console.log(`[SSE Route] New connection request from user: ${userId}`);
-
-  // ===== STEP 1: Configure SSE Response Headers =====
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no');
-  res.setTimeout(0);
-
-  // ===== STEP 2: Send Initial Connection Confirmation =====
-  const connectedEvent = JSON.stringify({
-    type: 'connected',
-    userId: userId,
-    timestamp: Date.now(),
-    message: 'Real-time event stream established'
-  });
-
-  res.write(`data: ${connectedEvent}\n\n`);
-  console.log(`[SSE Route] Connection confirmed for user: ${userId}`);
-
-  // ===== STEP 3: Store Connection Using Event Emitter =====
-  const connectionCount = addConnection(userId, res);
-  console.log(`[SSE Route] User ${userId} now has ${connectionCount} active connection(s)`);
-
-  // ===== STEP 4: Setup Heartbeat Mechanism =====
-  const heartbeatInterval = setInterval(() => {
-    try {
-      const sent = emitHeartbeat(userId);
-      if (sent === 0) {
-        // Connection was cleaned up, stop heartbeat
-        clearInterval(heartbeatInterval);
-      }
-    } catch (error) {
-      console.error(`[SSE Route] Heartbeat error for user ${userId}:`, error.message);
-      clearInterval(heartbeatInterval);
-      cleanupConnection();
+    // Try Authorization header first (for testing with curl)
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+      token = req.headers.authorization.split(' ')[1];
     }
-  }, 30000); // 30 seconds
 
-  // ===== STEP 5: Define Cleanup Function =====
-  const cleanupConnection = () => {
-    console.log(`[SSE Route] Cleaning up connection for user: ${userId}`);
-    clearInterval(heartbeatInterval);
-    removeConnection(userId, res);
-  };
+    // Fallback to query parameter (for browser EventSource)
+    if (!token && req.query.token) {
+      token = req.query.token;
+    }
 
-  // ===== STEP 6: Register Cleanup Event Listeners =====
-  res.on('close', () => {
-    console.log(`[SSE Route] Client disconnected: ${userId}`);
-    cleanupConnection();
-  });
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authorized, no token provided',
+        error: 'MISSING_TOKEN'
+      });
+    }
 
-  res.on('error', (error) => {
-    console.error(`[SSE Route] Connection error for user ${userId}:`, error.message);
-    cleanupConnection();
-  });
+    // Verify JWT token manually (since protect middleware expects header)
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id).select('-password');
 
-  res.on('finish', () => {
-    console.log(`[SSE Route] Response finished for user ${userId}`);
-    cleanupConnection();
-  });
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not found',
+        error: 'USER_NOT_FOUND'
+      });
+    }
+
+    // Attach user to request (mimics protect middleware)
+    req.user = user;
+
+    // ===== Continue with existing SSE setup =====
+    const userId = req.user._id.toString();
+    console.log(`[SSE Route] New connection request from user: ${userId}`);
+
+    // ===== STEP 1: Configure SSE Response Headers =====
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.setTimeout(0);
+
+    // ===== STEP 2: Send Initial Connection Confirmation =====
+    const connectedEvent = JSON.stringify({
+      type: 'connected',
+      userId: userId,
+      timestamp: Date.now(),
+      message: 'Real-time event stream established'
+    });
+
+    res.write(`data: ${connectedEvent}\n\n`);
+    console.log(`[SSE Route] Connection confirmed for user: ${userId}`);
+
+    // ===== STEP 3: Store Connection Using Event Emitter =====
+    const connectionCount = addConnection(userId, res);
+    console.log(`[SSE Route] User ${userId} now has ${connectionCount} active connection(s)`);
+
+    // ===== STEP 4: Setup Heartbeat Mechanism =====
+    const heartbeatInterval = setInterval(() => {
+      try {
+        const sent = emitHeartbeat(userId);
+        if (sent === 0) {
+          // Connection was cleaned up, stop heartbeat
+          clearInterval(heartbeatInterval);
+        }
+      } catch (error) {
+        console.error(`[SSE Route] Heartbeat error for user ${userId}:`, error.message);
+        clearInterval(heartbeatInterval);
+        cleanupConnection();
+      }
+    }, 30000); // 30 seconds
+
+    // ===== STEP 5: Define Cleanup Function =====
+    const cleanupConnection = () => {
+      console.log(`[SSE Route] Cleaning up connection for user: ${userId}`);
+      clearInterval(heartbeatInterval);
+      removeConnection(userId, res);
+    };
+
+    // ===== STEP 6: Register Cleanup Event Listeners =====
+    res.on('close', () => {
+      console.log(`[SSE Route] Client disconnected: ${userId}`);
+      cleanupConnection();
+    });
+
+    res.on('error', (error) => {
+      console.error(`[SSE Route] Connection error for user ${userId}:`, error.message);
+      cleanupConnection();
+    });
+
+    res.on('finish', () => {
+      console.log(`[SSE Route] Response finished for user ${userId}`);
+      cleanupConnection();
+    });
+  } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({
+        success: false,
+        message: 'Token has expired',
+        error: 'TOKEN_EXPIRED'
+      });
+    }
+
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({
+        success: false,
+        message: 'Token is invalid',
+        error: 'INVALID_TOKEN'
+      });
+    }
+
+    next(error);
+  }
 });
 
 /**
