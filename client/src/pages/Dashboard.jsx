@@ -34,6 +34,11 @@ import GoogleFitConnection from '../components/dashboard/GoogleFitConnection';
 import Button from '../components/common/Button';
 import Alert from '../components/common/Alert';
 import TestSSEComponent from '../components/test/TestSSEComponent';
+import TestRealtimeHook from '../components/TestRealtimeHook';
+import MultiEventTest from '../components/MultiEventTest';
+import FilteredMetricsTest from '../components/test/FilteredMetricsTest';
+import ConditionalSubscriptionTest from '../components/test/ConditionalSubscriptionTest';
+import ManualUnsubscribeTest from '../components/test/ManualUnsubscribeTest';
 
 /**
  * ============================================
@@ -139,6 +144,7 @@ const Dashboard = () => {
   const [showForm, setShowForm] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showTest, setShowTest] = useState(true); // For testing component unmount
 
   // Form Specific State
   // Reserved for future form submission loading indicator
@@ -814,6 +820,34 @@ const Dashboard = () => {
 
           {/* ===== SSE TEST COMPONENT ===== */}
           <TestSSEComponent />
+
+          {/* ===== REALTIME HOOK TEST TOGGLE ===== */}
+          <div className="mb-4">
+            <button
+              onClick={() => setShowTest(!showTest)}
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
+            >
+              {showTest ? '🙈 Hide' : '🐵 Show'} Test Component
+            </button>
+            <span className="ml-2 text-sm text-gray-600">
+              Test component unmounting and cleanup
+            </span>
+          </div>
+
+          {/* ===== REALTIME HOOK TEST COMPONENT ===== */}
+          {showTest && <TestRealtimeHook />}
+
+          {/* ===== MULTI-EVENT SUBSCRIPTION TEST ===== */}
+          <MultiEventTest />
+
+          {/* ===== FILTERED METRICS TEST (DEPENDENCIES ARRAY) ===== */}
+          <FilteredMetricsTest />
+
+          {/* ===== CONDITIONAL SUBSCRIPTION TEST ===== */}
+          <ConditionalSubscriptionTest />
+
+          {/* ===== MANUAL UNSUBSCRIBE TEST ===== */}
+          <ManualUnsubscribeTest />
 
           {/* ===== ADVANCED QUICK STATS SECTION ===== */}
           <div className="mb-8">
