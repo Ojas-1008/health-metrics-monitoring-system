@@ -142,7 +142,10 @@ function TestRealtimeHook() {
                     <div className="mt-1 grid grid-cols-2 gap-1">
                       {Object.entries(event.data.metrics).map(([key, value]) => (
                         <div key={key} className="bg-white px-2 py-1 rounded text-xs">
-                          <span className="font-medium capitalize">{key}:</span> {value}
+                          <span className="font-medium capitalize">{key}:</span>{' '}
+                          {typeof value === 'object' && value !== null
+                            ? JSON.stringify(value)
+                            : value ?? 'N/A'}
                         </div>
                       ))}
                     </div>

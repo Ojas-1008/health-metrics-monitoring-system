@@ -19,12 +19,17 @@
  * - Cleanup on unmount
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useAuth } from '../context/AuthContext';
 import * as metricsService from '../services/metricsService';
+import * as goalsService from '../services/goalsService';
+import * as googleFitService from '../services/googleFitService';
 import * as dateUtils from '../utils/dateUtils';
-import { getAuthToken } from '../api/axiosConfig';
-import { connectSSE, disconnectSSE } from '../services/sseService';
-import { useAuth } from '../context/AuthContext.jsx';
+
+// ===== NEW IMPORTS =====
+import { useRealtimeMetrics, useRealtimeSync, useConnectionStatus } from '../hooks/useRealtimeEvents';
+
+// Existing component imports...
 import MetricsForm from '../components/dashboard/MetricsForm';
 import MetricCard from '../components/dashboard/MetricCard';
 import MetricsList from '../components/dashboard/MetricsList';
@@ -33,6 +38,9 @@ import GoalsSection from '../components/dashboard/GoalsSection';
 import GoogleFitConnection from '../components/dashboard/GoogleFitConnection';
 import Button from '../components/common/Button';
 import Alert from '../components/common/Alert';
+
+// Debug component
+import RealtimeDebug from '../debug/RealtimeDebug';
 import TestSSEComponent from '../components/test/TestSSEComponent';
 import TestRealtimeHook from '../components/TestRealtimeHook';
 import MultiEventTest from '../components/MultiEventTest';
@@ -89,7 +97,7 @@ const INITIAL_STATE = {
 
 const Dashboard = () => {
   // ===== HOOKS =====
-  const { connectionStatus } = useAuth();
+  const { user, logout } = useAuth();
 
   // ===== STATE MANAGEMENT =====
 
@@ -159,6 +167,29 @@ const Dashboard = () => {
   const lastActionRef = useRef(null);
   const refreshTimeoutRef = useRef(null);
 
+  // ===== NEW STATE FOR REAL-TIME FEATURES =====
+  
+  /**
+   * Track recently submitted metrics to enable optimistic updates
+   * and prevent duplicate rendering from SSE events
+   */
+  const [optimisticMetrics, setOptimisticMetrics] = useState(new Set());
+  
+  /**
+   * Debounce timer ref for summary stat refetches
+   * Prevents thrashing when multiple events arrive quickly
+   */
+  const summaryRefetchTimerRef = useRef(null);
+  
+  /**
+   * Last event timestamp for deduplication
+   * Helps identify duplicate events from controller + change stream
+   */
+  const lastEventRef = useRef(new Map());
+
+  // ===== NEW: CONNECTION STATUS HOOK =====
+  const { isConnected, connectionStatus: realtimeConnectionStatus } = useConnectionStatus();
+
   // ===== HELPER FUNCTIONS =====
 
   /**
@@ -207,6 +238,83 @@ const Dashboard = () => {
     setGoals(updatedGoals);
     trackAction('GOALS_UPDATED', { goals: updatedGoals });
   }, [trackAction]);
+
+  /**
+   * ============================================
+   * HELPER: DEDUPLICATE EVENTS
+   * ============================================
+   * 
+   * Prevents duplicate processing of events from:
+   * - Controller emission (immediate)
+   * - Change stream emission (1-2 seconds later)
+   * 
+   * Uses timestamp-based window (5 seconds) to detect duplicates
+   */
+  const isDuplicateEvent = useCallback((eventData) => {
+    const { operation, date } = eventData;
+    const eventKey = `${operation}-${date}`;
+    const now = Date.now();
+    
+    // Check if we processed this event recently
+    const lastEventTime = lastEventRef.current.get(eventKey);
+    
+    if (lastEventTime && (now - lastEventTime < 5000)) {
+      // Duplicate detected within 5-second window
+      console.log(`[Dashboard] Duplicate event detected: ${eventKey}, skipping`);
+      return true;
+    }
+    
+    // Not a duplicate - record this event
+    lastEventRef.current.set(eventKey, now);
+    
+    // Cleanup old entries (older than 10 seconds)
+    for (const [key, timestamp] of lastEventRef.current.entries()) {
+      if (now - timestamp > 10000) {
+        lastEventRef.current.delete(key);
+      }
+    }
+    
+    return false;
+  }, []);
+
+  /**
+   * ============================================
+   * HELPER: DEBOUNCED SUMMARY REFETCH
+   * ============================================
+   * 
+   * Debounces summary stat refetches by 200ms to avoid thrashing
+   * when multiple events arrive during Google Fit sync
+   */
+  const debouncedSummaryRefetch = useCallback(() => {
+    // Clear existing timer
+    if (summaryRefetchTimerRef.current) {
+      clearTimeout(summaryRefetchTimerRef.current);
+    }
+    
+    // Set new timer
+    summaryRefetchTimerRef.current = setTimeout(async () => {
+      console.log('[Dashboard] Refetching summary stats (debounced)...');
+      
+      try {
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - 7);
+        
+        const summaryResult = await metricsService.getMetricsSummary(
+          'weekly',
+          dateUtils.formatDateISO(startDate),
+          dateUtils.formatDateISO(endDate)
+        );
+        
+        if (summaryResult.success) {
+          setSummaryStats(summaryResult.data);
+          console.log('[Dashboard] ✓ Summary stats refreshed');
+        }
+      } catch (err) {
+        console.error('[Dashboard] Failed to refresh summary stats:', err);
+      }
+    }, 200); // 200ms debounce
+  }, []);
 
   // ===== TREND CALCULATION UTILITIES =====
 
@@ -525,14 +633,203 @@ const Dashboard = () => {
   }, [trackAction]);
 
   /**
-   * Handle metrics updated or deleted (legacy - kept for backward compatibility)
+   * ============================================
+   * REAL-TIME: HANDLE METRICS CHANGE EVENTS
+   * ============================================
+   *
+   * Processes real-time metrics:change events from SSE
+   * Handles insert, update, delete, and sync operations
    */
-  // eslint-disable-next-line no-unused-vars
-  const handleMetricsChange = useCallback(() => {
-    trackAction('METRICS_CHANGED', { timestamp: new Date().toISOString() });
-    loadTodayMetrics();
-    loadMetricsRange();
-  }, [loadTodayMetrics, loadMetricsRange, trackAction]);
+  const handleMetricsChange = useCallback(async (eventData) => {
+    console.log('[Dashboard] Received metrics:change event:', eventData);
+
+    // Check for duplicates
+    if (isDuplicateEvent(eventData)) {
+      return; // Skip duplicate
+    }
+
+    const { operation, date, metrics: eventMetrics, source, deletedAt } = eventData;
+
+    // ===== OPTIMISTIC UPDATE CHECK =====
+    // If this event is for a metric we just submitted optimistically,
+    // we already updated the UI, so we can skip re-rendering
+    const optimisticKey = `${date}-${operation}`;
+    if (optimisticMetrics.has(optimisticKey)) {
+      console.log('[Dashboard] Skipping event (already applied optimistically):', optimisticKey);
+      optimisticMetrics.delete(optimisticKey); // Clean up
+      return;
+    }
+
+    // ===== HANDLE DIFFERENT OPERATIONS =====
+
+    switch (operation) {
+      case 'insert':
+      case 'upsert':
+      case 'sync': {
+        // New metric added or updated
+        console.log(`[Dashboard] Processing ${operation} for ${date}`);
+
+        // Update allMetrics array
+        setAllMetrics(prevMetrics => {
+          const existingIndex = prevMetrics.findIndex(m => m.date === date);
+
+          if (existingIndex >= 0) {
+            // Update existing metric
+            const updated = [...prevMetrics];
+            updated[existingIndex] = {
+              ...updated[existingIndex],
+              metrics: eventMetrics,
+              source: source || updated[existingIndex].source,
+              lastUpdated: new Date().toISOString()
+            };
+            return updated;
+          } else {
+            // Add new metric
+            return [
+              {
+                date,
+                metrics: eventMetrics,
+                source: source || 'unknown',
+                lastUpdated: new Date().toISOString()
+              },
+              ...prevMetrics
+            ].sort((a, b) => new Date(b.date) - new Date(a.date));
+          }
+        });
+
+        // Update todayMetrics if it's today's date
+        const today = dateUtils.formatDateISO(new Date());
+        if (date === today) {
+          setTodayMetrics(prev => ({
+            ...(prev || {}),
+            date,
+            metrics: eventMetrics,
+            source: source || 'unknown',
+            lastUpdated: new Date().toISOString()
+          }));
+        }
+
+        // Show toast notification
+        if (source === 'googlefit') {
+          showAlert('info', 'Synced from Google Fit', `✓ Data updated for ${date}`);
+        } else if (source === 'manual' && operation !== 'insert') {
+          // Only show toast for updates from other tabs/devices
+          showAlert('success', 'Metrics Updated', `✓ Changes saved for ${date}`);
+        }
+
+        // Debounced summary refetch
+        debouncedSummaryRefetch();
+        break;
+      }
+
+      case 'update': {
+        // Metric updated
+        console.log(`[Dashboard] Processing update for ${date}`);
+
+        setAllMetrics(prevMetrics => {
+          const existingIndex = prevMetrics.findIndex(m => m.date === date);
+
+          if (existingIndex >= 0) {
+            const updated = [...prevMetrics];
+            updated[existingIndex] = {
+              ...updated[existingIndex],
+              metrics: { ...updated[existingIndex].metrics, ...eventMetrics },
+              lastUpdated: new Date().toISOString()
+            };
+            return updated;
+          }
+          return prevMetrics;
+        });
+
+        // Update todayMetrics if needed
+        const todayDate = dateUtils.formatDateISO(new Date());
+        if (date === todayDate) {
+          setTodayMetrics(prev => ({
+            ...prev,
+            metrics: { ...prev.metrics, ...eventMetrics },
+            lastUpdated: new Date().toISOString()
+          }));
+        }
+
+        debouncedSummaryRefetch();
+        break;
+      }
+
+      case 'delete':
+      case 'bulk_delete': {
+        // Metric deleted
+        console.log(`[Dashboard] Processing delete for ${date}`);
+
+        setAllMetrics(prevMetrics =>
+          prevMetrics.filter(m => m.date !== date)
+        );
+
+        // Clear todayMetrics if it's today
+        const currentDate = dateUtils.formatDateISO(new Date());
+        if (date === currentDate) {
+          setTodayMetrics(null);
+        }
+
+        showAlert('info', 'Metrics Deleted', `Data removed for ${date}`);
+        debouncedSummaryRefetch();
+        break;
+      }
+
+      default:
+        console.warn(`[Dashboard] Unknown operation: ${operation}`);
+    }
+  }, [isDuplicateEvent, optimisticMetrics, debouncedSummaryRefetch, showAlert]);
+
+  /**
+   * ============================================
+   * REAL-TIME: HANDLE GOOGLE FIT SYNC UPDATES
+   * ============================================
+   * 
+   * Processes sync:update events (batch Google Fit sync completed)
+   */
+  const handleSyncUpdate = useCallback(async (eventData) => {
+    console.log('[Dashboard] Received sync:update event:', eventData);
+    
+    const { syncedDates, totalDays, summary } = eventData;
+    
+    // Show comprehensive sync notification
+    showAlert(
+      'success',
+      `Google Fit Sync Complete`,
+      `✓ Synced ${totalDays} day(s)${summary ? ` - ${summary.totalSteps.toLocaleString()} steps, ${summary.totalCalories.toLocaleString()} calories` : ''}`
+    );
+    
+    // Refetch all metrics to ensure consistency
+    // (individual metrics:change events already handled above)
+    console.log('[Dashboard] Refetching all metrics after sync...');
+    
+    try {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 30);
+      
+      const result = await metricsService.getMetrics(
+        dateUtils.formatDateISO(startDate),
+        dateUtils.formatDateISO(endDate)
+      );
+      
+      if (result.success) {
+        setAllMetrics(result.data || []);
+        
+        // Update today's metrics
+        const today = dateUtils.formatDateISO(new Date());
+        const todayData = result.data?.find(m => m.date === today);
+        setTodayMetrics(todayData || null);
+        
+        console.log('[Dashboard] ✓ Metrics refreshed after sync');
+      }
+    } catch (err) {
+      console.error('[Dashboard] Failed to refresh metrics after sync:', err);
+    }
+    
+    // Refetch summary stats
+    debouncedSummaryRefetch();
+  }, [debouncedSummaryRefetch, showAlert]);
 
   /**
    * Handle date range change for metrics list
@@ -597,6 +894,147 @@ const Dashboard = () => {
     loadSummaryStats(period);
   }, [loadSummaryStats, trackAction]);
 
+  /**
+   * ============================================
+   * HANDLE FORM SUBMISSION (WITH OPTIMISTIC UPDATE)
+   * ============================================
+   */
+  const handleSubmit = async (formData) => {
+    try {
+      setIsSubmittingForm(true);
+      setFormError(null);
+
+      // Prepare optimistic update
+      const optimisticKey = `${formData.date}-upsert`;
+      const optimisticData = {
+        date: formData.date,
+        metrics: formData.metrics,
+        source: 'manual',
+        lastUpdated: new Date().toISOString(),
+        _optimistic: true // Flag for styling
+      };
+
+      // ===== OPTIMISTIC UPDATE: UPDATE UI IMMEDIATELY =====
+      console.log('[Dashboard] Applying optimistic update...');
+
+      setAllMetrics(prevMetrics => {
+        const existingIndex = prevMetrics.findIndex(m => m.date === formData.date);
+
+        if (existingIndex >= 0) {
+          const updated = [...prevMetrics];
+          updated[existingIndex] = optimisticData;
+          return updated;
+        } else {
+          return [optimisticData, ...prevMetrics]
+            .sort((a, b) => new Date(b.date) - new Date(a.date));
+        }
+      });
+
+      // Update todayMetrics if it's today
+      const today = dateUtils.formatDateISO(new Date());
+      if (formData.date === today) {
+        setTodayMetrics(optimisticData);
+      }
+
+      // Track this optimistic update to ignore SSE event
+      setOptimisticMetrics(prev => new Set([...prev, optimisticKey]));
+
+      // ===== SUBMIT TO SERVER =====
+      const result = await metricsService.addMetrics(formData);
+
+      if (result.success) {
+        console.log('[Dashboard] ✓ Metrics saved to server');
+
+        // Replace optimistic data with server response
+        setAllMetrics(prevMetrics => {
+          const existingIndex = prevMetrics.findIndex(m => m.date === formData.date);
+
+          if (existingIndex >= 0) {
+            const updated = [...prevMetrics];
+            updated[existingIndex] = {
+              ...result.data,
+              _optimistic: false
+            };
+            return updated;
+          }
+          return prevMetrics;
+        });
+
+        // Update todayMetrics with server data
+        if (formData.date === today) {
+          setTodayMetrics(result.data);
+        }
+
+        // Show success toast
+        showAlert('success', 'Success! 🎉', 'Metrics saved successfully');
+
+        // Collapse form
+        setShowForm(false);
+
+        // Cleanup optimistic tracking after 5 seconds
+        setTimeout(() => {
+          setOptimisticMetrics(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(optimisticKey);
+            return newSet;
+          });
+        }, 5000);
+
+        // Debounced summary refetch
+        debouncedSummaryRefetch();
+      } else {
+        // ===== SERVER ERROR: REVERT OPTIMISTIC UPDATE =====
+        console.error('[Dashboard] Server error, reverting optimistic update');
+
+        setAllMetrics(prevMetrics =>
+          prevMetrics.filter(m => m.date !== formData.date || !m._optimistic)
+        );
+
+        if (formData.date === today) {
+          setTodayMetrics(null);
+        }
+
+        setOptimisticMetrics(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(optimisticKey);
+          return newSet;
+        });
+
+        setFormError(result.message || 'Failed to save metrics');
+        showAlert('error', 'Error ❌', result.message || 'Failed to save metrics');
+      }
+    } catch (err) {
+      console.error('[Dashboard] Error submitting metrics:', err);
+
+      // Revert optimistic update on error
+      const today = dateUtils.formatDateISO(new Date());
+      setAllMetrics(prevMetrics =>
+        prevMetrics.filter(m => !(m.date === formData.date && m._optimistic))
+      );
+
+      if (formData.date === today) {
+        setTodayMetrics(null);
+      }
+
+      setFormError(err.message || 'Failed to save metrics');
+      showAlert('error', 'Error ❌', err.message || 'Failed to save metrics');
+    } finally {
+      setIsSubmittingForm(false);
+    }
+  };
+
+  // ===== REAL-TIME EVENT SUBSCRIPTIONS =====
+
+  // Subscribe to metrics:change events
+  useRealtimeMetrics(handleMetricsChange, [
+    isDuplicateEvent,
+    optimisticMetrics,
+    debouncedSummaryRefetch
+  ]);
+
+  // Subscribe to sync:update events
+  useRealtimeSync(handleSyncUpdate, [debouncedSummaryRefetch]);
+
   // ===== EFFECTS =====
 
   /**
@@ -610,44 +1048,11 @@ const Dashboard = () => {
     loadMetricsRange();
     loadSummaryStats('week');
 
-    // Connect to SSE for real-time updates
-    const token = getAuthToken();
-    if (token) {
-      connectSSE(token, {
-        onConnect: () => {
-          console.log('[Dashboard] SSE connected for real-time updates');
-        },
-        onConnected: (data) => {
-          console.log('[Dashboard] SSE authenticated and ready:', data);
-        },
-        onMetricsUpdate: (data) => {
-          console.log('[Dashboard] Real-time metrics update:', data);
-          // Refresh metrics data when updated via SSE
-          loadTodayMetrics();
-          loadMetricsRange();
-        },
-        onGoalsUpdate: (data) => {
-          console.log('[Dashboard] Real-time goals update:', data);
-          // GoalsSection component handles its own data loading
-          // No need to refresh here as component will reload when needed
-        },
-        onGoogleFitSync: (data) => {
-          console.log('[Dashboard] Google Fit sync completed:', data);
-          // Refresh all data after sync
-          loadTodayMetrics();
-          loadMetricsRange();
-          loadSummaryStats(summaryPeriod);
-        },
-        onError: (error) => {
-          console.error('[Dashboard] SSE connection error:', error);
-        }
-      });
-    }
+    // Note: SSE connection is handled by AuthContext
+    // Real-time updates are received via useRealtimeMetrics and useRealtimeSync hooks
 
     return () => {
       trackAction('DASHBOARD_UNMOUNTED');
-      // Disconnect SSE on unmount
-      disconnectSSE();
       if (refreshTimeoutRef.current) {
         clearTimeout(refreshTimeoutRef.current);
       }
@@ -693,24 +1098,43 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Connection Status Indicator - Top Left */}
-      <div className={`fixed top-4 left-4 z-40 px-3 py-2 rounded-full text-sm font-medium ${
-        connectionStatus.connected
-          ? 'bg-green-100 text-green-800 border border-green-200'
-          : 'bg-red-100 text-red-800 border border-red-200'
-      }`}>
-        {connectionStatus.connected ? (
-          <>
-            <span className="inline-block w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
-            Live
-          </>
-        ) : (
-          <>
-            <span className="inline-block w-2 h-2 bg-red-500 rounded-full mr-2"></span>
-            {connectionStatus.reason === 'reconnecting' ? 'Reconnecting' : 'Offline'}
-            {connectionStatus.retryCount > 0 && ` (${connectionStatus.retryCount})`}
-          </>
-        )}
+      {/* ===== NEW: CONNECTION STATUS INDICATOR ===== */}
+      <div className="fixed top-4 right-4 z-50">
+        <div className={`
+          flex items-center space-x-2 px-4 py-2 rounded-full shadow-lg text-sm font-medium
+          transition-all duration-300
+          ${isConnected 
+            ? 'bg-green-50 text-green-800 border border-green-200' 
+            : 'bg-red-50 text-red-800 border border-red-200'
+          }
+        `}>
+          {isConnected ? (
+            <>
+              <span className="flex h-3 w-3 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+              </span>
+              <span>Live</span>
+            </>
+          ) : (
+            <>
+              <span className="flex h-3 w-3 relative">
+                <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+              </span>
+              <span>
+                {realtimeConnectionStatus?.reason === 'reconnecting' 
+                  ? `Reconnecting... (${realtimeConnectionStatus?.retryCount || 0})` 
+                  : 'Offline'}
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ===== DEBUG PANEL (TEMPORARY - REMOVE AFTER TESTING) ===== */}
+      <div className="fixed bottom-4 right-4 z-50 max-w-md">
+        <RealtimeDebug />
       </div>
 
       <div className="flex flex-col lg:flex-row min-h-screen">
@@ -908,6 +1332,7 @@ const Dashboard = () => {
                   goal={getGoalForMetric('steps')}
                   trend={trendData.steps}
                   lastValue={previousDayMetrics?.metrics?.steps}
+                  isOptimistic={todayMetrics._optimistic}
                 />
 
                 {/* Calories */}
@@ -920,6 +1345,7 @@ const Dashboard = () => {
                   goal={getGoalForMetric('calories')}
                   trend={trendData.calories}
                   lastValue={previousDayMetrics?.metrics?.calories}
+                  isOptimistic={todayMetrics._optimistic}
                 />
 
                 {/* Sleep */}
@@ -932,6 +1358,7 @@ const Dashboard = () => {
                   goal={getGoalForMetric('sleepHours')}
                   trend={trendData.sleepHours}
                   lastValue={previousDayMetrics?.metrics?.sleepHours}
+                  isOptimistic={todayMetrics._optimistic}
                 />
 
                 {/* Weight */}
@@ -943,6 +1370,7 @@ const Dashboard = () => {
                   color="weight"
                   trend={trendData.weight}
                   lastValue={previousDayMetrics?.metrics?.weight}
+                  isOptimistic={todayMetrics._optimistic}
                 />
               </div>
             ) : (

@@ -171,18 +171,22 @@ export const AuthProvider = ({ children }) => {
           }
 
           // ===== NEW: ESTABLISH SSE CONNECTION =====
-          const token = localStorage.getItem('token');
+          console.log('[AuthContext] About to establish SSE connection...');
+          const tokenKey = import.meta.env.VITE_TOKEN_KEY || 'health_metrics_token';
+          const token = localStorage.getItem(tokenKey);
+          console.log('[AuthContext] Token from localStorage:', token ? 'EXISTS' : 'MISSING');
           if (token) {
+            console.log('[AuthContext] Calling eventService.connect()...');
             try {
               await eventService.connect(token);
-              if (import.meta.env.DEV) {
-                console.log('🔔 SSE connection established on initialization');
-              }
+              console.log('🔔 SSE connection established on initialization');
             } catch (sseError) {
               console.error('⚠️ Failed to establish SSE connection:', sseError);
               // Don't fail initialization if SSE connection fails
               // User can still use the app, just without real-time updates
             }
+          } else {
+            console.error('[AuthContext] No token found in localStorage!');
           }
         } else {
           // Token exists but API returned error
@@ -242,13 +246,12 @@ export const AuthProvider = ({ children }) => {
         }
 
         // ===== NEW: ESTABLISH SSE CONNECTION =====
-        const token = localStorage.getItem('token');
+        const tokenKey = import.meta.env.VITE_TOKEN_KEY || 'health_metrics_token';
+        const token = localStorage.getItem(tokenKey);
         if (token) {
           try {
             await eventService.connect(token);
-            if (import.meta.env.DEV) {
-              console.log('🔔 SSE connection established after login');
-            }
+            console.log('🔔 SSE connection established after login');
           } catch (sseError) {
             console.error('⚠️ Failed to establish SSE connection:', sseError);
             // Don't fail login if SSE connection fails
@@ -328,13 +331,12 @@ export const AuthProvider = ({ children }) => {
         }
 
         // ===== NEW: ESTABLISH SSE CONNECTION =====
-        const token = localStorage.getItem('token');
+        const tokenKey = import.meta.env.VITE_TOKEN_KEY || 'health_metrics_token';
+        const token = localStorage.getItem(tokenKey);
         if (token) {
           try {
             await eventService.connect(token);
-            if (import.meta.env.DEV) {
-              console.log('🔔 SSE connection established after registration');
-            }
+            console.log('🔔 SSE connection established after registration');
           } catch (sseError) {
             console.error('⚠️ Failed to establish SSE connection:', sseError);
           }

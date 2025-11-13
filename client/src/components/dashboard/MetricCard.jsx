@@ -147,6 +147,7 @@ const MetricCard = ({
   lastValue = null,
   onClick = null,
   className = '',
+  isOptimistic = false,
 }) => {
   // Get color scheme based on metric type or custom color
   const colorScheme = METRIC_COLORS[color] || METRIC_COLORS.default;
@@ -191,7 +192,10 @@ const MetricCard = ({
   return (
     <div
       className={`
-        ${colorScheme.bg} ${colorScheme.border}
+        ${isOptimistic 
+          ? 'border-blue-300 bg-blue-50 opacity-90' 
+          : `${colorScheme.bg} ${colorScheme.border}`
+        }
         rounded-lg border-2 p-6
         transition-all duration-200 ease-in-out
         ${onClick ? 'cursor-pointer hover:shadow-lg hover:scale-105' : ''}
@@ -207,9 +211,16 @@ const MetricCard = ({
           <span className="text-3xl" aria-hidden="true">
             {icon}
           </span>
-          <h3 className={`${colorScheme.text} text-sm font-semibold truncate`}>
-            {title}
-          </h3>
+          <div className="flex-1">
+            <h3 className={`${colorScheme.text} text-sm font-semibold truncate`}>
+              {title}
+            </h3>
+            {isOptimistic && (
+              <span className="text-xs text-blue-600 font-medium">
+                Saving...
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Trend Badge */}

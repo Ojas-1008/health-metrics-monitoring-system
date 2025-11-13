@@ -109,9 +109,12 @@ class EventService {
    * @returns {Promise<void>}
    */
   async connect(token) {
+    console.log('[EventService] connect() called with token:', token ? 'EXISTS' : 'MISSING');
+    
     // Prevent multiple connections
     if (this.eventSource && this.isConnected) {
       this.log('Already connected, ignoring connect request');
+      console.log('[EventService] Already connected, ignoring connect request');
       return;
     }
 
@@ -121,20 +124,24 @@ class EventService {
     this.connectionAttempt++;
 
     try {
+      console.log(`[EventService] Connection attempt ${this.connectionAttempt}...`);
       this.log(`Connection attempt ${this.connectionAttempt}...`);
 
       // ===== AUTHENTICATION VIA QUERY PARAMETER =====
       // Native EventSource doesn't support custom headers
       // We pass the token as a query parameter (over HTTPS in production)
       const url = `${CONFIG.baseUrl}${CONFIG.endpoint}?token=${encodeURIComponent(token)}`;
+      console.log('[EventService] Connecting to SSE endpoint:', url.replace(/token=[^&]+/, 'token=***'));
 
       // Create EventSource instance
       this.eventSource = new EventSource(url);
+      console.log('[EventService] EventSource created, readyState:', this.eventSource.readyState);
 
       // ===== EVENT HANDLERS =====
 
       // Connection opened
       this.eventSource.addEventListener('open', (event) => {
+        console.log('[EventService] ✓ Connection established (open event fired)');
         this.log('✓ Connection established');
         this.isConnected = true;
         this.retryCount = 0; // Reset retry counter on success
@@ -237,6 +244,8 @@ class EventService {
 
       // Error handler
       this.eventSource.addEventListener('error', (event) => {
+        console.error('[EventService] EventSource error event fired:', event);
+        console.error('[EventService] ReadyState:', this.eventSource.readyState, '(CONNECTING=0, OPEN=1, CLOSED=2)');
         this.logError('EventSource error:', event);
 
         // Check if it's a connection error or HTTP error

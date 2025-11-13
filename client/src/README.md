@@ -1408,8 +1408,8 @@ import * as dateUtils from '../utils/dateUtils';
 const formatted = dateUtils.formatDate('2025-11-04'); 
 // "November 4, 2025"
 
-// Format for API (YYYY-MM-DD)
-const apiDate = dateUtils.formatDateForAPI(new Date());
+// Format for API (ISO format: YYYY-MM-DD)
+const apiDate = dateUtils.formatDateISO(new Date());
 // "2025-11-04"
 
 // Get date ranges
