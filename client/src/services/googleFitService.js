@@ -438,6 +438,122 @@ export const getUserProfile = async () => {
 
 /**
  * ============================================
+ * TRIGGER MANUAL GOOGLE FIT SYNC
+ * ============================================
+ *
+ * Purpose: Manually trigger Google Fit data synchronization
+ *
+ * Process:
+ * 1. Call backend GET /api/googlefit/sync
+ * 2. Backend initiates sync process with Google Fit API
+ * 3. Returns sync status and results
+ *
+ * Backend Response Format:
+ * {
+ *   success: true,
+ *   message: "Sync initiated successfully",
+ *   data: {
+ *     syncId: "sync_123",
+ *     status: "running"
+ *   }
+ * }
+ *
+ * @returns {Promise<Object>} - Sync initiation result
+ * @throws {Error} - User-friendly error message
+ *
+ * Usage:
+ * ```
+ * try {
+ *   const result = await triggerSync();
+ *   if (result.success) {
+ *     console.log('Sync started:', result.data);
+ *   }
+ * } catch (error) {
+ *   console.error('Sync failed:', error.message);
+ * }
+ * ```
+ */
+export const triggerSync = async () => {
+  try {
+    const response = await axiosInstance.get('/api/googlefit/sync');
+    return {
+      success: true,
+      data: response.data,
+      message: 'Sync triggered successfully',
+    };
+  } catch (error) {
+    console.error('[googleFitService] Trigger sync error:', error);
+    return {
+      success: false,
+      message: error.response?.data?.message || 'Failed to trigger sync',
+    };
+  }
+};
+
+/**
+ * ============================================
+ * GET GOOGLE FIT CONNECTION STATUS
+ * ============================================
+ *
+ * Purpose: Get detailed Google Fit connection and sync status
+ *
+ * Process:
+ * 1. Call backend GET /api/googlefit/status
+ * 2. Backend returns connection status and last sync info
+ * 3. Includes sync history and connection health
+ *
+ * Backend Response Format:
+ * {
+ *   success: true,
+ *   message: "Status retrieved successfully",
+ *   data: {
+ *     connected: true,
+ *     lastSyncAt: "2025-11-14T10:30:00Z",
+ *     syncStatus: "idle",
+ *     totalSyncedDays: 30,
+ *     lastSyncSummary: {
+ *       steps: 12500,
+ *       calories: 450,
+ *       distance: 8.5
+ *     }
+ *   }
+ * }
+ *
+ * @returns {Promise<Object>} - Connection status details
+ * @throws {Error} - User-friendly error message
+ *
+ * Usage:
+ * ```
+ * try {
+ *   const result = await getGoogleFitStatus();
+ *   if (result.success) {
+ *     console.log('Connected:', result.data.connected);
+ *     console.log('Last sync:', result.data.lastSyncAt);
+ *   }
+ * } catch (error) {
+ *   console.error('Status check failed:', error.message);
+ * }
+ * ```
+ */
+export const getGoogleFitStatus = async () => {
+  try {
+    const response = await axiosInstance.get('/api/googlefit/status');
+    return {
+      success: true,
+      data: response.data.data,
+      message: 'Status retrieved successfully',
+    };
+  } catch (error) {
+    console.error('[googleFitService] Get status error:', error);
+    return {
+      success: false,
+      message: error.response?.data?.message || 'Failed to get status',
+    };
+  }
+};
+
+/**
+ * ============================================
  * EXPORTS
  * ============================================
  */
@@ -447,4 +563,6 @@ export default {
   disconnectGoogleFit,
   handleCallback, // Optional
   getUserProfile,
+  triggerSync,
+  getGoogleFitStatus,
 };

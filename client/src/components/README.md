@@ -4,8 +4,9 @@ Organized by feature for better maintainability.
 
 - `auth/` - Login, Register, AuthForm components
 - `metrics/` - MetricCard, MetricList, MetricForm
+- `dashboard/` - GoogleFitStatus, MetricsList components
 - `charts/` - LineChart, BarChart, PieChart wrappers
-- `common/` - Button, Input, Card, Modal, Navbar
+- `common/` - Button, Input, Card, Modal, Navbar, Toast
 
 Keep components small, focused, and reusable.
 
@@ -140,3 +141,140 @@ import MetricsList from '../components/dashboard/MetricsList';
 - Weight (⚖️)
 - Heart Rate (❤️)
 - Oxygen Saturation (🫁)
+
+## GoogleFitStatus Component
+
+**Location:** `components/dashboard/GoogleFitStatus.jsx`
+
+**Purpose:** Display Google Fit connection status, last sync time, and manual sync trigger.
+
+### Features
+- Connection status indicator (Connected/Disconnected with visual badges)
+- Last sync timestamp with relative time display ("2 hours ago", "Just now", etc.)
+- Manual sync trigger button with loading states
+- Sync in progress indicator with spinning animation
+- Real-time updates via SSE events
+- Responsive design (mobile-friendly)
+- Conditional rendering (hidden when status not loaded)
+- Error handling for missing data
+
+### Props
+```javascript
+{
+  googleFitStatus: {           // Google Fit connection data from API
+    connected: true,           // Boolean connection status
+    lastSyncAt: "2025-11-14T10:30:00Z"  // ISO timestamp
+  },
+  lastSyncAt: "2025-11-14T10:30:00Z",   // Last sync timestamp (from SSE)
+  onSyncClick: () => {},       // Callback when manual sync triggered
+  isSyncing: false             // Boolean indicating sync in progress
+}
+```
+
+### Usage Example
+```jsx
+import GoogleFitStatus from '../components/dashboard/GoogleFitStatus';
+
+<GoogleFitStatus
+  googleFitStatus={{
+    connected: true,
+    lastSyncAt: "2025-11-14T10:30:00Z"
+  }}
+  lastSyncAt="2025-11-14T10:30:00Z"
+  onSyncClick={handleManualSync}
+  isSyncing={false}
+/>
+```
+
+### Status Display Logic
+- **Connected:** Green checkmark icon, "Connected" badge, shows last sync time
+- **Disconnected:** Gray icon, "Disconnected" badge, no sync info shown
+- **Syncing:** Spinning loader icon, "Syncing..." text, disabled sync button
+- **Never synced:** Shows "Never" for last sync time
+
+### Time Formatting
+- **< 1 minute:** "Just now"
+- **< 60 minutes:** "X minute(s) ago"
+- **< 24 hours:** "X hour(s) ago"
+- **< 7 days:** "X day(s) ago"
+- **> 7 days:** Formatted date using `dateUtils.formatDateShort()`
+
+### Real-time Updates
+- Listens for `sync:update` SSE events to update `lastSyncAt`
+- Automatically recalculates relative time every render
+- Updates connection status when Google Fit data changes
+
+## Toast Component
+
+**Location:** `components/common/Toast.jsx`
+
+**Purpose:** Display temporary auto-dismissing notifications with progress bar and animations.
+
+### Features
+- Auto-dismiss after configurable duration (default 5000ms)
+- Multiple variants: success (green), error (red), warning (yellow), info (blue)
+- Smooth slide-in/slide-out animations
+- Optional progress bar showing remaining time
+- Manual close button with hover effects
+- Accessibility features (ARIA labels, screen reader support)
+- Configurable duration (set to 0 for no auto-dismiss)
+- Custom close callback support
+- Responsive design (mobile-friendly)
+- Icon support with variant-specific emojis
+
+### Props
+```javascript
+{
+  message: 'Operation completed successfully',  // Notification message
+  variant: 'success',                           // 'success' | 'error' | 'warning' | 'info'
+  duration: 5000,                               // Auto-dismiss delay in ms (0 = never)
+  showProgress: true,                           // Show progress bar
+  onClose: () => {},                            // Optional close callback
+  className: ''                                 // Additional CSS classes
+}
+```
+
+### Usage Example
+```jsx
+import Toast from '../components/common/Toast';
+
+// Success notification
+<Toast
+  message="Google Fit data synced successfully"
+  variant="success"
+  duration={4000}
+  onClose={() => console.log('Toast closed')}
+/>
+
+// Error notification with no auto-dismiss
+<Toast
+  message="Failed to connect to Google Fit"
+  variant="error"
+  duration={0}
+  showProgress={false}
+/>
+
+// Warning notification
+<Toast
+  message="Your session will expire in 5 minutes"
+  variant="warning"
+/>
+```
+
+### Variants
+- **success:** Green theme with checkmark icon (✓)
+- **error:** Red theme with X icon (✕)
+- **warning:** Yellow theme with exclamation icon (⚠️)
+- **info:** Blue theme with info icon (ℹ️)
+
+### Animation Details
+- **Entry:** Slide down from top with fade-in (300ms)
+- **Exit:** Slide up with fade-out (300ms)
+- **Progress Bar:** Smooth width reduction animation
+- **Hover Effects:** Close button scales on hover
+
+### Accessibility
+- ARIA live region for screen readers
+- Proper ARIA labels on interactive elements
+- Keyboard navigation support (Escape key closes)
+- High contrast colors for visibility

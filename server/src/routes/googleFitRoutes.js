@@ -95,6 +95,52 @@ router.get("/callback", handleGoogleFitCallback);
 router.get("/status", protect, getGoogleFitStatus);
 
 /**
+ * GET /api/googlefit/sync
+ * Manually trigger Google Fit sync for current user
+ *
+ * Initiates background sync process for the authenticated user
+ * Returns immediately while sync runs asynchronously
+ *
+ * Request:
+ * - Headers: Authorization: Bearer <JWT>
+ *
+ * Response (200):
+ * {
+ *   "success": true,
+ *   "message": "Google Fit sync started",
+ *   "timestamp": "2025-11-14T10:30:00.000Z"
+ * }
+ *
+ * Errors:
+ * - 401: Not authenticated
+ * - 400: Not connected to Google Fit
+ * - 500: Sync worker error
+ */
+router.get('/sync', protect, async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+
+    console.log(`[googleFitRoutes] Manual sync triggered by user: ${userId}`);
+
+    // Import sync function
+    const { syncSingleUser } = await import('../../workers/googleFitSyncWorker.js');
+
+    // Trigger sync asynchronously (don't wait for completion)
+    syncSingleUser(userId).catch(error => {
+      console.error(`[googleFitRoutes] Sync error for user ${userId}:`, error);
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Google Fit sync started',
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * POST /api/googlefit/disconnect
  * Disconnect Google Fit account
  * 

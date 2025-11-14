@@ -19,15 +19,17 @@
  * - Cleanup on unmount
  */
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useState, useEffect, useCallback, useRef } from 'react';
+// import { useAuth } from '../context/AuthContext'; // Reserved for future auth features
 import * as metricsService from '../services/metricsService';
-import * as goalsService from '../services/goalsService';
+// import * as goalsService from '../services/goalsService'; // Reserved for future goals functionality
 import * as googleFitService from '../services/googleFitService';
 import * as dateUtils from '../utils/dateUtils';
 
 // ===== NEW IMPORTS =====
 import { useRealtimeMetrics, useRealtimeSync, useConnectionStatus } from '../hooks/useRealtimeEvents';
+import Toast from '../components/common/Toast';
+import GoogleFitStatus from '../components/dashboard/GoogleFitStatus';
 
 // Existing component imports...
 import MetricsForm from '../components/dashboard/MetricsForm';
@@ -35,7 +37,6 @@ import MetricCard from '../components/metrics/MetricCard';
 import MetricsList from '../components/dashboard/MetricsList';
 import SummaryStats from '../components/dashboard/SummaryStats';
 import GoalsSection from '../components/dashboard/GoalsSection';
-import GoogleFitConnection from '../components/dashboard/GoogleFitConnection';
 import Button from '../components/common/Button';
 import Alert from '../components/common/Alert';
 
@@ -97,7 +98,7 @@ const INITIAL_STATE = {
 
 const Dashboard = () => {
   // ===== HOOKS =====
-  const { user, logout } = useAuth();
+  // const { user, logout } = useAuth(); // Reserved for future auth features
 
   // ===== STATE MANAGEMENT =====
 
@@ -110,7 +111,7 @@ const Dashboard = () => {
   const [metricsError, setMetricsError] = useState(null);
 
   // Goals State
-  const [goals, setGoals] = useState(null);
+  // const [goals, setGoals] = useState(null); // Reserved for future goals functionality
 
   // Previous Day Metrics State (for trend comparison)
   const [previousDayMetrics, setPreviousDayMetrics] = useState(null);
@@ -187,6 +188,12 @@ const Dashboard = () => {
    */
   const lastEventRef = useRef(new Map());
 
+  // ===== NEW STATE FOR GOOGLE FIT SYNC =====
+  const [googleFitStatus, setGoogleFitStatus] = useState(null);
+  const [lastSyncAt, setLastSyncAt] = useState(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncToast, setSyncToast] = useState(null);
+
   // ===== NEW: CONNECTION STATUS HOOK =====
   const { isConnected, connectionStatus: realtimeConnectionStatus } = useConnectionStatus();
 
@@ -235,7 +242,7 @@ const Dashboard = () => {
    * Handle goals update
    */
   const handleGoalsUpdate = useCallback((updatedGoals) => {
-    setGoals(updatedGoals);
+    // setGoals(updatedGoals); // Reserved for future goals functionality
     trackAction('GOALS_UPDATED', { goals: updatedGoals });
   }, [trackAction]);
 
@@ -656,7 +663,7 @@ const Dashboard = () => {
       return; // Skip duplicate
     }
 
-    const { operation, date, metrics: eventMetrics, source, deletedAt } = eventData;
+    const { operation, date, metrics: eventMetrics, source } = eventData;
 
     // ===== OPTIMISTIC UPDATE CHECK =====
     // If this event is for a metric we just submitted optimistically,
@@ -790,54 +797,128 @@ const Dashboard = () => {
 
   /**
    * ============================================
-   * REAL-TIME: HANDLE GOOGLE FIT SYNC UPDATES
+   * REAL-TIME: HANDLE SYNC UPDATE EVENTS
    * ============================================
-   * 
-   * Processes sync:update events (batch Google Fit sync completed)
+   *
+   * Processes sync:update events from Google Fit sync worker
+   * Updates lastSyncAt timestamp and triggers dashboard refresh
    */
   const handleSyncUpdate = useCallback(async (eventData) => {
     console.log('[Dashboard] Received sync:update event:', eventData);
-    
-    const { syncedDates, totalDays, summary } = eventData;
-    
-    // Show comprehensive sync notification
-    showAlert(
-      'success',
-      `Google Fit Sync Complete`,
-      `✓ Synced ${totalDays} day(s)${summary ? ` - ${summary.totalSteps.toLocaleString()} steps, ${summary.totalCalories.toLocaleString()} calories` : ''}`
-    );
-    
-    // Refetch all metrics to ensure consistency
-    // (individual metrics:change events already handled above)
-    console.log('[Dashboard] Refetching all metrics after sync...');
-    
+
+    const { syncedDates, totalDays, summary, syncedAt } = eventData;
+
+    // ===== UPDATE LAST SYNC TIMESTAMP =====
+    if (syncedAt) {
+      setLastSyncAt(syncedAt);
+      console.log(`[Dashboard] Updated lastSyncAt: ${syncedAt}`);
+    }
+
+    // ===== SHOW TOAST NOTIFICATION =====
+    const toastMessage = totalDays === 1
+      ? `Google Fit synced 1 day`
+      : `Google Fit synced ${totalDays} days`;
+
+    const toastDescription = summary
+      ? `${summary.totalSteps.toLocaleString()} steps • ${summary.totalCalories.toLocaleString()} calories`
+      : syncedDates?.length > 0
+      ? `Dates: ${syncedDates.slice(0, 3).join(', ')}${syncedDates.length > 3 ? '...' : ''}`
+      : undefined;
+
+    setSyncToast({
+      id: Date.now(),
+      message: toastMessage,
+      description: toastDescription,
+      variant: 'success',
+    });
+
+    // ===== TRIGGER DASHBOARD REFRESH =====
+    console.log('[Dashboard] Triggering dashboard-wide refresh after sync...');
+
     try {
+      // Refetch all metrics to ensure consistency
       const endDate = new Date();
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - 30);
-      
+
       const result = await metricsService.getMetrics(
         dateUtils.formatDateISO(startDate),
         dateUtils.formatDateISO(endDate)
       );
-      
+
       if (result.success) {
         setAllMetrics(result.data || []);
-        
+
         // Update today's metrics
         const today = dateUtils.formatDateISO(new Date());
         const todayData = result.data?.find(m => m.date === today);
         setTodayMetrics(todayData || null);
-        
+
         console.log('[Dashboard] ✓ Metrics refreshed after sync');
       }
+
+      // Refetch summary stats (debounced)
+      debouncedSummaryRefetch();
+
+      // Refetch Google Fit status to update lastSyncAt from server
+      const statusResult = await googleFitService.getGoogleFitStatus();
+      if (statusResult.success) {
+        setGoogleFitStatus(statusResult.data);
+      }
+
     } catch (err) {
-      console.error('[Dashboard] Failed to refresh metrics after sync:', err);
+      console.error('[Dashboard] Failed to refresh after sync:', err);
     }
-    
-    // Refetch summary stats
-    debouncedSummaryRefetch();
-  }, [debouncedSummaryRefetch, showAlert]);
+
+    // Clear syncing flag
+    setIsSyncing(false);
+  }, [debouncedSummaryRefetch]);
+
+  /**
+   * ============================================
+   * MANUAL SYNC TRIGGER
+   * ============================================
+   */
+  const handleManualSync = async () => {
+    if (isSyncing) return;
+
+    try {
+      setIsSyncing(true);
+      console.log('[Dashboard] Triggering manual Google Fit sync...');
+
+      const result = await googleFitService.triggerSync();
+
+      if (result.success) {
+        // Show immediate feedback
+        setSyncToast({
+          id: Date.now(),
+          message: 'Google Fit sync started',
+          description: 'Your data is being synced in the background',
+          variant: 'info',
+        });
+
+        // The actual sync:update event will arrive in a few seconds
+        // and will update the UI with final results
+      } else {
+        setIsSyncing(false);
+        setSyncToast({
+          id: Date.now(),
+          message: 'Sync failed',
+          description: result.message || 'Failed to start Google Fit sync',
+          variant: 'error',
+        });
+      }
+    } catch (error) {
+      console.error('[Dashboard] Manual sync error:', error);
+      setIsSyncing(false);
+      setSyncToast({
+        id: Date.now(),
+        message: 'Sync failed',
+        description: error.message || 'An error occurred during sync',
+        variant: 'error',
+      });
+    }
+  };
 
   /**
    * Handle date range change for metrics list
@@ -907,6 +988,7 @@ const Dashboard = () => {
    * HANDLE FORM SUBMISSION (WITH OPTIMISTIC UPDATE)
    * ============================================
    */
+  // eslint-disable-next-line no-unused-vars
   const handleSubmit = async (formData) => {
     try {
       setIsSubmittingForm(true);
@@ -1088,6 +1170,31 @@ const Dashboard = () => {
       loadPreviousDayMetrics();
     }
   }, [todayMetrics, loadPreviousDayMetrics]);
+
+  /**
+   * ============================================
+   * LOAD GOOGLE FIT STATUS ON MOUNT
+   * ============================================
+   */
+  useEffect(() => {
+    const loadGoogleFitStatus = async () => {
+      try {
+        const result = await googleFitService.getGoogleFitStatus();
+        if (result.success) {
+          setGoogleFitStatus(result.data);
+
+          // Set initial lastSyncAt from server
+          if (result.data?.lastSyncAt) {
+            setLastSyncAt(result.data.lastSyncAt);
+          }
+        }
+      } catch (error) {
+        console.error('[Dashboard] Failed to load Google Fit status:', error);
+      }
+    };
+
+    loadGoogleFitStatus();
+  }, []);
 
   // ===== RENDER =====
 
@@ -1520,10 +1627,17 @@ const Dashboard = () => {
             )}
           </div>
 
-          {/* ⭐ NEW: GOOGLE FIT CONNECTION SECTION */}
-          <div className="mb-8">
-            <GoogleFitConnection />
-          </div>
+          {/* ===== NEW: GOOGLE FIT STATUS SECTION ===== */}
+          {googleFitStatus && (
+            <div className="mb-8">
+              <GoogleFitStatus
+                googleFitStatus={googleFitStatus}
+                lastSyncAt={lastSyncAt}
+                onSyncClick={handleManualSync}
+                isSyncing={isSyncing}
+              />
+            </div>
+          )}
 
           {/* ===== ADVANCED COLLAPSIBLE FORM SECTION ===== */}
           <div className="mb-8">
@@ -1904,6 +2018,18 @@ const Dashboard = () => {
           <div className="h-12"></div>
         </main>
       </div>
+
+      {/* ===== NEW: TOAST NOTIFICATIONS ===== */}
+      {syncToast && (
+        <Toast
+          message={syncToast.message}
+          description={syncToast.description}
+          variant={syncToast.variant}
+          duration={5000}
+          onClose={() => setSyncToast(null)}
+          showProgress={true}
+        />
+      )}
     </div>
   );
 };

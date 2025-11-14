@@ -1011,6 +1011,53 @@ export const triggerManualSync = async () => {
   return await syncAllUsers();
 };
 
+/**
+ * Sync Google Fit data for a single user by ID
+ *
+ * @param {string} userId - MongoDB ObjectId of the user to sync
+ * @returns {Promise<Object>} Sync result for the user
+ */
+export const syncSingleUser = async (userId) => {
+  console.log(`🔄 Starting single user sync for user: ${userId}`);
+
+  try {
+    // Import User model
+    const { default: User } = await import('../models/User.js');
+
+    // Find user and check if connected
+    const user = await User.findById(userId).select('+googleFitTokens');
+    if (!user) {
+      throw new Error(`User not found: ${userId}`);
+    }
+
+    if (!user.googleFitConnected) {
+      throw new Error(`User not connected to Google Fit: ${userId}`);
+    }
+
+    console.log(`✅ Found connected user: ${user.email}`);
+
+    // Sync the user's data
+    const syncResult = await syncUserGoogleFitData(user);
+
+    console.log(`✅ Single user sync completed for ${user.email}:`, syncResult);
+
+    return {
+      success: true,
+      userId: user._id,
+      email: user.email,
+      ...syncResult
+    };
+
+  } catch (error) {
+    console.error(`❌ Single user sync failed for ${userId}:`, error);
+    return {
+      success: false,
+      userId,
+      error: error.message
+    };
+  }
+};
+
 // Export all functions
 export default {
   startSyncWorker,
@@ -1018,4 +1065,5 @@ export default {
   getWorkerStatus,
   triggerManualSync,
   syncAllUsers,
+  syncSingleUser,
 };

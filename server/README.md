@@ -338,6 +338,7 @@ All core backend features are fully implemented, tested, and production-ready:
   - GET /api/googlefit/connect - Initiate OAuth flow
   - GET /api/googlefit/callback - Handle OAuth callback
   - GET /api/googlefit/status - Check connection status
+  - GET /api/googlefit/sync - Trigger manual sync
   - POST /api/googlefit/disconnect - Disconnect account
 - **Worker:** `src/workers/googleFitSyncWorker.js` (983 lines)
   - Node-cron scheduled task (every 15 minutes by default)
@@ -345,6 +346,7 @@ All core backend features are fully implemented, tested, and production-ready:
   - Fetches data from Google Fit API
   - Stores metrics in MongoDB
   - Comprehensive error handling and logging
+  - `syncSingleUser(userId)` - Manual sync for individual users
 
 ---
 
@@ -1463,6 +1465,36 @@ Authorization: Bearer <token>
 }
 ```
 
+#### 3.5. Manual Sync Trigger
+```http
+GET /api/googlefit/sync
+Authorization: Bearer <token>
+```
+
+**Description:** Manually trigger Google Fit data synchronization for the authenticated user. The sync runs asynchronously in the background.
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Google Fit sync started",
+  "timestamp": "2025-11-14T10:30:00.000Z"
+}
+```
+
+**Response (400 Bad Request - Not Connected):**
+```json
+{
+  "success": false,
+  "message": "User not connected to Google Fit"
+}
+```
+
+**Notes:**
+- Returns immediately while sync runs in background
+- Sync progress is communicated via SSE events (`sync:update`)
+- Only works for users connected to Google Fit
+
 #### 4. Disconnect Google Fit
 ```http
 POST /api/googlefit/disconnect
@@ -1558,6 +1590,7 @@ Base URL: http://localhost:5000
   - Connect: GET /api/googlefit/connect
   - OAuth Callback: GET /api/googlefit/callback
   - Connection Status: GET /api/googlefit/status
+  - Manual Sync: GET /api/googlefit/sync
   - Disconnect: POST /api/googlefit/disconnect
 ========================================
 ```
