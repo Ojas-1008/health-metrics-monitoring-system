@@ -31,7 +31,7 @@ import { useRealtimeMetrics, useRealtimeSync, useConnectionStatus } from '../hoo
 
 // Existing component imports...
 import MetricsForm from '../components/dashboard/MetricsForm';
-import MetricCard from '../components/dashboard/MetricCard';
+import MetricCard from '../components/metrics/MetricCard';
 import MetricsList from '../components/dashboard/MetricsList';
 import SummaryStats from '../components/dashboard/SummaryStats';
 import GoalsSection from '../components/dashboard/GoalsSection';
@@ -383,9 +383,17 @@ const Dashboard = () => {
         setTodayMetrics(result.data);
         trackAction('LOAD_TODAY_METRICS', { success: true });
       } else {
-        setTodayMetrics(null);
-        setMetricsError(result.message);
-        trackAction('LOAD_TODAY_METRICS', { success: false, error: result.message });
+        // For today's metrics, 404 is normal (no metrics entered yet)
+        // Only treat as error if it's not a "no metrics found" message
+        if (result.message && result.message.includes('No metrics found')) {
+          setTodayMetrics(null);
+          setMetricsError(null); // Clear any previous errors
+          trackAction('LOAD_TODAY_METRICS', { success: true, noData: true });
+        } else {
+          setTodayMetrics(null);
+          setMetricsError(result.message);
+          trackAction('LOAD_TODAY_METRICS', { success: false, error: result.message });
+        }
       }
     } catch (error) {
       console.error('Error loading today metrics:', error);
@@ -940,7 +948,7 @@ const Dashboard = () => {
       setOptimisticMetrics(prev => new Set([...prev, optimisticKey]));
 
       // ===== SUBMIT TO SERVER =====
-      const result = await metricsService.addMetrics(formData);
+      const result = await metricsService.addMetric(formData);
 
       if (result.success) {
         console.log('[Dashboard] ✓ Metrics saved to server');

@@ -1,9 +1,10 @@
 /**
  * ============================================
- * METRICS LIST COMPONENT
+ * METRICS LIST COMPONENT (WITH REAL-TIME UPDATES)
  * ============================================
  *
  * Purpose: Display historical metrics grouped by date
+ * ENHANCED: Scroll position preservation and update indicators
  *
  * Features:
  * - Grouped by date display (newest first)
@@ -16,6 +17,10 @@
  * - Delete confirmation
  * - Responsive grid layout
  * - Error handling
+ * - NEW: Scroll position preservation on prepend
+ * - NEW: Visual indicators for newly added/updated entries
+ * - NEW: Flash animation on updates
+ * - NEW: Real-time sync badges
  *
  * Props:
  * - metrics: Array of metric objects
@@ -26,7 +31,8 @@
  * - itemsPerPage: Pagination size (default 5)
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import PropTypes from 'prop-types';
 import * as dateUtils from '../../utils/dateUtils';
 import * as metricsService from '../../services/metricsService';
 import Button from '../common/Button';
@@ -37,24 +43,19 @@ import Alert from '../common/Alert';
  * LOADING SKELETON COMPONENT
  * ============================================
  */
-
 const MetricsSkeleton = ({ count = 3 }) => {
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="bg-gray-100 rounded-lg p-6 space-y-3 animate-pulse">
-          <div className="flex justify-between items-center">
-            <div className="h-6 bg-gray-300 rounded w-32"></div>
-            <div className="h-5 bg-gray-300 rounded w-24"></div>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {Array.from({ length: 3 }).map((_, j) => (
-              <div key={j} className="h-10 bg-gray-300 rounded"></div>
+        <div key={i} className="bg-white rounded-lg shadow-sm p-6 animate-pulse">
+          <div className="h-6 bg-gray-200 rounded w-32 mb-4"></div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, j) => (
+              <div key={j} className="space-y-2">
+                <div className="h-4 bg-gray-200 rounded w-20"></div>
+                <div className="h-8 bg-gray-200 rounded w-full"></div>
+              </div>
             ))}
-          </div>
-          <div className="flex gap-2 justify-end pt-2">
-            <div className="h-8 bg-gray-300 rounded w-16"></div>
-            <div className="h-8 bg-gray-300 rounded w-16"></div>
           </div>
         </div>
       ))}
@@ -62,219 +63,8 @@ const MetricsSkeleton = ({ count = 3 }) => {
   );
 };
 
-/**
- * ============================================
- * INDIVIDUAL METRIC ENTRY COMPONENT
- * ============================================
- */
-
-const MetricEntry = ({ date, metrics, onEdit, onDelete, isDeleting }) => {
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-
-  const metricIcons = {
-    steps: '👟',
-    calories: '🔥',
-    distance: '🏃',
-    activeMinutes: '⏱️',
-    weight: '⚖️',
-    sleepHours: '😴',
-    heartRate: '❤️',
-  };
-
-  const formatMetricValue = (key, value) => {
-    if (!value && value !== 0) return 'N/A';
-
-    const unitMap = {
-      steps: 'steps',
-      calories: 'kcal',
-      distance: 'km',
-      activeMinutes: 'min',
-      weight: 'kg',
-      sleepHours: 'hrs',
-      heartRate: 'bpm',
-    };
-
-    const formatted = typeof value === 'number' ? value.toLocaleString('en-US', { maximumFractionDigits: 1 }) : value;
-    return `${formatted} ${unitMap[key] || ''}`;
-  };
-
-  return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow">
-      {/* Header: Date and Actions */}
-      <div className="flex justify-between items-center mb-4 pb-4 border-b border-gray-100">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900">
-            {dateUtils.formatDateLong(date)}
-          </h3>
-          <p className="text-sm text-gray-500">
-            {dateUtils.getRelativeDateLabel(date)}
-          </p>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => onEdit(date)}
-            disabled={isDeleting}
-          >
-            Edit
-          </Button>
-
-          {!showDeleteConfirm ? (
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={() => setShowDeleteConfirm(true)}
-              disabled={isDeleting}
-            >
-              Delete
-            </Button>
-          ) : (
-            <div className="flex gap-2">
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={() => onDelete(date)}
-                disabled={isDeleting}
-              >
-                {isDeleting ? 'Deleting...' : 'Confirm'}
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setShowDeleteConfirm(false)}
-                disabled={isDeleting}
-              >
-                Cancel
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Metrics Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {Object.entries(metrics).map(([key, value]) => {
-          // Skip internal fields
-          if (key.startsWith('_') || key === 'id') return null;
-
-          return (
-            <div key={key} className="bg-gray-50 rounded p-3">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-lg">{metricIcons[key] || '📊'}</span>
-                <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">
-                  {key.replace(/([A-Z])/g, ' $1').trim()}
-                </span>
-              </div>
-              <div className="text-sm font-semibold text-gray-900">
-                {formatMetricValue(key, value)}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Delete Confirmation */}
-      {showDeleteConfirm && (
-        <div className="mt-4 pt-4 border-t border-gray-200 bg-red-50 p-3 rounded flex justify-between items-center">
-          <p className="text-sm text-red-800">
-            Are you sure you want to delete metrics for {dateUtils.formatDateShort(date)}?
-          </p>
-        </div>
-      )}
-    </div>
-  );
-};
-
-/**
- * ============================================
- * EDIT MODAL COMPONENT
- * ============================================
- */
-
-const EditMetricModal = ({ date, metric, onSave, onCancel, isSaving }) => {
-  const [formData, setFormData] = useState(metric);
-  const [errors, setErrors] = useState({});
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value ? parseFloat(value) : '',
-    }));
-
-    if (errors[name]) {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[name];
-        return newErrors;
-      });
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    await onSave(date, formData);
-  };
-
-  const metricLabels = {
-    steps: 'Steps',
-    calories: 'Calories',
-    distance: 'Distance (km)',
-    activeMinutes: 'Active Minutes',
-    weight: 'Weight (kg)',
-    sleepHours: 'Sleep Hours',
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">
-          Edit Metrics for {dateUtils.formatDateShort(date)}
-        </h2>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {Object.entries(metricLabels).map(([key, label]) => (
-            <div key={key} className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700">{label}</label>
-              <input
-                type="number"
-                name={key}
-                value={formData[key] || ''}
-                onChange={handleInputChange}
-                placeholder="0"
-                step="0.1"
-                min="0"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              {errors[key] && (
-                <p className="text-red-500 text-xs">{errors[key]}</p>
-              )}
-            </div>
-          ))}
-
-          <div className="flex gap-2 justify-end pt-4 border-t">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={onCancel}
-              disabled={isSaving}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={isSaving}
-            >
-              {isSaving ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
+MetricsSkeleton.propTypes = {
+  count: PropTypes.number,
 };
 
 /**
@@ -282,248 +72,517 @@ const EditMetricModal = ({ date, metric, onSave, onCancel, isSaving }) => {
  * METRICS LIST COMPONENT
  * ============================================
  */
-
 const MetricsList = ({
   metrics = [],
   isLoading = false,
-  onMetricsChange = null,
+  onEdit = null,
+  onDelete = null,
   dateRange = null,
   itemsPerPage = 5,
 }) => {
-  // State management
+  // ===== STATE =====
   const [currentPage, setCurrentPage] = useState(1);
-  const [editingDate, setEditingDate] = useState(null);
   const [deletingDate, setDeletingDate] = useState(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [alert, setAlert] = useState({ visible: false, type: 'info', title: '', message: '' });
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+
+  // ===== NEW: STATE FOR REAL-TIME UPDATES =====
+  const [newlyAddedDates, setNewlyAddedDates] = useState(new Set());
+  const [updatedDates, setUpdatedDates] = useState(new Set());
+  const listRef = useRef(null);
+  const previousMetricsRef = useRef([]);
+  const scrollPositionRef = useRef(0);
+
+  /**
+   * ============================================
+   * EFFECT: DETECT NEWLY ADDED/UPDATED METRICS
+   * ============================================
+   *
+   * Compares current metrics with previous metrics
+   * to determine which dates were added or updated
+   */
+  useEffect(() => {
+    const previousDates = new Set(previousMetricsRef.current.map(m => m.date));
+    const currentDates = new Set(metrics.map(m => m.date));
+
+    // Detect newly added dates
+    const added = new Set();
+    for (const date of currentDates) {
+      if (!previousDates.has(date)) {
+        added.add(date);
+        console.log(`[MetricsList] New metric detected: ${date}`);
+      }
+    }
+
+    // Detect updated dates (existing dates with changed data)
+    const updated = new Set();
+    for (const metric of metrics) {
+      const previousMetric = previousMetricsRef.current.find(m => m.date === metric.date);
+      if (previousMetric && JSON.stringify(previousMetric.metrics) !== JSON.stringify(metric.metrics)) {
+        updated.add(metric.date);
+        console.log(`[MetricsList] Updated metric detected: ${metric.date}`);
+      }
+    }
+
+    // Update state
+    if (added.size > 0) {
+      setNewlyAddedDates(added);
+      // Clear indicators after 3 seconds
+      setTimeout(() => {
+        setNewlyAddedDates(new Set());
+      }, 3000);
+    }
+
+    if (updated.size > 0) {
+      setUpdatedDates(updated);
+      // Clear indicators after 2 seconds
+      setTimeout(() => {
+        setUpdatedDates(new Set());
+      }, 2000);
+    }
+
+    // Update previous metrics ref
+    previousMetricsRef.current = metrics;
+  }, [metrics]);
+
+  /**
+   * ============================================
+   * EFFECT: PRESERVE SCROLL POSITION
+   * ============================================
+   *
+   * When metrics are prepended (new metrics added at top),
+   * adjust scroll position to maintain user's view
+   */
+  useEffect(() => {
+    if (!listRef.current) return;
+
+    const currentMetricsCount = metrics.length;
+    const previousMetricsCount = previousMetricsRef.current.length;
+
+    // Check if new metrics were prepended
+    if (currentMetricsCount > previousMetricsCount) {
+      const newMetricsCount = currentMetricsCount - previousMetricsCount;
+
+      // Only adjust if user was scrolled down (not at top)
+      if (scrollPositionRef.current > 100) {
+        console.log(
+          `[MetricsList] ${newMetricsCount} new metric(s) prepended, preserving scroll position`
+        );
+
+        // Calculate approximate height of new items (estimate 200px per item)
+        const estimatedNewHeight = newMetricsCount * 200;
+
+        // Adjust scroll position
+        requestAnimationFrame(() => {
+          if (listRef.current) {
+            listRef.current.scrollTop = scrollPositionRef.current + estimatedNewHeight;
+          }
+        });
+      }
+    }
+  }, [metrics.length]);
+
+  /**
+   * ============================================
+   * EFFECT: TRACK SCROLL POSITION
+   * ============================================
+   */
+  useEffect(() => {
+    const listElement = listRef.current;
+    if (!listElement) return;
+
+    const handleScroll = () => {
+      scrollPositionRef.current = listElement.scrollTop;
+    };
+
+    listElement.addEventListener('scroll', handleScroll);
+    return () => listElement.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // ===== SORT METRICS BY DATE (DESCENDING) =====
+  const sortedMetrics = useMemo(() => {
+    return [...metrics].sort((a, b) => {
+      const dateA = new Date(a.date);
+      const dateB = new Date(b.date);
+      return dateB - dateA; // Descending order (newest first)
+    });
+  }, [metrics]);
+
+  // ===== PAGINATION =====
+  const totalPages = Math.ceil(sortedMetrics.length / itemsPerPage);
+  const paginatedMetrics = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return sortedMetrics.slice(startIndex, endIndex);
+  }, [sortedMetrics, currentPage, itemsPerPage]);
+
+  // Reset to page 1 when metrics change significantly
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1);
+    }
+  }, [totalPages, currentPage]);
 
   // ===== HELPER FUNCTIONS =====
 
-  const showAlert = (type, title, message, duration = 4000) => {
-    setAlert({ visible: true, type, title, message });
-    if (duration > 0) {
-      setTimeout(() => {
-        setAlert((prev) => ({ ...prev, visible: false }));
-      }, duration);
+  /**
+   * Check if a date is newly added
+   */
+  const isNewlyAdded = (date) => {
+    return newlyAddedDates.has(date);
+  };
+
+  /**
+   * Check if a date was recently updated
+   */
+  const isRecentlyUpdated = (date) => {
+    return updatedDates.has(date);
+  };
+
+  /**
+   * Get visual indicator classes for a metric card
+   */
+  const getCardClasses = (date) => {
+    const baseClasses = 'bg-white rounded-lg shadow-sm p-6 transition-all duration-300';
+
+    if (isNewlyAdded(date)) {
+      return `${baseClasses} border-2 border-green-400 shadow-lg animate-slideInDown`;
     }
+
+    if (isRecentlyUpdated(date)) {
+      return `${baseClasses} border-2 border-blue-400 shadow-md`;
+    }
+
+    return baseClasses;
   };
 
-  const hideAlert = () => {
-    setAlert((prev) => ({ ...prev, visible: false }));
-  };
+  /**
+   * Format metric value for display
+   */
+  const formatMetricValue = (value, metricKey) => {
+    if (value === null || value === undefined) return '--';
 
-  // Group metrics by date (newest first)
-  const groupedMetrics = useMemo(() => {
-    const groups = {};
-
-    metrics.forEach((metric) => {
-      const dateKey = metric.date.split('T')[0]; // YYYY-MM-DD
-      if (!groups[dateKey]) {
-        groups[dateKey] = metric.metrics;
+    // Handle object-based metrics
+    if (typeof value === 'object') {
+      if (metricKey === 'bloodPressure' && value.systolic && value.diastolic) {
+        return `${value.systolic}/${value.diastolic} mmHg`;
       }
-    });
-
-    return Object.entries(groups)
-      .sort(([dateA], [dateB]) => dateB.localeCompare(dateA)) // Sort newest first
-      .map(([date, metricData]) => ({ date, metrics: metricData }));
-  }, [metrics]);
-
-  // Pagination
-  const totalPages = Math.ceil(groupedMetrics.length / itemsPerPage);
-  const paginatedMetrics = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return groupedMetrics.slice(startIndex, startIndex + itemsPerPage);
-  }, [groupedMetrics, currentPage, itemsPerPage]);
-
-  // ===== EVENT HANDLERS =====
-
-  const handleEdit = (date) => {
-    const metricEntry = metrics.find((m) => m.date.split('T')[0] === date);
-    if (metricEntry) {
-      setEditingDate(date);
+      // For other objects, return a placeholder
+      return '--';
     }
+
+    const formats = {
+      steps: (v) => v.toLocaleString(),
+      calories: (v) => v.toLocaleString(),
+      distance: (v) => `${v.toFixed(1)} km`,
+      activeMinutes: (v) => `${v} min`,
+      sleepHours: (v) => `${v.toFixed(1)} hrs`,
+      weight: (v) => `${v.toFixed(1)} kg`,
+      heartRate: (v) => `${v} bpm`,
+      oxygenSaturation: (v) => `${v}%`,
+      bodyTemperature: (v) => `${v.toFixed(1)}°C`,
+      hydration: (v) => `${v.toFixed(1)} L`,
+      heartPoints: (v) => v.toLocaleString(),
+    };
+
+    const formatter = formats[metricKey];
+    return formatter ? formatter(value) : value;
   };
 
-  const handleSaveEdit = async (date, updatedMetrics) => {
-    setIsSaving(true);
-
-    try {
-      const result = await metricsService.updateMetric(date, updatedMetrics);
-
-      if (result.success) {
-        showAlert('success', 'Success! ✓', `Metrics updated for ${dateUtils.formatDateShort(date)}`);
-        setEditingDate(null);
-
-        if (onMetricsChange && typeof onMetricsChange === 'function') {
-          onMetricsChange();
-        }
-      } else {
-        showAlert('error', 'Error', result.message || 'Failed to update metrics');
-      }
-    } catch (error) {
-      showAlert('error', 'Error', error.message || 'An error occurred');
-    } finally {
-      setIsSaving(false);
-    }
+  /**
+   * Handle edit button click
+   */
+  const handleEditClick = (metric) => {
+    if (onEdit) onEdit(metric);
   };
 
-  const handleDelete = async (date) => {
+  /**
+   * Handle delete button click
+   */
+  const handleDeleteClick = (date) => {
     setDeletingDate(date);
-    setIsDeleting(true);
+    setDeleteError(null);
+  };
+
+  /**
+   * Confirm delete
+   */
+  const confirmDelete = async () => {
+    if (!deletingDate) return;
 
     try {
-      const result = await metricsService.deleteMetric(date);
+      setDeleteLoading(true);
+      setDeleteError(null);
+
+      const result = await metricsService.deleteMetric(deletingDate);
 
       if (result.success) {
-        showAlert('success', 'Deleted! ✓', `Metrics removed for ${dateUtils.formatDateShort(date)}`);
+        console.log(`[MetricsList] Metrics deleted for ${deletingDate}`);
         setDeletingDate(null);
-
-        if (onMetricsChange && typeof onMetricsChange === 'function') {
-          onMetricsChange();
-        }
+        if (onDelete) onDelete(deletingDate);
       } else {
-        showAlert('error', 'Error', result.message || 'Failed to delete metrics');
+        setDeleteError(result.message || 'Failed to delete metrics');
       }
     } catch (error) {
-      showAlert('error', 'Error', error.message || 'An error occurred');
+      console.error('[MetricsList] Delete error:', error);
+      setDeleteError(error.message || 'Failed to delete metrics');
     } finally {
-      setIsDeleting(false);
-      setDeletingDate(null);
+      setDeleteLoading(false);
     }
   };
 
-  const handleCancelEdit = () => {
-    setEditingDate(null);
+  /**
+   * Cancel delete
+   */
+  const cancelDelete = () => {
+    setDeletingDate(null);
+    setDeleteError(null);
   };
 
-  // ===== RENDER =====
+  // ===== RENDER FUNCTIONS =====
 
+  /**
+   * Render individual metric card
+   */
+  const renderMetricCard = (metric) => {
+    const { date, metrics: metricsData, source } = metric;
+    const isNew = isNewlyAdded(date);
+    const isUpdated = isRecentlyUpdated(date);
+
+    return (
+      <div key={date} className={getCardClasses(date)}>
+        {/* Header: Date + Actions */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-2">
+            <h3 className="text-lg font-semibold text-gray-900">
+              {dateUtils.getRelativeDateLabel(date)}
+            </h3>
+            <span className="text-sm text-gray-500">
+              {dateUtils.formatDateShort(date)}
+            </span>
+
+            {/* NEW/UPDATED Badge */}
+            {isNew && (
+              <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full animate-pulse">
+                New
+              </span>
+            )}
+            {isUpdated && !isNew && (
+              <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">
+                Updated
+              </span>
+            )}
+
+            {/* Source Badge */}
+            {source && source !== 'manual' && (
+              <span className="px-2 py-1 text-xs font-medium bg-purple-100 text-purple-700 rounded-full">
+                {source === 'googlefit' ? 'Google Fit' : 'Synced'}
+              </span>
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex space-x-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => handleEditClick(metric)}
+              disabled={deleteLoading}
+            >
+              Edit
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => handleDeleteClick(date)}
+              disabled={deleteLoading}
+            >
+              Delete
+            </Button>
+          </div>
+        </div>
+
+        {/* Metrics Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {Object.entries(metricsData).map(([key, value]) => {
+            if (value === null || value === undefined || value === 0) return null;
+
+            const metricIcons = {
+              steps: '👟',
+              calories: '🔥',
+              distance: '📏',
+              activeMinutes: '⏱️',
+              sleepHours: '😴',
+              weight: '⚖️',
+              heartRate: '❤️',
+              oxygenSaturation: '🫁',
+              bloodPressure: '🩸',
+              bodyTemperature: '🌡️',
+              hydration: '💧',
+              heartPoints: '💖',
+            };
+
+            const metricLabels = {
+              steps: 'Steps',
+              calories: 'Calories',
+              distance: 'Distance',
+              activeMinutes: 'Active Minutes',
+              sleepHours: 'Sleep',
+              weight: 'Weight',
+              heartRate: 'Heart Rate',
+              oxygenSaturation: 'SpO2',
+              bloodPressure: 'Blood Pressure',
+              bodyTemperature: 'Temperature',
+              hydration: 'Hydration',
+              heartPoints: 'Heart Points',
+            };
+
+            return (
+              <div key={key} className="space-y-1">
+                <div className="flex items-center space-x-1 text-sm text-gray-600">
+                  <span>{metricIcons[key] || '📊'}</span>
+                  <span>{metricLabels[key] || key}</span>
+                </div>
+                <div className="text-lg font-semibold text-gray-900">
+                  {formatMetricValue(value, key)}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  // ===== MAIN RENDER =====
+
+  // Loading state
   if (isLoading) {
-    return <MetricsSkeleton count={itemsPerPage} />;
+    return <MetricsSkeleton count={3} />;
   }
 
-  return (
-    <div className="w-full">
-      {/* Alert */}
-      {alert.visible && (
-        <div className="mb-6">
-          <Alert
-            type={alert.type}
-            title={alert.title}
-            message={alert.message}
-            onClose={hideAlert}
-            dismissible
-          />
-        </div>
-      )}
-
-      {/* Header */}
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Metrics History</h2>
-        {dateRange && (
-          <p className="text-gray-600 mt-1">
-            Showing {dateRange.label || `${dateRange.startDate} to ${dateRange.endDate}`}
+  // Empty state
+  if (sortedMetrics.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <div className="text-6xl mb-4">📊</div>
+        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+          No metrics recorded yet
+        </h3>
+        <p className="text-gray-600 mb-4">
+          {dateRange
+            ? 'No metrics recorded for the selected date range. Try adjusting your search or add new metrics.'
+            : 'Start tracking your health metrics to see them here!'}
+        </p>
+        {!dateRange && (
+          <p className="text-sm text-gray-500">
+            Use the form above to log your daily metrics.
           </p>
         )}
       </div>
+    );
+  }
 
-      {/* Empty State */}
-      {paginatedMetrics.length === 0 && !isLoading ? (
-        <div className="text-center py-12">
-          <div className="text-5xl mb-4">📊</div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">
-            No metrics found
-          </h3>
-          <p className="text-gray-600 mb-6">
-            {dateRange
-              ? `No metrics recorded for the selected date range. Try adjusting your search or add new metrics.`
-              : `Start tracking your health metrics to see them here!`}
-          </p>
-          {!dateRange && (
-            <p className="text-gray-500 text-sm">
-              Use the form above to log your daily metrics.
-            </p>
-          )}
+  return (
+    <div className="space-y-6">
+      {/* Date Range Info */}
+      {dateRange && (
+        <div className="text-sm text-gray-600">
+          Showing {dateRange.label || `${dateRange.startDate} to ${dateRange.endDate}`}
         </div>
-      ) : (
-        <>
-          {/* Metrics List */}
-          <div className="space-y-4 mb-6">
-            {paginatedMetrics.map(({ date, metrics: metricData }) => (
-              <MetricEntry
-                key={date}
-                date={date}
-                metrics={metricData}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                isDeleting={deletingDate === date && isDeleting}
-              />
-            ))}
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-6 border-t">
-              <div className="text-sm text-gray-600">
-                Page {currentPage} of {totalPages}
-                {' • '}
-                {groupedMetrics.length} total entries
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                >
-                  ← Previous
-                </Button>
-
-                {/* Page Numbers */}
-                <div className="flex gap-1">
-                  {Array.from({ length: totalPages }).map((_, i) => (
-                    <button
-                      key={i + 1}
-                      onClick={() => setCurrentPage(i + 1)}
-                      className={`px-3 py-1 rounded transition ${
-                        currentPage === i + 1
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      }`}
-                    >
-                      {i + 1}
-                    </button>
-                  ))}
-                </div>
-
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                >
-                  Next →
-                </Button>
-              </div>
-            </div>
-          )}
-        </>
       )}
 
-      {/* Edit Modal */}
-      {editingDate && (
-        <EditMetricModal
-          date={editingDate}
-          metric={metrics.find((m) => m.date.split('T')[0] === editingDate)?.metrics || {}}
-          onSave={handleSaveEdit}
-          onCancel={handleCancelEdit}
-          isSaving={isSaving}
-        />
+      {/* Metrics List with Scroll Preservation */}
+      <div ref={listRef} className="space-y-6 max-h-[800px] overflow-y-auto">
+        {paginatedMetrics.map(renderMetricCard)}
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between pt-4 border-t">
+          <div className="text-sm text-gray-600">
+            Page {currentPage} of {totalPages} ({sortedMetrics.length} total)
+          </div>
+          <div className="flex space-x-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deletingDate && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              Confirm Delete
+            </h3>
+            <p className="text-gray-600 mb-4">
+              Are you sure you want to delete metrics for{' '}
+              <strong>{dateUtils.formatDateShort(deletingDate)}</strong>? This
+              action cannot be undone.
+            </p>
+
+            {deleteError && (
+              <Alert variant="error" className="mb-4">
+                {deleteError}
+              </Alert>
+            )}
+
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="secondary"
+                onClick={cancelDelete}
+                disabled={deleteLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                onClick={confirmDelete}
+                disabled={deleteLoading}
+              >
+                {deleteLoading ? 'Deleting...' : 'Delete'}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
+};
+
+MetricsList.propTypes = {
+  metrics: PropTypes.arrayOf(
+    PropTypes.shape({
+      date: PropTypes.string.isRequired,
+      metrics: PropTypes.object.isRequired,
+      source: PropTypes.string,
+    })
+  ),
+  isLoading: PropTypes.bool,
+  onEdit: PropTypes.func,
+  onDelete: PropTypes.func,
+  dateRange: PropTypes.shape({
+    label: PropTypes.string,
+    startDate: PropTypes.string,
+    endDate: PropTypes.string,
+  }),
+  itemsPerPage: PropTypes.number,
 };
 
 export default MetricsList;
