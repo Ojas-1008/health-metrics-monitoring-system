@@ -31,7 +31,7 @@ function EventServiceTest() {
   const addEvent = useCallback((type, data) => {
     const timestamp = new Date().toLocaleTimeString();
     setEvents(prev => [{
-      id: Date.now(),
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       type,
       data,
       timestamp,

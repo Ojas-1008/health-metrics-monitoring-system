@@ -109,18 +109,16 @@ body {
 
 /**
  * Slide Down Animation
- * Alternative animation for collapsible sections
+ * Used for: Notification banners, dropdown menus, status messages
  */
 @keyframes slideDown {
   from {
+    transform: translateY(-100%);
     opacity: 0;
-    max-height: 0;
-    overflow: hidden;
   }
   to {
+    transform: translateY(0);
     opacity: 1;
-    max-height: 1000px;
-    overflow: visible;
   }
 }
 

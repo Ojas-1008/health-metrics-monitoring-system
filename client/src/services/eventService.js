@@ -1,43 +1,19 @@
 /**
  * ============================================
- * SSE EVENT SERVICE
+ * SSE EVENT SERVICE (WITH STATE MANAGEMENT)
  * ============================================
- *
+ * 
  * Real-time event streaming service using Server-Sent Events (SSE)
- *
+ * ENHANCED: Comprehensive connection state management
+ * 
  * Features:
+ * - State machine: connecting → connected → disconnected → reconnecting → error
+ * - Error message tracking and user-friendly descriptions
+ * - sessionStorage persistence for retry count
+ * - Detailed connection status events
  * - Automatic reconnection with exponential backoff
- * - Event type routing (metrics:change, sync:update, etc.)
- * - Connection state tracking
- * - Authentication via query parameter (EventSource limitation)
- * - Manual disconnect support
+ * - Event type routing
  * - Debug logging
- *
- * Usage:
- *
- * import eventService from './services/eventService';
- *
- * // Connect
- * eventService.connect(token);
- *
- * // Subscribe to events
- * eventService.on('metrics:change', (data) => {
- *   console.log('Metrics updated:', data);
- * });
- *
- * eventService.on('sync:update', (data) => {
- *   console.log('Google Fit synced:', data);
- * });
- *
- * eventService.on('connectionStatus', (status) => {
- *   console.log('Connection:', status.connected ? 'online' : 'offline');
- * });
- *
- * // Unsubscribe
- * eventService.off('metrics:change', callback);
- *
- * // Disconnect
- * eventService.disconnect();
  */
 
 /**
@@ -46,20 +22,63 @@
  * ============================================
  */
 const CONFIG = {
-  // SSE endpoint URL
-  baseUrl: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseUrl: import.meta.env.VITE_API_URL || 'http://localhost:5000',
   endpoint: '/events/stream',
-
-  // Reconnection settings
   maxRetries: 10,
-  initialRetryDelay: 1000, // 1 second
-  maxRetryDelay: 30000, // 30 seconds
+  initialRetryDelay: 1000,
+  maxRetryDelay: 30000,
+  heartbeatTimeout: 60000,
+  debug: import.meta.env.DEV,
+  
+  // NEW: sessionStorage keys
+  storageKeys: {
+    retryCount: 'sse_retry_count',
+    lastDisconnect: 'sse_last_disconnect',
+  },
+};
 
-  // Connection health check
-  heartbeatTimeout: 60000, // 60 seconds (expect ping every 30s)
+/**
+ * ============================================
+ * CONNECTION STATES (State Machine)
+ * ============================================
+ */
+const ConnectionState = {
+  NOT_INITIALIZED: 'not_initialized',
+  CONNECTING: 'connecting',
+  CONNECTED: 'connected',
+  DISCONNECTED: 'disconnected',
+  RECONNECTING: 'reconnecting',
+  ERROR: 'error',
+  MAX_RETRIES_EXCEEDED: 'max_retries_exceeded',
+};
 
-  // Debug logging
-  debug: import.meta.env.DEV, // Enable in development
+/**
+ * ============================================
+ * USER-FRIENDLY ERROR MESSAGES
+ * ============================================
+ */
+const ERROR_MESSAGES = {
+  // Network errors
+  NETWORK_ERROR: 'Network connection lost. Please check your internet connection.',
+  TIMEOUT: 'Connection timed out. Retrying...',
+  REFUSED: 'Unable to connect to server. Please try again later.',
+  
+  // Server errors
+  SERVER_ERROR: 'Server error occurred. Our team has been notified.',
+  UNAUTHORIZED: 'Authentication failed. Please log in again.',
+  FORBIDDEN: 'Access denied. Please check your permissions.',
+  NOT_FOUND: 'Service endpoint not found. Please contact support.',
+  
+  // Client errors
+  TOKEN_EXPIRED: 'Your session has expired. Please log in again.',
+  INVALID_TOKEN: 'Invalid authentication token. Please log in again.',
+  
+  // Retry errors
+  MAX_RETRIES: 'Unable to establish connection after multiple attempts. Please refresh the page.',
+  MANUAL_DISCONNECT: 'Disconnected manually.',
+  
+  // Generic
+  UNKNOWN: 'An unexpected error occurred. Please try again.',
 };
 
 /**
@@ -69,28 +88,38 @@ const CONFIG = {
  */
 class EventService {
   constructor() {
-    // EventSource instance
     this.eventSource = null;
-
-    // Connection state
+    
+    // NEW: Connection state machine
+    this.state = ConnectionState.NOT_INITIALIZED;
+    this.previousState = null;
+    
+    // Connection metadata
     this.isConnected = false;
     this.isManualDisconnect = false;
     this.connectionAttempt = 0;
-
+    
     // Authentication
     this.token = null;
-
-    // Event listeners Map: eventType -> Set of callbacks
+    
+    // Event listeners
     this.listeners = new Map();
-
+    
     // Reconnection
     this.reconnectTimeout = null;
-    this.retryCount = 0;
-
+    
+    // NEW: Enhanced error tracking
+    this.lastError = null;
+    this.lastErrorMessage = null;
+    this.lastDisconnectReason = null;
+    
+    // NEW: Persistent retry count (survives page refresh)
+    this.retryCount = this.loadRetryCount();
+    
     // Heartbeat monitoring
     this.lastHeartbeat = null;
     this.heartbeatCheckInterval = null;
-
+    
     // Bind methods
     this.connect = this.connect.bind(this);
     this.disconnect = this.disconnect.bind(this);
@@ -100,71 +129,199 @@ class EventService {
 
   /**
    * ============================================
+   * STATE MANAGEMENT
+   * ============================================
+   */
+
+  /**
+   * Set connection state and emit status event
+   */
+  setState(newState, reason = null, error = null) {
+    if (this.state === newState && !reason && !error) {
+      return; // No change
+    }
+
+    this.previousState = this.state;
+    this.state = newState;
+
+    console.log(
+      `[EventService] State transition: ${this.previousState} → ${newState}`,
+      reason ? `(${reason})` : ''
+    );
+
+    // Update error tracking
+    if (error) {
+      this.lastError = error;
+      this.lastErrorMessage = this.getUserFriendlyErrorMessage(error, reason);
+    } else if (newState === ConnectionState.CONNECTED) {
+      // Clear errors on successful connection
+      this.lastError = null;
+      this.lastErrorMessage = null;
+      this.lastDisconnectReason = null;
+    }
+
+    // Update isConnected flag
+    this.isConnected = newState === ConnectionState.CONNECTED;
+
+    // Emit connectionStatus event
+    this.emit('connectionStatus', {
+      state: newState,
+      previousState: this.previousState,
+      connected: this.isConnected,
+      reason: reason || undefined,
+      error: this.lastErrorMessage || undefined,
+      retryCount: this.retryCount,
+      maxRetries: CONFIG.maxRetries,
+      timestamp: new Date().toISOString(),
+      readyState: this.eventSource?.readyState,
+      readyStateName: this.getReadyStateName(),
+    });
+  }
+
+  /**
+   * Get user-friendly error message
+   */
+  getUserFriendlyErrorMessage(error, reason) {
+    // Check for specific error types
+    if (reason === 'token_expired') return ERROR_MESSAGES.TOKEN_EXPIRED;
+    if (reason === 'invalid_token') return ERROR_MESSAGES.INVALID_TOKEN;
+    if (reason === 'unauthorized') return ERROR_MESSAGES.UNAUTHORIZED;
+    if (reason === 'forbidden') return ERROR_MESSAGES.FORBIDDEN;
+    if (reason === 'not_found') return ERROR_MESSAGES.NOT_FOUND;
+    if (reason === 'max_retries') return ERROR_MESSAGES.MAX_RETRIES;
+    if (reason === 'manual') return ERROR_MESSAGES.MANUAL_DISCONNECT;
+
+    // Check error object
+    if (error) {
+      if (error.name === 'NetworkError' || error.message?.includes('network')) {
+        return ERROR_MESSAGES.NETWORK_ERROR;
+      }
+      if (error.message?.includes('timeout')) {
+        return ERROR_MESSAGES.TIMEOUT;
+      }
+      if (error.message?.includes('refused') || error.message?.includes('ECONNREFUSED')) {
+        return ERROR_MESSAGES.REFUSED;
+      }
+      if (error.status === 401) {
+        return ERROR_MESSAGES.UNAUTHORIZED;
+      }
+      if (error.status === 403) {
+        return ERROR_MESSAGES.FORBIDDEN;
+      }
+      if (error.status === 404) {
+        return ERROR_MESSAGES.NOT_FOUND;
+      }
+      if (error.status >= 500) {
+        return ERROR_MESSAGES.SERVER_ERROR;
+      }
+    }
+
+    return ERROR_MESSAGES.UNKNOWN;
+  }
+
+  /**
+   * ============================================
+   * SESSIONSTORAGE PERSISTENCE
+   * ============================================
+   */
+
+  /**
+   * Load retry count from sessionStorage
+   */
+  loadRetryCount() {
+    try {
+      const stored = sessionStorage.getItem(CONFIG.storageKeys.retryCount);
+      return stored ? parseInt(stored, 10) : 0;
+    } catch (error) {
+      console.warn('[EventService] Failed to load retry count from sessionStorage:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Save retry count to sessionStorage
+   */
+  saveRetryCount() {
+    try {
+      sessionStorage.setItem(CONFIG.storageKeys.retryCount, this.retryCount.toString());
+    } catch (error) {
+      console.warn('[EventService] Failed to save retry count to sessionStorage:', error);
+    }
+  }
+
+  /**
+   * Reset retry count (on successful connection)
+   */
+  resetRetryCount() {
+    this.retryCount = 0;
+    try {
+      sessionStorage.removeItem(CONFIG.storageKeys.retryCount);
+    } catch (error) {
+      console.warn('[EventService] Failed to clear retry count from sessionStorage:', error);
+    }
+  }
+
+  /**
+   * Save last disconnect timestamp
+   */
+  saveLastDisconnect(reason) {
+    try {
+      sessionStorage.setItem(CONFIG.storageKeys.lastDisconnect, JSON.stringify({
+        timestamp: Date.now(),
+        reason,
+      }));
+    } catch (error) {
+      console.warn('[EventService] Failed to save last disconnect:', error);
+    }
+  }
+
+  /**
+   * ============================================
    * CONNECT TO SSE STREAM
    * ============================================
-   *
-   * Establishes SSE connection with authentication
-   *
-   * @param {string} token - JWT authentication token
-   * @returns {Promise<void>}
    */
   async connect(token) {
-    console.log('[EventService] connect() called with token:', token ? 'EXISTS' : 'MISSING');
-    
-    // Prevent multiple connections
     if (this.eventSource && this.isConnected) {
       this.log('Already connected, ignoring connect request');
-      console.log('[EventService] Already connected, ignoring connect request');
       return;
     }
 
-    // Store token for reconnection
     this.token = token;
     this.isManualDisconnect = false;
     this.connectionAttempt++;
 
+    // Set connecting state
+    this.setState(
+      this.retryCount > 0 ? ConnectionState.RECONNECTING : ConnectionState.CONNECTING,
+      this.retryCount > 0 ? `Attempt ${this.retryCount + 1}/${CONFIG.maxRetries}` : 'Initial connection'
+    );
+
     try {
-      console.log(`[EventService] Connection attempt ${this.connectionAttempt}...`);
       this.log(`Connection attempt ${this.connectionAttempt}...`);
 
-      // ===== AUTHENTICATION VIA QUERY PARAMETER =====
-      // Native EventSource doesn't support custom headers
-      // We pass the token as a query parameter (over HTTPS in production)
       const url = `${CONFIG.baseUrl}${CONFIG.endpoint}?token=${encodeURIComponent(token)}`;
-      console.log('[EventService] Connecting to SSE endpoint:', url.replace(/token=[^&]+/, 'token=***'));
-
-      // Create EventSource instance
       this.eventSource = new EventSource(url);
-      console.log('[EventService] EventSource created, readyState:', this.eventSource.readyState);
 
       // ===== EVENT HANDLERS =====
 
-      // Connection opened
       this.eventSource.addEventListener('open', (event) => {
-        console.log('[EventService] ✓ Connection established (open event fired)');
         this.log('✓ Connection established');
-        this.isConnected = true;
-        this.retryCount = 0; // Reset retry counter on success
+        
+        // Set connected state
+        this.setState(ConnectionState.CONNECTED, 'Connection opened');
+        
+        // Reset retry count on successful connection
+        this.resetRetryCount();
+        
         this.lastHeartbeat = Date.now();
-
-        // Start heartbeat monitoring
         this.startHeartbeatMonitoring();
-
-        // Emit connection status event
-        this.emit('connectionStatus', {
-          connected: true,
-          attempt: this.connectionAttempt,
-          timestamp: new Date().toISOString()
-        });
       });
 
-      // Generic message handler (for messages without event type)
       this.eventSource.addEventListener('message', (event) => {
         try {
           const data = JSON.parse(event.data);
           this.log('Received message:', data);
-
-          // Route to appropriate handler
+          
           if (data.type) {
             this.emit(data.type, data.data || data);
           }
@@ -173,9 +330,7 @@ class EventService {
         }
       });
 
-      // ===== CUSTOM EVENT TYPES =====
-
-      // Connection confirmed
+      // Custom event types
       this.eventSource.addEventListener('connected', (event) => {
         try {
           const data = JSON.parse(event.data);
@@ -186,7 +341,6 @@ class EventService {
         }
       });
 
-      // Heartbeat/ping
       this.eventSource.addEventListener('ping', (event) => {
         try {
           const data = JSON.parse(event.data);
@@ -198,7 +352,6 @@ class EventService {
         }
       });
 
-      // Metrics changed
       this.eventSource.addEventListener('metrics:change', (event) => {
         try {
           const data = JSON.parse(event.data);
@@ -209,7 +362,6 @@ class EventService {
         }
       });
 
-      // Google Fit sync update
       this.eventSource.addEventListener('sync:update', (event) => {
         try {
           const data = JSON.parse(event.data);
@@ -220,7 +372,6 @@ class EventService {
         }
       });
 
-      // Goals updated
       this.eventSource.addEventListener('goals:updated', (event) => {
         try {
           const data = JSON.parse(event.data);
@@ -231,59 +382,36 @@ class EventService {
         }
       });
 
-      // Test event (for debugging)
-      this.eventSource.addEventListener('test:event', (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          this.log('Test event received:', data);
-          this.emit('test:event', data.data);
-        } catch (error) {
-          this.logError('Failed to parse test:event event:', error);
-        }
-      });
-
-      // Error handler
       this.eventSource.addEventListener('error', (event) => {
-        console.error('[EventService] EventSource error event fired:', event);
-        console.error('[EventService] ReadyState:', this.eventSource.readyState, '(CONNECTING=0, OPEN=1, CLOSED=2)');
         this.logError('EventSource error:', event);
-
-        // Check if it's a connection error or HTTP error
+        
+        // Set error state
+        this.setState(ConnectionState.ERROR, 'Connection error', event);
+        
         if (this.eventSource.readyState === EventSource.CLOSED) {
           this.log('Connection closed by server');
-          this.isConnected = false;
-
-          // Stop heartbeat monitoring
+          
+          // Set disconnected state
+          this.setState(ConnectionState.DISCONNECTED, 'closed');
+          
           this.stopHeartbeatMonitoring();
-
-          // Emit connection status event
-          this.emit('connectionStatus', {
-            connected: false,
-            reason: 'closed',
-            timestamp: new Date().toISOString()
-          });
-
-          // Attempt reconnection if not manually disconnected
+          this.saveLastDisconnect('closed');
+          
           if (!this.isManualDisconnect) {
             this.scheduleReconnection();
           }
         } else if (this.eventSource.readyState === EventSource.CONNECTING) {
           this.log('Attempting to reconnect...');
+          this.setState(ConnectionState.RECONNECTING, 'Auto-reconnecting');
         }
       });
 
     } catch (error) {
       this.logError('Failed to connect:', error);
-
-      // Emit connection status event
-      this.emit('connectionStatus', {
-        connected: false,
-        reason: 'error',
-        error: error.message,
-        timestamp: new Date().toISOString()
-      });
-
-      // Attempt reconnection
+      
+      // Set error state
+      this.setState(ConnectionState.ERROR, 'Connection failed', error);
+      
       if (!this.isManualDisconnect) {
         this.scheduleReconnection();
       }
@@ -292,90 +420,68 @@ class EventService {
 
   /**
    * ============================================
-   * DISCONNECT FROM SSE STREAM
+   * DISCONNECT
    * ============================================
-   *
-   * Manually closes the SSE connection
-   * Prevents automatic reconnection
    */
   disconnect() {
     this.log('Disconnecting...');
-
-    // Mark as manual disconnect to prevent reconnection
+    
     this.isManualDisconnect = true;
-
-    // Clear reconnection timeout
+    
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
     }
-
-    // Stop heartbeat monitoring
+    
     this.stopHeartbeatMonitoring();
-
-    // Close EventSource
+    
     if (this.eventSource) {
       this.eventSource.close();
       this.eventSource = null;
     }
-
-    this.isConnected = false;
-    this.retryCount = 0;
-
+    
+    // Set disconnected state
+    this.setState(ConnectionState.DISCONNECTED, 'manual');
+    
+    this.saveLastDisconnect('manual');
+    this.resetRetryCount();
+    
     this.log('✓ Disconnected');
-
-    // Emit connection status event
-    this.emit('connectionStatus', {
-      connected: false,
-      reason: 'manual',
-      timestamp: new Date().toISOString()
-    });
   }
 
   /**
    * ============================================
-   * SCHEDULE RECONNECTION (EXPONENTIAL BACKOFF)
+   * SCHEDULE RECONNECTION
    * ============================================
-   *
-   * Implements exponential backoff reconnection strategy
-   * Delay formula: min(initialDelay * 2^retryCount, maxDelay)
    */
   scheduleReconnection() {
-    // Check if max retries exceeded
     if (this.retryCount >= CONFIG.maxRetries) {
       this.logError(`Max reconnection attempts (${CONFIG.maxRetries}) reached`);
-      this.emit('connectionStatus', {
-        connected: false,
-        reason: 'max_retries',
-        retryCount: this.retryCount,
-        timestamp: new Date().toISOString()
-      });
+      
+      // Set max retries exceeded state
+      this.setState(ConnectionState.MAX_RETRIES_EXCEEDED, 'max_retries');
+      
       return;
     }
 
-    // Calculate backoff delay
     const delay = Math.min(
       CONFIG.initialRetryDelay * Math.pow(2, this.retryCount),
       CONFIG.maxRetryDelay
     );
 
     this.retryCount++;
+    this.saveRetryCount();
 
     this.log(
       `Scheduling reconnection attempt ${this.retryCount}/${CONFIG.maxRetries} in ${delay}ms (${(delay / 1000).toFixed(1)}s)`
     );
 
-    // Emit connection status event
-    this.emit('connectionStatus', {
-      connected: false,
-      reason: 'reconnecting',
-      retryCount: this.retryCount,
-      maxRetries: CONFIG.maxRetries,
-      delay,
-      timestamp: new Date().toISOString()
-    });
+    // Set reconnecting state
+    this.setState(
+      ConnectionState.RECONNECTING,
+      `Retrying in ${(delay / 1000).toFixed(0)}s`
+    );
 
-    // Schedule reconnection
     this.reconnectTimeout = setTimeout(() => {
       if (!this.isManualDisconnect && this.token) {
         this.log(`Reconnecting now (attempt ${this.retryCount})...`);
@@ -386,36 +492,32 @@ class EventService {
 
   /**
    * ============================================
-   * START HEARTBEAT MONITORING
+   * HEARTBEAT MONITORING
    * ============================================
-   *
-   * Monitors for missing heartbeats and triggers reconnection
    */
   startHeartbeatMonitoring() {
-    this.stopHeartbeatMonitoring(); // Clear any existing interval
+    this.stopHeartbeatMonitoring();
 
     this.heartbeatCheckInterval = setInterval(() => {
       const timeSinceLastHeartbeat = Date.now() - (this.lastHeartbeat || 0);
-
+      
       if (timeSinceLastHeartbeat > CONFIG.heartbeatTimeout) {
         this.logError(
           `No heartbeat received for ${(timeSinceLastHeartbeat / 1000).toFixed(0)}s, connection may be dead`
         );
-
+        
         // Force reconnection
+        this.setState(ConnectionState.DISCONNECTED, 'heartbeat_timeout');
+        this.saveLastDisconnect('heartbeat_timeout');
+        
         this.disconnect();
         if (this.token) {
           this.connect(this.token);
         }
       }
-    }, 10000); // Check every 10 seconds
+    }, 10000);
   }
 
-  /**
-   * ============================================
-   * STOP HEARTBEAT MONITORING
-   * ============================================
-   */
   stopHeartbeatMonitoring() {
     if (this.heartbeatCheckInterval) {
       clearInterval(this.heartbeatCheckInterval);
@@ -425,11 +527,8 @@ class EventService {
 
   /**
    * ============================================
-   * SUBSCRIBE TO EVENT TYPE
+   * EVENT SUBSCRIPTION
    * ============================================
-   *
-   * @param {string} eventType - Event type to listen for
-   * @param {Function} callback - Callback function to invoke
    */
   on(eventType, callback) {
     if (typeof callback !== 'function') {
@@ -444,14 +543,6 @@ class EventService {
     this.log(`Subscribed to ${eventType} (${this.listeners.get(eventType).size} listener(s))`);
   }
 
-  /**
-   * ============================================
-   * UNSUBSCRIBE FROM EVENT TYPE
-   * ============================================
-   *
-   * @param {string} eventType - Event type to stop listening for
-   * @param {Function} callback - Callback function to remove
-   */
   off(eventType, callback) {
     if (!this.listeners.has(eventType)) {
       return;
@@ -462,20 +553,11 @@ class EventService {
       `Unsubscribed from ${eventType} (${this.listeners.get(eventType).size} listener(s) remaining)`
     );
 
-    // Clean up empty listener sets
     if (this.listeners.get(eventType).size === 0) {
       this.listeners.delete(eventType);
     }
   }
 
-  /**
-   * ============================================
-   * EMIT EVENT TO SUBSCRIBERS
-   * ============================================
-   *
-   * @param {string} eventType - Event type to emit
-   * @param {*} data - Event data
-   */
   emit(eventType, data) {
     if (!this.listeners.has(eventType)) {
       return;
@@ -493,34 +575,41 @@ class EventService {
 
   /**
    * ============================================
-   * GET CONNECTION STATUS
+   * GET STATUS
    * ============================================
-   *
-   * @returns {object} Connection status
    */
   getStatus() {
     return {
+      // State machine
+      state: this.state,
+      previousState: this.previousState,
+      
+      // Connection
       connected: this.isConnected,
       readyState: this.eventSource ? this.eventSource.readyState : null,
       readyStateName: this.getReadyStateName(),
+      
+      // Retry tracking
       retryCount: this.retryCount,
       maxRetries: CONFIG.maxRetries,
+      
+      // Error tracking
+      lastError: this.lastError,
+      lastErrorMessage: this.lastErrorMessage,
+      lastDisconnectReason: this.lastDisconnectReason,
+      
+      // Heartbeat
       lastHeartbeat: this.lastHeartbeat,
       timeSinceHeartbeat: this.lastHeartbeat ? Date.now() - this.lastHeartbeat : null,
-      connectionAttempt: this.connectionAttempt
+      
+      // Metadata
+      connectionAttempt: this.connectionAttempt,
     };
   }
 
-  /**
-   * ============================================
-   * GET READY STATE NAME
-   * ============================================
-   *
-   * @returns {string} Human-readable ready state
-   */
   getReadyStateName() {
     if (!this.eventSource) return 'not_initialized';
-
+    
     switch (this.eventSource.readyState) {
       case EventSource.CONNECTING:
         return 'connecting';
@@ -535,7 +624,7 @@ class EventService {
 
   /**
    * ============================================
-   * DEBUG LOGGING
+   * LOGGING
    * ============================================
    */
   log(...args) {
@@ -551,18 +640,10 @@ class EventService {
 
 /**
  * ============================================
- * SINGLETON INSTANCE
+ * SINGLETON EXPORT
  * ============================================
- *
- * Export a singleton instance to ensure single connection
  */
 const eventService = new EventService();
 
 export default eventService;
-
-/**
- * ============================================
- * NAMED EXPORTS (for testing)
- * ============================================
- */
-export { EventService, CONFIG };
+export { EventService, CONFIG, ConnectionState };

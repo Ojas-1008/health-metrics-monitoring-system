@@ -88,7 +88,11 @@ export const AuthProvider = ({ children }) => {
    */
   const [connectionStatus, setConnectionStatus] = useState({
     connected: false,
-    reason: 'not_initialized'
+    state: 'not_initialized',
+    reason: null,
+    error: null, // NEW: Error message for UI
+    retryCount: 0,
+    maxRetries: 10,
   });
 
   /**
@@ -100,17 +104,18 @@ export const AuthProvider = ({ children }) => {
    * Updates UI indicators when connection state changes
    */
   useEffect(() => {
-    // Subscribe to connection status events
+    // Enhanced connectionStatus subscription
     const handleConnectionStatus = (status) => {
       setConnectionStatus(status);
-
+      
       // Development logging
       if (import.meta.env.DEV) {
-        if (status.connected) {
-          console.log('🟢 SSE Connected');
-        } else {
-          console.log('🔴 SSE Disconnected:', status.reason);
-        }
+        console.log('[AuthContext] Connection status update:', {
+          state: status.state,
+          connected: status.connected,
+          error: status.error,
+          retryCount: status.retryCount,
+        });
       }
     };
 

@@ -6,7 +6,7 @@ Organized by feature for better maintainability.
 - `metrics/` - MetricCard, MetricList, MetricForm
 - `dashboard/` - GoogleFitStatus, MetricsList components
 - `charts/` - LineChart, BarChart, PieChart wrappers
-- `common/` - Button, Input, Card, Modal, Navbar, Toast
+- `common/` - Button, Input, Card, Modal, Navbar, Toast, ConnectionStatusBanner
 
 Keep components small, focused, and reusable.
 
@@ -278,3 +278,81 @@ import Toast from '../components/common/Toast';
 - Proper ARIA labels on interactive elements
 - Keyboard navigation support (Escape key closes)
 - High contrast colors for visibility
+
+## ConnectionStatusBanner Component
+
+**Location:** `components/common/ConnectionStatusBanner.jsx`
+
+**Purpose:** Display real-time Server-Sent Events (SSE) connection status with user-friendly messages and retry options.
+
+### Features
+- **Color-coded status indicators** for different connection states
+- **User-friendly error messages** from enhanced eventService
+- **Retry count display** showing current attempt vs maximum retries
+- **Auto-hide behavior** when successfully connected
+- **Manual retry button** for failed connections
+- **Slide-in/out animations** with CSS transitions
+- **State machine integration** with comprehensive connection states
+- **Responsive design** (mobile-first approach)
+- **Accessibility features** (ARIA labels, screen reader support)
+
+### Connection States
+- **connecting:** Blue theme - Initial connection attempt
+- **connected:** Green theme - Successful connection (auto-hides after 2s)
+- **disconnected/error:** Red theme - Connection lost with error message
+- **reconnecting:** Yellow theme - Automatic retry with progress
+- **max_retries_exceeded:** Red theme - Failed after all retry attempts
+
+### Props
+```javascript
+// No props required - uses useConnectionStatus hook internally
+<ConnectionStatusBanner />
+```
+
+### Usage Example
+```jsx
+import ConnectionStatusBanner from '../components/common/ConnectionStatusBanner';
+
+// Add to App.jsx or main layout component
+function App() {
+  return (
+    <div>
+      <ConnectionStatusBanner />
+      {/* Rest of your app */}
+    </div>
+  );
+}
+```
+
+### Status Messages
+- **Connecting:** "Establishing real-time connection"
+- **Connected:** "Real-time updates active"
+- **Disconnected:** Shows user-friendly error message from eventService
+- **Reconnecting:** "Retrying... (2/10)" with error details
+- **Max Retries:** "Unable to establish connection after multiple attempts"
+
+### Visual Design
+- **Fixed positioning** at top of viewport (z-index 40)
+- **Full-width banner** with responsive padding
+- **Icon + text layout** with left-aligned content, right-aligned button
+- **Smooth animations** using `animate-slideDown` CSS class
+- **Color themes** matching status severity
+
+### Integration
+- **useConnectionStatus hook** from `useRealtimeEvents.js`
+- **AuthContext integration** for connection status state
+- **Enhanced eventService** with state machine and error tracking
+- **Button component** for retry functionality (secondary variant, small size)
+
+### Error Handling
+- **Graceful degradation** - component hides if no connection status
+- **User-friendly messages** instead of technical errors
+- **Retry functionality** - reloads page to restart connection
+- **State persistence** - survives page refreshes via sessionStorage
+
+### Accessibility
+- **ARIA labels** on status icons
+- **Semantic HTML** with proper heading structure
+- **Screen reader support** for status announcements
+- **Keyboard accessible** retry button
+- **High contrast colors** for visibility

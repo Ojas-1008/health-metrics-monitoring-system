@@ -475,7 +475,7 @@ export const getUserProfile = async () => {
  */
 export const triggerSync = async () => {
   try {
-    const response = await axiosInstance.get('/api/googlefit/sync');
+    const response = await axiosInstance.get('/googlefit/sync');
     return {
       success: true,
       data: response.data,
@@ -537,7 +537,7 @@ export const triggerSync = async () => {
  */
 export const getGoogleFitStatus = async () => {
   try {
-    const response = await axiosInstance.get('/api/googlefit/status');
+    const response = await axiosInstance.get('/googlefit/status');
     return {
       success: true,
       data: response.data.data,

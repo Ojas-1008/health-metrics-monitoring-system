@@ -38,7 +38,7 @@ function TestRealtimeHook() {
     setEvents(prevEvents => [
       ...prevEvents,
       {
-        id: Date.now(),
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         type: 'metrics:change',
         data,
         timestamp: new Date().toISOString()
