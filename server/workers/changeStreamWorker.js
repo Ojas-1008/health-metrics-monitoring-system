@@ -26,7 +26,8 @@
 
 import mongoose from 'mongoose';
 import HealthMetric from '../src/models/HealthMetric.js';
-import { emitToUser, getConnectionCount } from '../src/utils/eventEmitter.js';
+import { emitToUser, getConnectionCount } from '../src/services/sseService.js';
+import * as payloadOptimizer from '../src/utils/eventPayloadOptimizer.js';
 
 /**
  * ============================================
@@ -136,62 +137,6 @@ const extractUserId = async (change) => {
 
 /**
  * ============================================
- * HELPER: FORMAT EVENT PAYLOAD
- * ============================================
- *
- * Transforms MongoDB change event into frontend-friendly format
- * Only includes fields needed for UI updates (no sensitive data)
- *
- * @param {object} change - MongoDB change event
- * @returns {object} Formatted event payload
- */
-const formatEventPayload = (change) => {
-  const { operationType, fullDocument, documentKey, updateDescription } = change;
-
-  const payload = {
-    operation: operationType,
-    timestamp: new Date().toISOString(),
-    documentId: documentKey._id.toString()
-  };
-
-  // Include relevant data based on operation type
-  switch (operationType) {
-    case 'insert':
-      payload.date = fullDocument.date;
-      payload.metrics = fullDocument.metrics;
-      payload.source = fullDocument.source;
-      payload.syncedAt = fullDocument.syncedAt;
-      break;
-
-    case 'update':
-    case 'replace':
-      // For updates, include both updated fields and full document
-      payload.date = fullDocument?.date;
-      payload.metrics = fullDocument?.metrics;
-      payload.source = fullDocument?.source;
-      payload.syncedAt = fullDocument?.syncedAt;
-
-      // Include information about what was updated
-      if (updateDescription) {
-        payload.updatedFields = Object.keys(updateDescription.updatedFields || {});
-        payload.removedFields = updateDescription.removedFields || [];
-      }
-      break;
-
-    case 'delete':
-      // For deletes, only documentId is available
-      payload.message = 'Health metric deleted';
-      break;
-
-    default:
-      payload.message = `Unsupported operation: ${operationType}`;
-  }
-
-  return payload;
-};
-
-/**
- * ============================================
  * MAIN: PROCESS CHANGE EVENT
  * ============================================
  *
@@ -225,17 +170,78 @@ const processChangeEvent = async (change) => {
       return;
     }
 
-    // ===== STEP 3: Format event payload =====
-    const payload = formatEventPayload(change);
+    // ===== OPTIMIZED PAYLOAD CREATION =====
+    let payload = null;
 
-    // ===== STEP 4: Emit to user via SSE =====
+    switch (operationType) {
+      case 'insert':
+      case 'replace':
+        payload = payloadOptimizer.optimizeMetricPayload(
+          fullDocument,
+          operationType === 'insert' ? 'insert' : 'update'
+        );
+        break;
+
+      case 'update':
+        // For updates, extract only changed fields from updateDescription
+        const changedFields = {};
+        if (change.updateDescription && change.updateDescription.updatedFields) {
+          const updates = change.updateDescription.updatedFields;
+          
+          // Extract metrics updates
+          Object.keys(updates).forEach(key => {
+            if (key.startsWith('metrics.')) {
+              const metricKey = key.replace('metrics.', '');
+              changedFields[metricKey] = updates[key];
+            }
+          });
+        }
+
+        payload = {
+          operation: 'update',
+          date: fullDocument.date,
+          metrics: changedFields, // Only changed fields
+          source: fullDocument.source || 'manual',
+          lastUpdated: fullDocument.lastUpdated || new Date().toISOString(),
+        };
+        break;
+
+      case 'delete':
+        payload = {
+          operation: 'delete',
+          date: fullDocument?.date || 'unknown',
+          deletedAt: new Date().toISOString(),
+        };
+        break;
+    }
+
+    if (!payload) {
+      return;
+    }
+
+    // ===== CONDITIONAL EMISSION BASED ON DATE RANGE =====
+    if (!payloadOptimizer.shouldEmitEvent(payload)) {
+      console.log(
+        `[${WORKER_NAME}] Skipped event for user ${userId} (date outside relevant range: ${payload.date})`
+      );
+      return;
+    }
+
+    // Validate payload size
+    if (!payloadOptimizer.validatePayloadSize(payload, 'metrics:change')) {
+      console.warn(
+        `[${WORKER_NAME}] Large payload for user ${userId}, consider further optimization`
+      );
+    }
+
+    // ===== STEP 4: Emit optimized event =====
     const emitted = emitToUser(userId, 'metrics:change', payload);
 
     if (emitted > 0) {
       const duration = Date.now() - startTime;
       totalEventsProcessed++;
       console.log(
-        `[${WORKER_NAME}] ✓ Emitted ${operationType} event to ${emitted} connection(s) for user ${userId} (${duration}ms)`
+        `[${WORKER_NAME}] ✓ Emitted ${operationType} to user ${userId} (${emitted} connection(s), ${payloadOptimizer.calculatePayloadSize(payload)} bytes, ${duration}ms)`
       );
     } else {
       console.warn(`[${WORKER_NAME}] Failed to emit event to user ${userId}`);

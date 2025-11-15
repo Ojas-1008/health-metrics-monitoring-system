@@ -28,7 +28,8 @@
 
 import HealthMetric from "../models/HealthMetric.js";
 import { asyncHandler, ErrorResponse } from "../middleware/errorHandler.js";
-import { emitToUser, getConnectionCount } from "../utils/eventEmitter.js";
+import { emitToUser, getConnectionCount } from "../services/sseService.js";
+import * as payloadOptimizer from "../utils/eventPayloadOptimizer.js";
 
 /**
  * ============================================
@@ -247,31 +248,34 @@ export const addOrUpdateMetrics = asyncHandler(async (req, res, next) => {
     }
   );
 
-  // ===== ENHANCED: EMIT REAL-TIME UPDATE WITH SOURCE =====
+  // ===== OPTIMIZED: EMIT EVENT WITH MINIMAL PAYLOAD =====
   const connectionCount = getConnectionCount(req.user._id);
   
   if (connectionCount > 0) {
-    console.log(
-      `[healthMetricsController] User has ${connectionCount} active connection(s), emitting metrics:change event`
-    );
-    
-    // Emit with operation type and source for frontend differentiation
-    emitToUser(req.user._id, 'metrics:change', {
-      operation: 'upsert',
-      date: healthMetric.date,
-      metrics: healthMetric.metrics,
-      source: healthMetric.source || 'manual',
-      lastUpdated: healthMetric.lastUpdated,
-      timestamp: new Date().toISOString()
-    });
-    
-    console.log(
-      `[healthMetricsController] ✓ Emitted metrics:change (upsert) for ${healthMetric.date}`
-    );
-  } else {
-    console.log(
-      `[healthMetricsController] User offline (0 connections), skipping real-time update`
-    );
+    // Create optimized payload
+    const payload = payloadOptimizer.optimizeMetricPayload(healthMetric, 'upsert');
+
+    // Check if event should be emitted (date relevance check)
+    if (payloadOptimizer.shouldEmitEvent(payload)) {
+      // Validate payload size
+      payloadOptimizer.validatePayloadSize(payload, 'metrics:change');
+
+      // Log stats in development
+      if (process.env.NODE_ENV === 'development') {
+        payloadOptimizer.logPayloadStats(payload, 'metrics:change');
+      }
+
+      // Emit optimized event
+      emitToUser(req.user._id, 'metrics:change', payload);
+      
+      console.log(
+        `[healthMetricsController] Emitted metrics:change to ${connectionCount} connection(s) for ${date} (${payloadOptimizer.calculatePayloadSize(payload)} bytes)`
+      );
+    } else {
+      console.log(
+        `[healthMetricsController] Skipped event emission for ${date} (outside relevant date range)`
+      );
+    }
   }
 
   res.status(200).json({
@@ -439,27 +443,25 @@ export const updateMetric = asyncHandler(async (req, res, next) => {
   existingMetric.metrics = updatedMetrics;
   await existingMetric.save();
 
-  // ===== ENHANCED: EMIT WITH OPERATION AND SOURCE =====
+  // ===== OPTIMIZED: EMIT EVENT WITH ONLY CHANGED FIELDS =====
   const connectionCount = getConnectionCount(req.user._id);
   
   if (connectionCount > 0) {
-    console.log(
-      `[healthMetricsController] Emitting metrics:change (update) for ${existingMetric.date}`
+    // Create payload with only changed fields
+    const payload = payloadOptimizer.optimizeMetricPayload(
+      existingMetric,
+      'update',
+      metrics // Only changed fields
     );
-    
-    emitToUser(req.user._id, 'metrics:change', {
-      operation: 'update',
-      date: existingMetric.date,
-      metrics: existingMetric.metrics,
-      source: existingMetric.source || 'manual',
-      lastUpdated: existingMetric.lastUpdated,
-      updatedFields: Object.keys(metrics), // Which fields were updated
-      timestamp: new Date().toISOString()
-    });
-    
-    console.log(
-      `[healthMetricsController] ✓ Emitted metrics:change (update) to ${connectionCount} connection(s)`
-    );
+
+    if (payloadOptimizer.shouldEmitEvent(payload)) {
+      payloadOptimizer.validatePayloadSize(payload, 'metrics:change');
+      emitToUser(req.user._id, 'metrics:change', payload);
+      
+      console.log(
+        `[healthMetricsController] Emitted update with ${Object.keys(metrics).length} changed field(s) (${payloadOptimizer.calculatePayloadSize(payload)} bytes)`
+      );
+    }
   }
 
   res.status(200).json({
@@ -502,28 +504,19 @@ export const deleteMetrics = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // ===== ENHANCED: EMIT DELETE EVENT WITH MORE CONTEXT =====
+  // ===== OPTIMIZED: MINIMAL DELETE EVENT =====
   const connectionCount = getConnectionCount(req.user._id);
   
   if (connectionCount > 0) {
-    console.log(
-      `[healthMetricsController] Emitting metrics:change (delete) for ${healthMetric.date}`
-    );
-    
-    emitToUser(req.user._id, 'metrics:change', {
+    const payload = {
       operation: 'delete',
-      date: healthMetric.date,
+      date: queryDate,
       deletedAt: new Date().toISOString(),
-      // Include minimal metric info for undo functionality (optional)
-      deletedMetrics: {
-        steps: healthMetric.metrics.steps,
-        calories: healthMetric.metrics.calories
-      }
-    });
-    
-    console.log(
-      `[healthMetricsController] ✓ Emitted metrics:change (delete) to ${connectionCount} connection(s)`
-    );
+    };
+
+    if (payloadOptimizer.shouldEmitEvent(payload)) {
+      emitToUser(req.user._id, 'metrics:change', payload);
+    }
   }
 
   res.status(200).json({

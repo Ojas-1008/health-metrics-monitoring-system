@@ -21,7 +21,8 @@ import User from "../src/models/User.js";
 import HealthMetric from "../src/models/HealthMetric.js";
 import oauthConfig from "../src/config/oauth.config.js";
 import { refreshGoogleFitToken, getValidAccessToken } from "../src/utils/googleFitHelper.js";
-import { emitToUser, getConnectionCount } from "../src/utils/eventEmitter.js";
+import { emitToUser, getConnectionCount } from "../src/services/sseService.js";
+import * as payloadOptimizer from "../src/utils/eventPayloadOptimizer.js";
 
 /**
  * ============================================
@@ -591,47 +592,65 @@ upsertedCount = allDates.size;
 
 console.log(`    ✅ Upserted ${upsertedCount} health metric documents`);
 
-// ===== ENHANCED: BROADCAST DETAILED SYNC UPDATE =====
+// ===== OPTIMIZED: BATCH AGGREGATION FOR LARGE SYNCS =====
 if (upsertedCount > 0) {
   const connectionCount = getConnectionCount(user._id);
   
   if (connectionCount > 0) {
-    console.log(
-      `    🔔 User has ${connectionCount} active connection(s), emitting sync:update events`
-    );
-    
-    // Emit individual metric updates for real-time UI refresh
-    upsertedMetrics.forEach((metricData) => {
-      emitToUser(user._id, 'metrics:change', {
-        operation: 'sync',
-        date: metricData.date,
-        metrics: metricData.metrics,
-        source: 'googlefit',
-        syncedAt: new Date().toISOString()
-      });
-    });
-    
-    // Also emit a summary event for batch processing
-    emitToUser(user._id, 'sync:update', {
-      syncedDates: Array.from(allDates).sort(),
-      totalDays: upsertedCount,
-      syncedAt: new Date(),
-      syncWindow: {
-        startDate: syncWindow.startDate.toISOString(),
-        endDate: syncWindow.endDate.toISOString()
-      },
-      summary: {
-        totalSteps: upsertedMetrics.reduce((sum, m) => sum + (m.metrics.steps || 0), 0),
-        totalCalories: upsertedMetrics.reduce((sum, m) => sum + (m.metrics.calories || 0), 0),
-        avgSteps: Math.round(
-          upsertedMetrics.reduce((sum, m) => sum + (m.metrics.steps || 0), 0) / upsertedCount
-        )
+    if (payloadOptimizer.shouldUseBatchAggregation(upsertedCount)) {
+      // Large sync (50+ days) - send aggregated event
+      console.log(
+        `    🔔 Large sync (${upsertedCount} days), using batch aggregation`
+      );
+
+      const aggregatedPayload = payloadOptimizer.aggregateSyncEvents(upsertedMetrics);
+
+      if (aggregatedPayload) {
+        // Validate aggregated payload size
+        payloadOptimizer.validatePayloadSize(aggregatedPayload, 'sync:update');
+
+        // Log payload stats
+        if (process.env.NODE_ENV === 'development') {
+          payloadOptimizer.logPayloadStats(aggregatedPayload, 'sync:update');
+        }
+
+        // Emit single aggregated event
+        emitToUser(user._id, 'sync:update', aggregatedPayload);
+
+        console.log(
+          `    ✅ Emitted aggregated sync:update for ${upsertedCount} days (${payloadOptimizer.calculatePayloadSize(aggregatedPayload)} bytes)`
+        );
       }
-    });
-    
-    console.log(
-      `    ✅ Emitted ${upsertedCount} metrics:change events + 1 sync:update summary`
-    );
+    } else {
+      // Small sync (< 50 days) - send individual events for each day
+      console.log(
+        `    🔔 Small sync (${upsertedCount} days), using individual events`
+      );
+
+      let emittedCount = 0;
+      let skippedCount = 0;
+
+      for (const metric of upsertedMetrics) {
+        const payload = payloadOptimizer.optimizeMetricPayload(metric, 'sync');
+
+        if (payloadOptimizer.shouldEmitEvent(payload)) {
+          emitToUser(user._id, 'metrics:change', payload);
+          emittedCount++;
+        } else {
+          skippedCount++;
+        }
+      }
+
+      console.log(
+        `    ✅ Emitted ${emittedCount} metrics:change events, skipped ${skippedCount} (outside date range)`
+      );
+
+      // Send summary sync:update event
+      const summaryPayload = payloadOptimizer.aggregateSyncEvents(upsertedMetrics);
+      if (summaryPayload) {
+        emitToUser(user._id, 'sync:update', summaryPayload);
+      }
+    }
   } else {
     console.log(`    ℹ️ User offline (0 connections), skipping SSE emission`);
   }

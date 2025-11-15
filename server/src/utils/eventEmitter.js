@@ -8,17 +8,18 @@
  * This module provides a singleton for managing real-time SSE connections
  * and broadcasting events to connected clients. It abstracts away the
  * complexity of connection management, error handling, and cleanup.
- *
- * Architecture:
- * - Singleton pattern: One shared connection Map across the application
- * - Connection storage: Map<userId, Response[]> for multi-tab support
- * - Auto-cleanup: Dead connections automatically removed on write failures
- * - Type-safe: Consistent event format with timestamps
- *
- * Usage:
+ */
+
+import * as payloadMonitor from '../middleware/payloadMonitor.js';
+
+/**
+ * ============================================
+ * ACTIVE CONNECTIONS MAP
+ * ============================================
  *
  * // In controllers, workers, or any service
  * import { emitToUser, emitToAll, getConnectionCount } from '../utils/eventEmitter.js';
+import * as payloadMonitor from '../middleware/payloadMonitor.js';
  *
  * // Emit to specific user
  * emitToUser(userId, 'metrics:updated', { steps: 10000 });
@@ -257,6 +258,9 @@ export const emitToUser = (userId, eventType, data) => {
     console.log(`[EventEmitter] No active connections for user ${userIdString}, skipping event: ${eventType}`);
     return 0;
   }
+
+  // ===== PAYLOAD MONITORING =====
+  payloadMonitor.monitorEventPayload(userIdString, eventType, data);
 
   // Construct SSE-compliant event payload
   const payload = {

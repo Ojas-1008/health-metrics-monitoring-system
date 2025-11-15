@@ -113,20 +113,29 @@ router.get('/stream', async (req, res, next) => {
     const connectionCount = addConnection(userId, res);
     console.log(`[SSE Route] User ${userId} now has ${connectionCount} active connection(s)`);
 
+    // ===== SEND IMMEDIATE HEARTBEAT (TEST) =====
+    setTimeout(() => {
+      console.log(`[SSE Route] Sending immediate test heartbeat to user ${userId}...`);
+      const sent = emitHeartbeat(userId);
+      console.log(`[SSE Route] Immediate heartbeat sent to ${sent} connection(s)`);
+    }, 2000); // 2 seconds after connection
+
     // ===== STEP 4: Setup Heartbeat Mechanism =====
     const heartbeatInterval = setInterval(() => {
       try {
+        console.log(`[SSE Route] Sending heartbeat to user ${userId}...`);
         const sent = emitHeartbeat(userId);
+        console.log(`[SSE Route] Heartbeat sent to ${sent} connection(s)`);
         if (sent === 0) {
           // Connection was cleaned up, stop heartbeat
+          console.log(`[SSE Route] No connections remaining, stopping heartbeat for user ${userId}`);
           clearInterval(heartbeatInterval);
         }
       } catch (error) {
         console.error(`[SSE Route] Heartbeat error for user ${userId}:`, error.message);
         clearInterval(heartbeatInterval);
-        cleanupConnection();
       }
-    }, 30000); // 30 seconds
+    }, 15000); // Changed from 30s to 15s for faster testing
 
     // ===== STEP 5: Define Cleanup Function =====
     const cleanupConnection = () => {
