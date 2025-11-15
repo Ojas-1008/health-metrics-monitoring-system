@@ -4,7 +4,7 @@
  * ============================================
  * 
  * Real-time event streaming service using Server-Sent Events (SSE)
- * ENHANCED: Comprehensive connection state management
+ * ENHANCED: Comprehensive connection state management + Event deduplication
  * 
  * Features:
  * - State machine: connecting → connected → disconnected → reconnecting → error
@@ -13,8 +13,11 @@
  * - Detailed connection status events
  * - Automatic reconnection with exponential backoff
  * - Event type routing
+ * - Event deduplication with LRU cache
  * - Debug logging
  */
+
+import LRUCache from '../utils/LRUCache.js';
 
 /**
  * ============================================
@@ -29,6 +32,13 @@ const CONFIG = {
   maxRetryDelay: 30000,
   heartbeatTimeout: 60000,
   debug: import.meta.env.DEV,
+  
+  // NEW: Deduplication cache config
+  deduplication: {
+    enabled: true,
+    cacheSize: 50, // Last 50 events
+    maxAge: 60000, // 60 seconds
+  },
   
   // NEW: sessionStorage keys
   storageKeys: {
@@ -119,6 +129,19 @@ class EventService {
     // Heartbeat monitoring
     this.lastHeartbeat = null;
     this.heartbeatCheckInterval = null;
+    
+    // NEW: LRU cache for event deduplication
+    this.eventCache = new LRUCache(
+      CONFIG.deduplication.cacheSize,
+      CONFIG.deduplication.maxAge
+    );
+    
+    // Statistics
+    this.deduplicationStats = {
+      totalEvents: 0,
+      duplicatesDetected: 0,
+      uniqueEvents: 0,
+    };
     
     // Bind methods
     this.connect = this.connect.bind(this);
@@ -304,7 +327,7 @@ class EventService {
 
       // ===== EVENT HANDLERS =====
 
-      this.eventSource.addEventListener('open', (event) => {
+      this.eventSource.addEventListener('open', () => {
         this.log('✓ Connection established');
         
         // Set connected state
@@ -446,6 +469,9 @@ class EventService {
     this.saveLastDisconnect('manual');
     this.resetRetryCount();
     
+    // NEW: Clear event cache on disconnect
+    this.eventCache.clear();
+    
     this.log('✓ Disconnected');
   }
 
@@ -558,12 +584,172 @@ class EventService {
     }
   }
 
+  /**
+   * ============================================
+   * GENERATE EVENT ID
+   * ============================================
+   * 
+   * Creates a unique identifier for each event to detect duplicates
+   * Format: {eventType}:{date}:{documentId}:{keyMetrics}:{timestamp}
+   * 
+   * For metrics:change events, focuses on actual data rather than operation type
+   * to properly deduplicate controller emissions vs change stream emissions
+   * 
+   * @param {string} eventType - Type of event (e.g., 'metrics:change')
+   * @param {object} eventData - Event data payload
+   * @returns {string} Unique event ID
+   */
+  generateEventId(eventType, eventData) {
+    // Build ID from event characteristics
+    const parts = [eventType];
+
+    // Special handling for metrics:change events
+    if (eventType === 'metrics:change') {
+      // Focus on the actual data that changed, not the operation type
+      if (eventData.date) {
+        parts.push(eventData.date);
+      }
+      
+      // Include document ID if available
+      if (eventData.documentId) {
+        parts.push(eventData.documentId);
+      }
+      
+      // Include key metrics to detect same data changes
+      if (eventData.metrics) {
+        const keyMetrics = ['steps', 'calories', 'distance', 'activeMinutes'].map(key => 
+          eventData.metrics[key] != null ? `${key}:${eventData.metrics[key]}` : ''
+        ).filter(Boolean).sort().join('|');
+        if (keyMetrics) {
+          parts.push(keyMetrics);
+        }
+      }
+    } else {
+      // For other events, use the original logic
+      if (eventData.date) {
+        parts.push(eventData.date);
+      }
+      if (eventData.operation) {
+        parts.push(eventData.operation);
+      }
+      if (eventData.documentId) {
+        parts.push(eventData.documentId);
+      }
+    }
+
+    // Add timestamp for truly unique ID (but allows deduplication within time window)
+    // We truncate to seconds to allow deduplication of events within same second
+    if (eventData.timestamp) {
+      const secondTimestamp = Math.floor(new Date(eventData.timestamp).getTime() / 1000);
+      parts.push(secondTimestamp.toString());
+    }
+
+    return parts.join(':');
+  }
+
+  /**
+   * ============================================
+   * CHECK AND CACHE EVENT (DEDUPLICATION)
+   * ============================================
+   * 
+   * Checks if event was already processed, caches it if new
+   * 
+   * @param {string} eventType - Type of event
+   * @param {object} eventData - Event data payload
+   * @returns {boolean} True if event is new (should be processed)
+   */
+  checkAndCacheEvent(eventType, eventData) {
+    if (!CONFIG.deduplication.enabled) {
+      return true; // Deduplication disabled, process all events
+    }
+
+    this.deduplicationStats.totalEvents++;
+
+    // Generate unique event ID
+    const eventId = this.generateEventId(eventType, eventData);
+
+    // Check if event already processed
+    if (this.eventCache.has(eventId)) {
+      this.deduplicationStats.duplicatesDetected++;
+      
+      this.log(`[Deduplication] Duplicate event detected and ignored: ${eventId}`);
+      
+      if (CONFIG.debug) {
+        console.log('[EventService] Duplicate event details:', {
+          eventType,
+          eventId,
+          eventData: JSON.stringify(eventData).substring(0, 100) + '...',
+          cacheStats: this.eventCache.getStats(),
+        });
+      }
+
+      return false; // Duplicate, skip processing
+    }
+
+    // New event - cache it
+    this.eventCache.set(eventId, {
+      eventType,
+      timestamp: Date.now(),
+      processed: true,
+    });
+
+    this.deduplicationStats.uniqueEvents++;
+
+    return true; // New event, process it
+  }
+
+  /**
+   * ============================================
+   * GET DEDUPLICATION STATS
+   * ============================================
+   * 
+   * @returns {object} Deduplication statistics
+   */
+  getDeduplicationStats() {
+    return {
+      ...this.deduplicationStats,
+      deduplicationRate: this.deduplicationStats.totalEvents > 0
+        ? (this.deduplicationStats.duplicatesDetected / this.deduplicationStats.totalEvents * 100).toFixed(2) + '%'
+        : '0%',
+      cacheStats: this.eventCache.getStats(),
+    };
+  }
+
+  /**
+   * ============================================
+   * CLEAR DEDUPLICATION CACHE
+   * ============================================
+   * 
+   * Manually clear the event cache (useful for testing)
+   */
+  clearEventCache() {
+    this.eventCache.clear();
+    this.log('Event cache cleared');
+  }
+
+  /**
+   * ============================================
+   * EMIT EVENT TO SUBSCRIBERS (WITH DEDUPLICATION)
+   * ============================================
+   * 
+   * Enhanced emit method that checks for duplicates before dispatching
+   */
   emit(eventType, data) {
+    // Check for duplicate before emitting
+    if (!this.checkAndCacheEvent(eventType, data)) {
+      // Duplicate detected, don't emit
+      return;
+    }
+
+    // Not a duplicate, proceed with normal emission
     if (!this.listeners.has(eventType)) {
       return;
     }
 
     const listeners = this.listeners.get(eventType);
+    
+    this.log(`Emitting ${eventType} to ${listeners.size} listener(s)`);
+
     listeners.forEach((callback) => {
       try {
         callback(data);
@@ -602,9 +788,25 @@ class EventService {
       lastHeartbeat: this.lastHeartbeat,
       timeSinceHeartbeat: this.lastHeartbeat ? Date.now() - this.lastHeartbeat : null,
       
+      // NEW: Deduplication stats
+      deduplication: this.getDeduplicationStats(),
+      
       // Metadata
       connectionAttempt: this.connectionAttempt,
     };
+  }
+
+  /**
+   * ============================================
+   * CLEANUP (NEW)
+   * ============================================
+   * 
+   * Destroy cache and cleanup resources
+   */
+  destroy() {
+    this.disconnect();
+    this.eventCache.destroy();
+    this.log('EventService destroyed');
   }
 
   getReadyStateName() {

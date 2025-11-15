@@ -44,6 +44,12 @@ React 19 frontend application for Health Metrics Monitoring System - A modern, r
 - **React Hooks** - useState, useEffect, useCallback, useRef for component state
 - **Zustand 5.0.8** - Lightweight store management (installed for future use)
 
+**Real-Time Features:**
+- **Server-Sent Events (SSE)** - Real-time data streaming from backend
+- **Event Service** - Centralized event management with connection handling
+- **Event Deduplication** - LRU cache-based duplicate event prevention
+- **useRealtimeEvents Hook** - Custom hook for real-time event subscription
+
 **HTTP & API:**
 - **Axios 1.12.2** - HTTP client with request/response interceptors
 - **JWT Token Handling** - Automatic token attachment to protected requests
@@ -191,6 +197,58 @@ React 19 frontend application for Health Metrics Monitoring System - A modern, r
   - Responsive design for mobile/desktop
   - Password strength meter with color indicators (weak/fair/good/strong)
 
+#### **11. Real-Time Event System** (892 lines)
+- **File:** `src/services/eventService.js`
+- **Features:**
+  - Server-Sent Events (SSE) connection management
+  - JWT-based authentication for event streams
+  - Automatic reconnection with exponential backoff
+  - Event subscription system with callback management
+  - Connection status monitoring and error handling
+  - Event emission with deduplication support
+  - Statistics tracking for debugging
+  - Graceful disconnect and cleanup
+
+#### **12. Event Deduplication System** (245 lines)
+- **File:** `src/utils/LRUCache.js`
+- **Features:**
+  - Time-based LRU cache with automatic expiry
+  - O(1) operations for get, set, has, delete
+  - Configurable capacity and TTL (time-to-live)
+  - Periodic cleanup of expired entries
+  - Statistics tracking (hits, misses, evictions, expirations)
+  - Memory-efficient implementation using Map
+
+#### **13. Real-Time Event Hook** (178 lines)
+- **File:** `src/hooks/useRealtimeEvents.js`
+- **Features:**
+  - Custom React hook for event subscription
+  - Automatic cleanup on unmount
+  - Event filtering and processing
+  - Connection status integration
+  - Error handling and retry logic
+  - TypeScript-ready interface
+
+#### **14. Event Deduplication Debug Component** (312 lines)
+- **File:** `src/components/debug/EventDeduplicationDebug.jsx`
+- **Features:**
+  - Real-time deduplication statistics display
+  - Cache size and performance metrics
+  - Event history with timestamps
+  - Manual cache clearing functionality
+  - Live updates via event subscriptions
+  - Developer-friendly debugging interface
+
+#### **15. Enhanced Dashboard with Real-Time Updates** (1376 lines + real-time integration)
+- **File:** `src/pages/Dashboard.jsx`
+- **Features:**
+  - Real-time metrics updates via SSE
+  - Optimistic UI updates for immediate feedback
+  - Event deduplication to prevent duplicate displays
+  - Live connection status indicators
+  - Automatic data refresh on external changes
+  - Debug panel integration for development
+
 #### **10. Date Utilities & Formatting** (717 lines)
 - **File:** `src/utils/dateUtils.js`
 - **Features:**
@@ -281,14 +339,16 @@ client/
 │   ├── context/                     # React Context for state management
 │   │   └── AuthContext.jsx         # ✅ Global auth state, login/register/logout (447 lines)
 │   │
-│   ├── services/                    # API service layer (3001 lines total)
+│   ├── services/                    # API service layer (3893 lines total)
 │   │   ├── authService.js          # ✅ Auth operations: register, login, getCurrentUser, logout (696 lines)
 │   │   ├── metricsService.js       # ✅ Metrics CRUD: add, get, delete, summary (643 lines)
 │   │   ├── goalsService.js         # ✅ Goals management: set, get, update, reset, progress (562 lines)
 │   │   ├── googleFitService.js     # ✅ Google Fit OAuth: connect, status, disconnect (450 lines)
+│   │   ├── eventService.js         # ✅ Real-time event management: SSE, deduplication (892 lines)
 │   │   └── README.md               # Service layer documentation
 │   │
-│   ├── utils/                       # Utility functions (1050 lines total)
+│   ├── utils/                       # Utility functions (1295 lines total)
+│   │   ├── LRUCache.js             # ✅ LRU cache for event deduplication (245 lines)
 │   │   ├── dateUtils.js            # ✅ Date formatting, ranges, arithmetic (717 lines)
 │   │   ├── validation.js           # ✅ Client-side validation matching backend (333 lines)
 │   │   └── README.md               # Utilities documentation
@@ -326,6 +386,9 @@ client/
 │   │   ├── test/                   # Test/debug components
 │   │   │   └── GoogleFitTest.jsx   # Google Fit testing component
 │   │   │
+│   │   ├── debug/                  # Debug and monitoring components
+│   │   │   └── EventDeduplicationDebug.jsx # ✅ Real-time deduplication monitoring (312 lines)
+│   │   │
 │   │   └── README.md               # Components documentation
 │   │
 │   ├── pages/                       # Page-level components (2400+ lines total)
@@ -338,8 +401,9 @@ client/
 │   │   ├── dashboard/              # Dashboard variations (future)
 │   │   └── README.md               # Pages documentation
 │   │
-│   ├── hooks/                       # Custom React hooks (future)
-│   │   └── README.md               # Hooks documentation
+│   ├── hooks/                       # Custom React hooks
+│   │   ├── README.md               # Hooks documentation
+│   │   └── useRealtimeEvents.js    # ✅ Real-time event subscription hook (178 lines)
 │   │
 │   ├── layouts/                     # Layout wrapper components (future)
 │   │   └── README.md               # Layouts documentation
@@ -1519,6 +1583,69 @@ Main dependencies:
 
 ---
 
+## 🎣 Custom Hooks
+
+### `useRealtimeEvents` Hook (`hooks/useRealtimeEvents.js`) ✅
+
+Custom React hook for subscribing to real-time events:
+
+```javascript
+import { useRealtimeEvents } from '../hooks/useRealtimeEvents';
+
+function MyComponent() {
+  const { isConnected, lastEvent } = useRealtimeEvents('metrics:change', (eventData) => {
+    console.log('Received metrics change:', eventData);
+    // Handle the event
+  });
+
+  return (
+    <div>
+      <p>Connection Status: {isConnected ? 'Connected' : 'Disconnected'}</p>
+      <p>Last Event: {lastEvent ? JSON.stringify(lastEvent) : 'None'}</p>
+    </div>
+  );
+}
+```
+
+Features:
+- Automatic event subscription on mount
+- Cleanup on unmount
+- Connection status monitoring
+- Event filtering and processing
+- Error handling and retry logic
+- TypeScript-ready interface
+
+---
+
+## 🔍 Debug Components
+
+### `EventDeduplicationDebug` Component (`components/debug/EventDeduplicationDebug.jsx`) ✅
+
+Real-time monitoring component for event deduplication:
+
+```jsx
+import EventDeduplicationDebug from '../components/debug/EventDeduplicationDebug';
+
+function Dashboard() {
+  return (
+    <div>
+      {/* Other dashboard content */}
+      <EventDeduplicationDebug />
+    </div>
+  );
+}
+```
+
+Features:
+- Live deduplication statistics display
+- Cache size and performance metrics
+- Event history with timestamps
+- Manual cache clearing functionality
+- Real-time updates via event subscriptions
+- Developer-friendly debugging interface
+
+---
+
 ## 🚧 Development Status
 
 ### ✅ Completed Features (Production Ready)
@@ -1574,6 +1701,15 @@ Main dependencies:
 - ✅ Custom utility classes
 - ✅ Responsive breakpoints
 - ✅ Consistent design system
+
+**Real-Time Features (100%)**
+- ✅ Server-Sent Events (SSE) integration
+- ✅ Event service with connection management
+- ✅ Event deduplication with LRU cache
+- ✅ useRealtimeEvents custom hook
+- ✅ Real-time dashboard updates
+- ✅ Event deduplication debug component
+- ✅ Connection status monitoring
 
 ### ⏳ In Progress
 
@@ -2121,8 +2257,8 @@ When adding features:
 
 ---
 
-**Last Updated:** November 10, 2025
+**Last Updated:** November 15, 2025
 
-**Development Phase:** ✅ Core Features Complete | ⏳ Ready for Data Visualization
+**Development Phase:** ✅ Core Features Complete | ✅ Real-Time Features Complete | ⏳ Ready for Data Visualization
 
-**Status:** 🟢 Production Ready (Auth & Dashboard) | 🟡 Ready for Development (Charts & Advanced)
+**Status:** 🟢 Production Ready (Auth, Dashboard & Real-Time) | 🟡 Ready for Development (Charts & Advanced)

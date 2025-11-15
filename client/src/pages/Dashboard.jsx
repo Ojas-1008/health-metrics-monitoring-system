@@ -48,6 +48,7 @@ import MultiEventTest from '../components/MultiEventTest';
 import FilteredMetricsTest from '../components/test/FilteredMetricsTest';
 import ConditionalSubscriptionTest from '../components/test/ConditionalSubscriptionTest';
 import ManualUnsubscribeTest from '../components/test/ManualUnsubscribeTest';
+import EventDeduplicationDebug from '../components/debug/EventDeduplicationDebug';
 
 /**
  * ============================================
@@ -1251,6 +1252,9 @@ const Dashboard = () => {
       <div className="fixed bottom-4 right-4 z-50 max-w-md">
         <RealtimeDebug />
       </div>
+
+      {/* ===== EVENT DEDUPLICATION DEBUG PANEL ===== */}
+      <EventDeduplicationDebug />
 
       <div className="flex flex-col lg:flex-row min-h-screen">
         {/* ===== SIDEBAR ===== */}
