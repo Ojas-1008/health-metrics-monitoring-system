@@ -12,6 +12,9 @@ import goalsRoutes from "./routes/goalsRoutes.js";
 import googleFitRoutes from "./routes/googleFitRoutes.js";
 import eventsRoutes from "./routes/eventsRoutes.js"; // SSE routes
 
+// Import Models (for index creation on startup)
+import Analytics from "./models/Analytics.js"; // ⬅️ ADD THIS LINE
+
 // Import Workers
 import { startSyncWorker, triggerManualSync } from "../workers/googleFitSyncWorker.js";
 import { startChangeStreamWorker } from "../workers/changeStreamWorker.js"; // ← NEW
