@@ -1,0 +1,26 @@
+# Apache Spark Core
+pyspark==3.5.0
+
+# MongoDB Integration
+pymongo==4.6.1
+pymongo[srv]==4.6.1  # For MongoDB Atlas connection strings
+
+# Environment Configuration
+python-dotenv==1.0.0
+
+# Data Processing & Analysis
+pandas==2.1.0
+numpy==1.26.0
+
+# HTTP Requests (for backend API communication)
+requests==2.31.0
+
+# Date/Time Handling
+python-dateutil==2.8.2
+
+# Logging & Monitoring
+colorlog==6.8.0  # Colored logging for development
+
+# Testing & Development
+pytest==7.4.3
+pytest-mock==3.12.0

@@ -26,7 +26,7 @@
  * - Provides auth state and event subscriptions to entire app
  */
 
-import { createContext, useState, useEffect, useCallback, useMemo, useContext } from 'react';
+import { createContext, useState, useEffect, useCallback, useMemo, useContext, useRef } from 'react';
 import PropTypes from 'prop-types';
 import * as authService from '../services/authService.js';
 import eventService from '../services/eventService.js'; // ← NEW: Import SSE service
@@ -96,6 +96,20 @@ export const AuthProvider = ({ children }) => {
   });
 
   /**
+   * ===== NEW: COMPONENT EVENT LISTENERS =====
+   * Map of eventType -> Set of component callbacks
+   * Used for centralized event distribution to prevent multiple SSE subscriptions
+   */
+  const componentListeners = useRef(new Map());
+
+  /**
+   * ===== NEW: SSE SUBSCRIPTION TRACKING =====
+   * Track which event types we have active subscriptions to in eventService
+   * Only subscribe once per event type to prevent multiple listeners
+   */
+  const activeSubscriptions = useRef(new Set());
+
+  /**
    * ============================================
    * SSE EVENT SUBSCRIPTIONS (NEW)
    * ============================================
@@ -124,6 +138,61 @@ export const AuthProvider = ({ children }) => {
     // Cleanup on unmount
     return () => {
       eventService.off('connectionStatus', handleConnectionStatus);
+    };
+  }, []);
+
+  /**
+   * ============================================
+   * CENTRALIZED EVENT DISTRIBUTION (NEW)
+   *
+   * Subscribe to SSE events once and distribute to component listeners
+   * This prevents multiple subscriptions to the same event type
+   */
+  useEffect(() => {
+    // Event types that components can subscribe to
+    const eventTypes = ['metrics:change', 'sync:update', 'goals:updated'];
+
+    // Subscribe to each event type once
+    const subscriptions = eventTypes.map(eventType => {
+      const handler = (data) => {
+        // Distribute to all component listeners for this event type
+        const listeners = componentListeners.current.get(eventType);
+        if (listeners && listeners.size > 0) {
+          if (import.meta.env.DEV) {
+            console.log(`[AuthContext] Distributing ${eventType} to ${listeners.size} component(s)`);
+          }
+
+          listeners.forEach(callback => {
+            try {
+              callback(data);
+            } catch (error) {
+              console.error(`[AuthContext] Error in ${eventType} listener:`, error);
+            }
+          });
+        }
+      };
+
+      // Subscribe to eventService
+      eventService.on(eventType, handler);
+      activeSubscriptions.current.add(eventType);
+
+      if (import.meta.env.DEV) {
+        console.log(`[AuthContext] Subscribed to ${eventType} in eventService`);
+      }
+
+      return { eventType, handler };
+    });
+
+    // Cleanup function
+    return () => {
+      subscriptions.forEach(({ eventType, handler }) => {
+        eventService.off(eventType, handler);
+        activeSubscriptions.current.delete(eventType);
+
+        if (import.meta.env.DEV) {
+          console.log(`[AuthContext] Unsubscribed from ${eventType} in eventService`);
+        }
+      });
     };
   }, []);
 
@@ -544,10 +613,20 @@ export const AuthProvider = ({ children }) => {
    * });
    */
   const addEventListener = useCallback((eventType, callback) => {
-    eventService.on(eventType, callback);
+    if (typeof callback !== 'function') {
+      console.error('[AuthContext] Callback must be a function');
+      return;
+    }
+
+    // Add to component listeners map
+    if (!componentListeners.current.has(eventType)) {
+      componentListeners.current.set(eventType, new Set());
+    }
+
+    componentListeners.current.get(eventType).add(callback);
 
     if (import.meta.env.DEV) {
-      console.log(`[AuthContext] Subscribed to ${eventType}`);
+      console.log(`[AuthContext] Component subscribed to ${eventType} (${componentListeners.current.get(eventType).size} total)`);
     }
   }, []);
 
@@ -563,10 +642,19 @@ export const AuthProvider = ({ children }) => {
    * removeEventListener('metrics:change', callback);
    */
   const removeEventListener = useCallback((eventType, callback) => {
-    eventService.off(eventType, callback);
+    if (!componentListeners.current.has(eventType)) {
+      return;
+    }
+
+    componentListeners.current.get(eventType).delete(callback);
 
     if (import.meta.env.DEV) {
-      console.log(`[AuthContext] Unsubscribed from ${eventType}`);
+      console.log(`[AuthContext] Component unsubscribed from ${eventType} (${componentListeners.current.get(eventType).size} remaining)`);
+    }
+
+    // Clean up empty sets
+    if (componentListeners.current.get(eventType).size === 0) {
+      componentListeners.current.delete(eventType);
     }
   }, []);
 

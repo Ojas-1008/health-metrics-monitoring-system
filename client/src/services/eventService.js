@@ -345,6 +345,12 @@ class EventService {
           const data = JSON.parse(event.data);
           this.log('Received message:', data);
           
+          // CRITICAL: Update heartbeat timestamp for ping events
+          if (data.type === 'ping') {
+            this.lastHeartbeat = Date.now();
+            this.log('Heartbeat received and updated');
+          }
+          
           if (data.type) {
             this.emit(data.type, data.data || data);
           }
@@ -661,6 +667,12 @@ class EventService {
   checkAndCacheEvent(eventType, eventData) {
     if (!CONFIG.deduplication.enabled) {
       return true; // Deduplication disabled, process all events
+    }
+
+    // CRITICAL: Never deduplicate system events - they're intentionally repetitive
+    const SYSTEM_EVENTS = ['ping', 'connected', 'connectionStatus'];
+    if (SYSTEM_EVENTS.includes(eventType)) {
+      return true; // Always process system events
     }
 
     this.deduplicationStats.totalEvents++;

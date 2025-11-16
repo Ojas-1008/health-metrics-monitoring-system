@@ -1,7 +1,7 @@
 
 # Health Metrics Server 🏥
 
-Backend API for Health Metrics Monitoring System - A production-ready RESTful API built with Node.js 18+, Express 4, and MongoDB Atlas featuring complete JWT authentication, comprehensive error handling, Google Fit OAuth2 integration, automated data synchronization, and extensive testing infrastructure.
+Backend API for Health Metrics Monitoring System - A production-ready RESTful API built with Node.js 18+, Express 4.19.2, and MongoDB Atlas featuring complete JWT authentication, comprehensive error handling, Google Fit OAuth2 integration, automated data synchronization, Server-Sent Events for real-time updates, and extensive testing infrastructure.
 
 ---
 
@@ -31,6 +31,8 @@ All core backend features are fully implemented, tested, and production-ready:
 - ✅ Fitness goals management with real-time progress tracking
 - ✅ Full Google Fit OAuth2 integration with automatic token refresh
 - ✅ Scheduled data synchronization worker (every 15 minutes)
+- ✅ Server-Sent Events (SSE) for real-time updates
+- ✅ MongoDB Change Stream worker for instant data synchronization
 - ✅ Centralized error handling with 20+ error scenarios covered
 - ✅ Express-validator input validation on all endpoints
 - ✅ Comprehensive test suite with 4+ test files
@@ -65,6 +67,13 @@ All core backend features are fully implemented, tested, and production-ready:
 - **HTTP Client:** axios 1.7.9 for external API calls and Google Fit requests
 - **Scheduling:** node-cron 3.0.3 for automated sync tasks
 - **Validation:** validator 13.15.15 for additional input validation
+
+**Real-Time Features:**
+- **Server-Sent Events:** Native SSE implementation for instant client updates
+- **Event Emitter:** Custom event system with connection management and payload optimization
+- **Change Streams:** MongoDB change streams for real-time database monitoring
+- **LRU Cache:** Event deduplication and payload size optimization
+- **Connection Pooling:** Multi-tab support with automatic cleanup
 
 **Important Notes:**
 - ⚠️ **ES Modules Only:** All code uses `import/export` syntax. No CommonJS `require()`.
@@ -398,6 +407,68 @@ All core backend features are fully implemented, tested, and production-ready:
   - Comprehensive logging with emoji indicators (✅ success, ❌ errors, 🟢 events)
 - **Routes:** Manual sync trigger via GET /api/sync/trigger (testing only)
 - **Monitoring:** Tracks total syncs completed, failures, performance metrics
+
+---
+
+### ✅ Real-Time Updates with Server-Sent Events (100% Implemented)
+
+**Server-Sent Events (SSE) Implementation:**
+- Native SSE support for instant, real-time updates to connected clients
+- Multi-tab support: Users can have multiple browser tabs/windows connected simultaneously
+- Automatic heartbeat mechanism (every 15 seconds) to keep connections alive
+- Smart connection cleanup: Dead connections automatically removed to prevent memory leaks
+- Event-driven architecture with custom event emitter system
+
+**Real-Time Event Types:**
+- `connected`: Initial confirmation when SSE connection established
+- `ping`: Heartbeat every 15 seconds to maintain connection
+- `metrics:change`: Health metrics updated (from CRUD operations and sync worker)
+- `goals:updated`: User goals modified
+- `sync:update`: Bulk sync completion with summary statistics
+- `test:event`: Debug events for testing SSE functionality
+
+**Connection Management:**
+- JWT token authentication for SSE connections (supports both header and query parameter)
+- User-specific event isolation (users only receive their own data updates)
+- Connection pooling with automatic cleanup on disconnect/error
+- Connection statistics tracking for monitoring and debugging
+
+**Payload Optimization:**
+- LRU cache for event deduplication (prevents duplicate events within time windows)
+- Smart payload filtering (only relevant date ranges trigger events)
+- Payload size validation and optimization for network efficiency
+- Batch event aggregation for large sync operations (50+ days)
+
+**MongoDB Change Streams:**
+- Real-time database change monitoring with MongoDB change streams
+- Instant synchronization when data is modified outside the API
+- Automatic event emission for database-level changes
+- Graceful error handling and reconnection logic
+
+**Performance Features:**
+- Exponential backoff for connection failures
+- Payload size limits to prevent memory issues
+- Event rate limiting and throttling
+- Development-mode payload monitoring and statistics
+
+**Implementation Details:**
+- **Service:** `src/services/sseService.js` (41 lines)
+  - Wrapper around event emitter with payload monitoring
+- **Routes:** `src/routes/eventsRoutes.js` (291 lines)
+  - GET /api/events/stream - Main SSE endpoint
+  - GET /api/events/debug/connections - Connection monitoring
+  - POST /api/events/debug/test - Test event broadcasting
+- **Emitter:** `src/utils/eventEmitter.js` (comprehensive event system)
+  - Connection management and cleanup
+  - User-specific event broadcasting
+  - Heartbeat mechanism
+- **Change Stream Worker:** `src/workers/changeStreamWorker.js`
+  - MongoDB change stream monitoring
+  - Real-time event emission for database changes
+- **Payload Optimizer:** `src/utils/eventPayloadOptimizer.js`
+  - LRU cache for deduplication
+  - Payload size optimization
+  - Event relevance filtering
 
 ---
 
@@ -1516,18 +1587,192 @@ Authorization: Bearer <token>
 
 ---
 
+### Server-Sent Events Routes (`/api/events`)
+
+All SSE routes require authentication via JWT token and establish persistent connections for real-time updates.
+
+#### 1. Real-Time Events Stream
+```http
+GET /api/events/stream
+Authorization: Bearer <token>
+Accept: text/event-stream
+Cache-Control: no-cache
+```
+
+**Description:** Establishes a persistent Server-Sent Events connection for real-time updates. The connection remains open and sends events as they occur.
+
+**Event Types:**
+- `sync:start` - Google Fit sync initiated
+- `sync:progress` - Sync progress updates with percentage
+- `sync:complete` - Sync completed successfully
+- `sync:error` - Sync failed with error details
+- `metrics:updated` - Health metrics were modified
+- `goals:updated` - User goals were changed
+- `user:updated` - User profile updated
+- `heartbeat` - Connection keep-alive (every 30 seconds)
+
+**Example Event Stream:**
+```
+event: sync:start
+data: {"message":"Starting Google Fit sync","timestamp":"2025-11-03T10:30:00.000Z"}
+
+event: sync:progress
+data: {"progress":45,"message":"Processing fitness data...","timestamp":"2025-11-03T10:30:15.000Z"}
+
+event: sync:complete
+data: {"message":"Sync completed successfully","newRecords":12,"timestamp":"2025-11-03T10:31:00.000Z"}
+
+event: heartbeat
+data: {"timestamp":"2025-11-03T10:31:30.000Z"}
+```
+
+**Response Headers:**
+```
+Content-Type: text/event-stream
+Cache-Control: no-cache
+Connection: keep-alive
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: Cache-Control
+```
+
+**Connection Management:**
+- Connections automatically close after 1 hour of inactivity
+- Maximum 5 concurrent connections per user
+- Automatic cleanup on connection close/error
+- Heartbeat events maintain connection health
+
+#### 2. Debug Connection Status
+```http
+GET /api/events/debug/connections
+Authorization: Bearer <token>
+```
+
+**Description:** Returns current SSE connection statistics for debugging purposes.
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "totalConnections": 3,
+    "connectionsByUser": {
+      "user123": 2,
+      "user456": 1
+    },
+    "uptime": "2h 15m 30s",
+    "memoryUsage": "45.2 MB"
+  }
+}
+```
+
+#### 3. Test Event Emission
+```http
+GET /api/events/debug/test
+Authorization: Bearer <token>
+```
+
+**Description:** Triggers a test event on the user's SSE stream for debugging connection status.
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Test event sent to your SSE stream",
+  "event": {
+    "type": "test",
+    "data": {
+      "message": "This is a test event",
+      "timestamp": "2025-11-03T10:30:00.000Z"
+    }
+  }
+}
+```
+
+**Notes:**
+- Test event will appear in your SSE stream within a few seconds
+- Useful for verifying connection is working
+- Event includes timestamp for timing verification
+
+---
+
 ## 🔐 Environment Variables
+
+### Required Variables
 
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `MONGODB_URI` | MongoDB connection string | `mongodb+srv://user:pass@cluster.mongodb.net/dbname` |
-| `JWT_SECRET` | Secret key for JWT signing | `your_secret_key_min_32_chars` |
-| `JWT_EXPIRE` | Token expiration time | `7d` (7 days) |
-| `PORT` | Server port | `5000` |
-| `NODE_ENV` | Environment mode | `development` or `production` |
-| `CLIENT_URL` | Frontend URL for CORS | `http://localhost:5173` |
-| `GOOGLE_CLIENT_ID` | Google OAuth client ID (optional) | `123456789-abc.apps.googleusercontent.com` |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth secret (optional) | `GOCSPX-...` |
+| `JWT_SECRET` | Secret key for JWT signing (min 32 characters) | `your_secret_key_min_32_chars` |
+
+### Basic Configuration
+
+| Variable | Description | Default | Example |
+|----------|-------------|---------|---------|
+| `JWT_EXPIRE` | Token expiration time | `7d` | `7d` (7 days) |
+| `JWT_REFRESH_EXPIRE` | Refresh token expiration time | `30d` | `30d` (30 days) |
+| `PORT` | Server port | `5000` | `5000` |
+| `NODE_ENV` | Environment mode | `development` | `development` or `production` |
+| `CLIENT_URL` | Frontend URL for CORS | `http://localhost:5173` | `http://localhost:5173` |
+| `SERVER_URL` | Backend server URL | `http://localhost:5000` | `http://localhost:5000` |
+| `FRONTEND_URL` | Frontend application URL | `http://localhost:5173` | `http://localhost:5173` |
+
+### Database Configuration
+
+| Variable | Description | Default | Example |
+|----------|-------------|---------|---------|
+| `MONGODB_RETRY_ATTEMPTS` | Number of connection retry attempts | `5` | `5` |
+| `MONGODB_RETRY_INTERVAL` | Retry interval in milliseconds | `5000` | `5000` |
+
+### Google OAuth & Fit API (Optional)
+
+| Variable | Description | Default | Example |
+|----------|-------------|---------|---------|
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID | - | `123456789-abc.apps.googleusercontent.com` |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth secret | - | `GOCSPX-...` |
+| `GOOGLE_REDIRECT_URI` | OAuth callback URL | `http://localhost:5000/api/googlefit/callback` | `https://yourdomain.com/api/googlefit/callback` |
+| `GOOGLE_FIT_OAUTH_SCOPES` | OAuth scopes (comma-separated) | See oauth.config.js | `https://www.googleapis.com/auth/fitness.activity.read,https://www.googleapis.com/auth/fitness.body.read` |
+| `GOOGLE_FIT_API_BASE_URL` | Google Fit API base URL | `https://www.googleapis.com/fitness/v1` | `https://www.googleapis.com/fitness/v1` |
+| `GOOGLE_FIT_API_TIMEOUT` | API request timeout (ms) | `30000` | `30000` |
+
+### Sync Worker Configuration
+
+| Variable | Description | Default | Example |
+|----------|-------------|---------|---------|
+| `SYNC_CRON_SCHEDULE` | Cron schedule for sync worker | `*/15 * * * *` | `*/15 * * * *` (every 15 minutes) |
+| `SYNC_BATCH_SIZE` | Users to sync per batch | `50` | `50` |
+| `SYNC_MAX_RETRIES` | Max retry attempts per sync | `3` | `3` |
+| `SYNC_RETRY_DELAY` | Delay between retries (ms) | `5000` | `5000` |
+| `SYNC_WORKER_ENABLED` | Enable/disable sync worker | `true` | `true` |
+
+### Security & Rate Limiting
+
+| Variable | Description | Default | Example |
+|----------|-------------|---------|---------|
+| `RATE_LIMIT_ENABLED` | Enable rate limiting | `true` | `true` |
+| `RATE_LIMIT_REQUESTS` | Requests per window | `100` | `100` |
+| `RATE_LIMIT_WINDOW` | Rate limit window (minutes) | `15` | `15` |
+| `MAX_LOGIN_ATTEMPTS` | Max failed login attempts | `5` | `5` |
+
+### Logging Configuration
+
+| Variable | Description | Default | Example |
+|----------|-------------|---------|---------|
+| `LOG_LEVEL` | Logging level | `debug` | `debug`, `info`, `warn`, `error` |
+| `LOG_HTTP_REQUESTS` | Log HTTP requests | `true` | `true` |
+
+### Feature Flags
+
+| Variable | Description | Default | Example |
+|----------|-------------|---------|---------|
+| `FEATURE_GOOGLE_FIT_ENABLED` | Enable Google Fit integration | `true` | `true` |
+| `FEATURE_REALTIME_UPDATES_ENABLED` | Enable real-time updates (SSE) | `true` | `true` |
+| `FEATURE_PREDICTIVE_ANALYTICS_ENABLED` | Enable predictive analytics | `false` | `true` |
+
+### CORS Configuration
+
+| Variable | Description | Default | Example |
+|----------|-------------|---------|---------|
+| `CORS_ENABLED` | Enable CORS | `true` | `true` |
 
 ---
 
