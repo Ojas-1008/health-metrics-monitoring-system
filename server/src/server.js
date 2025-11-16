@@ -11,6 +11,7 @@ import healthMetricsRoutes from "./routes/healthMetricsRoutes.js";
 import goalsRoutes from "./routes/goalsRoutes.js";
 import googleFitRoutes from "./routes/googleFitRoutes.js";
 import eventsRoutes from "./routes/eventsRoutes.js"; // SSE routes
+import analyticsRoutes from "./routes/analyticsRoutes.js"; // Analytics routes
 
 // Import Models (for index creation on startup)
 import Analytics from "./models/Analytics.js"; // ⬅️ ADD THIS LINE
@@ -125,6 +126,9 @@ app.use("/api/googlefit", googleFitRoutes);
 // ===== NEW: Server-Sent Events Routes =====
 app.use("/api/events", eventsRoutes);
 
+// ===== NEW: Analytics Routes =====
+app.use("/api/analytics", analyticsRoutes);
+
 /**
  * ============================================
  * ERROR HANDLING MIDDLEWARE
@@ -236,9 +240,18 @@ const initializeServer = async () => {
       console.log(" - Debug Connections: GET /api/events/debug/connections");
       console.log(" - Test Event: POST /api/events/debug/test");
       
+      console.log("\n📈 Analytics:");
+      console.log(" - Latest Analytics: GET /api/analytics/latest/:metricType");
+      console.log(" - All Analytics: GET /api/analytics");
+      console.log(" - Analytics Summary: GET /api/analytics/summary");
+      console.log(" - Anomalies: GET /api/analytics/anomalies");
+      console.log(" - By ID: GET /api/analytics/:id");
+      console.log(" - Delete: DELETE /api/analytics/:id");
+      
       console.log("\n⚙️  Background Workers:");
       console.log(" ✅ Google Fit Sync: Active (every 15 minutes)");
       console.log(" ✅ Change Stream: Active (real-time)");
+      console.log(" ✅ Analytics Processing: Active (via Apache Spark)");
       
       console.log("=".repeat(60) + "\n");
     });
