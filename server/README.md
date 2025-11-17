@@ -70,10 +70,10 @@ All core backend features are fully implemented, tested, and production-ready:
 
 **Analytics & Processing:**
 - **Apache Spark:** PySpark 3.5.0 for advanced analytics processing
-- **Data Processing:** pandas 2.2.0, numpy 1.26.0 for statistical analysis
-- **Database Connector:** pymongo 4.6.0 for MongoDB integration
-- **Streaming:** Apache Spark Streaming for real-time analytics
-- **TTL Management:** Automatic cleanup of expired analytics data
+- **Data Processing:** pandas 2.1.0, numpy 1.26.0 for statistical analysis
+- **Database Connector:** pymongo 4.6.1 for MongoDB integration
+- **Streaming:** Apache Spark Structured Streaming for real-time analytics
+- **TTL Management:** Automatic cleanup of expired analytics data (90 days)
 
 **Important Notes:**
 - ⚠️ **ES Modules Only:** All code uses `import/export` syntax. No CommonJS `require()`.
@@ -480,6 +480,16 @@ All core backend features are fully implemented, tested, and production-ready:
 - Automated analytics generation triggered by health metrics updates
 - Comprehensive data insights including rolling averages, streaks, and performance metrics
 - TTL-based data cleanup (90-day retention) to manage storage efficiently
+- **Processing Engine:** `spark-analytics/src/main.py` (complete implementation with all analytics functions)
+
+**Analytics Processing Pipeline:**
+1. **Data Ingestion:** Read from MongoDB `healthmetrics` collection via Spark
+2. **Rolling Averages:** Calculate 7-day, 30-day moving averages for all metrics
+3. **Anomaly Detection:** IQR-based statistical outlier detection with severity levels
+4. **Trend Analysis:** Week-over-week, month-over-month comparison with percentage changes
+5. **Streak Tracking:** Consecutive days meeting goals, longest streaks calculation
+6. **Data Persistence:** Write processed analytics to MongoDB `analytics` collection
+7. **Real-Time Updates:** SSE events for immediate frontend updates
 
 **Analytics Data Structure:**
 - **Rolling Averages:** 7-day, 30-day, 90-day moving averages for all metrics
