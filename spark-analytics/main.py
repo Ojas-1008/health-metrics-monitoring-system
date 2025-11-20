@@ -10,6 +10,13 @@ from pyspark.sql.functions import (
 )
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType, IntegerType, BooleanType, TimestampType
 
+# Import MongoDB utilities for analytics write operations
+from mongodb_utils import (
+    save_analytics_to_mongodb, 
+    build_analytics_record,
+    get_analytics_schema
+)
+
 # Set Hadoop home explicitly for Windows to avoid winutils requirement
 # Spark on Windows requires these settings to bypass winutils.exe
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -435,14 +442,18 @@ def process_health_metrics(df):
     return analytics_df
 
 
-def save_analytics_to_mongodb(analytics_df):
+def save_analytics_to_mongodb_deprecated(analytics_df):
     """
+    DEPRECATED: Use mongodb_utils.save_analytics_to_mongodb instead.
+    This function is kept for backward compatibility only.
+    
     Save analytics results to MongoDB analytics collection.
     
     Args:
         analytics_df: DataFrame with analytics results
     """
-    print(f"💾 Saving analytics to MongoDB...")
+    print(f"💾 Saving analytics to MongoDB (deprecated method)...")
+    print(f"⚠️  Consider migrating to mongodb_utils.save_analytics_to_mongodb for better error handling")
     
     try:
         # Get MongoDB configuration
@@ -465,6 +476,86 @@ def save_analytics_to_mongodb(analytics_df):
         print(f"   ❌ Error saving to MongoDB: {e}")
         import traceback
         traceback.print_exc()
+
+
+def convert_analytics_df_to_records(analytics_df):
+    """
+    Convert the flat analytics DataFrame to properly structured records
+    matching the Mongoose Analytics schema.
+    
+    This function takes the DataFrame output from process_health_metrics()
+    and converts it to a list of dictionaries with the correct nested structure
+    for the Analytics collection.
+    
+    Args:
+        analytics_df: DataFrame with flat analytics fields
+        
+    Returns:
+        list: List of properly structured analytics records
+    """
+    
+    print(f"🔄 Converting DataFrame to structured analytics records...")
+    
+    # Collect DataFrame rows
+    rows = analytics_df.collect()
+    analytics_list = []
+    
+    for row in rows:
+        # Extract values from the row
+        user_id = row['userId']
+        metric_type = row['metricType']
+        time_range = row['timeRange']
+        
+        # Build analytics nested structure
+        analytics_data = {
+            'rollingAverage': float(row['rollingAverage7Day']) if row['rollingAverage7Day'] is not None else 0.0,
+            'trend': row['trend'] if row['trend'] else 'stable',
+            'trendPercentage': float(row.get('trendPercentage', 0.0)) if row.get('trendPercentage') is not None else 0.0,
+            'anomalyDetected': bool(row['anomalyDetected']) if row['anomalyDetected'] is not None else False,
+            'anomalyDetails': None,  # Will be populated if anomaly detected
+            'streakDays': int(row['streakDays']) if row['streakDays'] is not None else 0,
+            'longestStreak': int(row.get('longestStreak', 0)) if row.get('longestStreak') is not None else 0,
+            'streakStartDate': None,  # Can be enhanced later
+            'percentile': float(row['percentile']) if row['percentile'] is not None else 50.0,
+            'comparisonToPrevious': {
+                'absoluteChange': float(row.get('comparisonToPrevious', 0.0)) if row.get('comparisonToPrevious') is not None else 0.0,
+                'percentageChange': 0.0,  # Can be calculated if needed
+                'isImprovement': None
+            },
+            'statistics': {
+                'standardDeviation': 0.0,
+                'minValue': None,
+                'maxValue': None,
+                'medianValue': None,
+                'dataPointsCount': 0,
+                'completenessPercentage': 0.0
+            }
+        }
+        
+        # Parse timestamps
+        try:
+            calculated_at = datetime.fromisoformat(row['calculatedAt'].replace('Z', '+00:00')) if isinstance(row['calculatedAt'], str) else row['calculatedAt']
+            expires_at = datetime.fromisoformat(row['expiresAt'].replace('Z', '+00:00')) if isinstance(row['expiresAt'], str) else row['expiresAt']
+        except:
+            calculated_at = datetime.now()
+            expires_at = calculated_at + timedelta(days=90)
+        
+        # Build complete record using helper function
+        record = build_analytics_record(
+            user_id=user_id,
+            metric_type=metric_type,
+            time_range=time_range,
+            analytics_data=analytics_data,
+            calculated_at=calculated_at,
+            expires_at=expires_at,
+            metadata=None  # Can add Spark metadata if needed
+        )
+        
+        analytics_list.append(record)
+    
+    print(f"✅ Converted {len(analytics_list)} records to structured format")
+    return analytics_list
+
 
 def process_batch(batch_df, batch_id):
     """
@@ -532,8 +623,28 @@ def process_batch(batch_df, batch_id):
                     'rollingAverage7Day', 'trend', 'anomalyDetected', 'streakDays'
                 ).show(5, truncate=False)
                 
-                # Save analytics to MongoDB
-                save_analytics_to_mongodb(analytics_results)
+                # Convert DataFrame to list of properly structured records
+                print(f"🔄 Converting analytics to MongoDB-compatible format...")
+                analytics_list = convert_analytics_df_to_records(analytics_results)
+                
+                # Save analytics to MongoDB using the new utility function
+                result = save_analytics_to_mongodb(
+                    spark_session=spark_session,
+                    analytics_list=analytics_list,
+                    batch_id=batch_id
+                )
+                
+                # Log write results
+                if result['success']:
+                    print(f"✅ Successfully wrote {result['records_written']} analytics records")
+                else:
+                    print(f"⚠️  Write completed with errors:")
+                    print(f"   - Processed: {result['records_processed']}")
+                    print(f"   - Written: {result['records_written']}")
+                    print(f"   - Failed: {result['records_failed']}")
+                    for error in result['errors']:
+                        print(f"   - Error: {error['message']}")
+
             
             # (4) Update the checkpoint timestamp to the max updatedAt in the current batch
             max_ts_row = new_data.agg(spark_max("updatedAt")).collect()

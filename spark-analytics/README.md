@@ -97,6 +97,7 @@ The application maintains two types of checkpoints:
 | `MONGO_URI` | MongoDB connection string | `mongodb://localhost:27017` |
 | `MONGO_DB_NAME` | Database name | `health-metrics` |
 | `ANALYTICS_COLLECTION` | Collection for storing analytics results | `analytics` |
+| `DLQ_DIRECTORY` | Directory for dead-letter queue (failed writes) | `./dlq` |
 | `SPARK_APP_NAME` | Name of the Spark application | `HealthMetricsAnalytics` |
 | `BATCH_INTERVAL_SECONDS` | Micro-batch interval in seconds | `60` |
 | `CHECKPOINT_LOCATION` | Directory for Spark checkpoints | `./spark-checkpoints` |
@@ -491,13 +492,101 @@ python test_polling.py
 # Test MongoDB connection
 python test_mongo_connection.py
 
+# Test MongoDB write operations
+python test_mongodb_write.py
+
 # Check Spark logs (if errors occur)
 ls .\spark-warehouse\
 ```
 
+## MongoDB Write Operations
+
+The analytics system writes processed results to MongoDB using a structured schema that matches the Mongoose Analytics model. See **[MONGODB_WRITE_GUIDE.md](./MONGODB_WRITE_GUIDE.md)** for complete documentation.
+
+### Key Features
+
+- ✅ **Schema Validation**: DataFrame schema matches Mongoose Analytics model exactly
+- ✅ **Append Mode**: Preserves historical analytics, TTL index handles expiration
+- ✅ **Error Handling**: Comprehensive error catching with detailed logging
+- ✅ **Dead-Letter Queue**: Failed records saved to DLQ for retry
+- ✅ **Retry Mechanism**: Automatic retry of failed writes from DLQ
+- ✅ **Batch Context**: All writes tagged with batch_id for traceability
+
+### Quick Start
+
+```python
+from mongodb_utils import save_analytics_to_mongodb
+
+# Convert analytics DataFrame to structured records
+analytics_list = convert_analytics_df_to_records(analytics_df)
+
+# Write to MongoDB
+result = save_analytics_to_mongodb(
+    spark_session=spark,
+    analytics_list=analytics_list,
+    batch_id="batch-001"
+)
+
+# Check results
+print(f"Written: {result['records_written']}")
+print(f"Failed: {result['records_failed']}")
+```
+
+### Schema Structure
+
+Analytics records have the following nested structure:
+
+```python
+{
+  'userId': str,                    # User ObjectId
+  'metricType': str,                # 'steps', 'calories', etc.
+  'timeRange': str,                 # '7day', '30day', '90day'
+  'analytics': {
+    'rollingAverage': float,        # Required
+    'trend': str,                   # 'up', 'down', 'stable'
+    'anomalyDetected': bool,
+    'streakDays': int,
+    'percentile': float,
+    'comparisonToPrevious': {...},
+    'statistics': {...}
+  },
+  'calculatedAt': datetime,         # Required
+  'expiresAt': datetime,            # TTL (90 days)
+  'metadata': {...}                 # Optional Spark metadata
+}
+```
+
+### Testing
+
+```powershell
+# Run comprehensive test suite
+python test_mongodb_write.py
+```
+
+Tests include:
+- ✅ Schema structure verification
+- ✅ Sample record generation
+- ✅ MongoDB write operations
+- ✅ Data verification (read-back)
+- ✅ Error handling with invalid data
+- ✅ DLQ functionality
+
+### Dead-Letter Queue (DLQ)
+
+Failed writes are automatically saved to `./dlq/` directory:
+
+```powershell
+# Check DLQ files
+ls .\dlq\
+
+# Retry a DLQ file
+python -c "from mongodb_utils import retry_dlq_records; from pyspark.sql import SparkSession; spark = SparkSession.builder.appName('Retry').getOrCreate(); retry_dlq_records(spark, './dlq/analytics_dlq_20251121_103045.json')"
+```
+
 ## Documentation
 
-- **[WINDOWS_TESTING_SUMMARY.md](./WINDOWS_TESTING_SUMMARY.md)** - Windows setup guide and test results ⭐ NEW
+- **[MONGODB_WRITE_GUIDE.md](./MONGODB_WRITE_GUIDE.md)** - MongoDB write configuration and error handling ⭐ NEW
+- **[WINDOWS_TESTING_SUMMARY.md](./WINDOWS_TESTING_SUMMARY.md)** - Windows setup guide and test results
 - **[ANALYTICS_GUIDE.md](./ANALYTICS_GUIDE.md)** - Complete analytics implementation guide
 - **[POLLING_ARCHITECTURE.md](./POLLING_ARCHITECTURE.md)** - Complete architecture guide with diagrams
 - **[INTEGRATION_TEST_GUIDE.md](./INTEGRATION_TEST_GUIDE.md)** - Integration testing procedures  
