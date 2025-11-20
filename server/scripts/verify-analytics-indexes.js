@@ -19,6 +19,11 @@ const verifyIndexes = async () => {
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('✅ Connected to MongoDB\n');
 
+    // Force index creation to ensure they exist for verification
+    console.log('⏳ Syncing indexes...');
+    await Analytics.syncIndexes();
+    console.log('✅ Indexes synced\n');
+
     // Get collection
     const collection = mongoose.connection.db.collection('analytics');
 
