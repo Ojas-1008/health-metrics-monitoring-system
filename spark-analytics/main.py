@@ -20,6 +20,10 @@ from mongodb_utils import (
 # Import batch logger for monitoring and metrics
 from batch_logger import BatchLogger
 
+# Import error handling and health check modules
+from error_handler import ErrorHandler, DeadLetterQueue
+from health_check import start_health_check_server, update_batch_status, update_error_status, set_job_status
+
 # Set Hadoop home explicitly for Windows to avoid winutils requirement
 # Spark on Windows requires these settings to bypass winutils.exe
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -690,17 +694,123 @@ def process_batch(batch_df, batch_id):
             errors=errors if errors else None
         )
         
-    except Exception as e:
-        error_message = f"Error in batch processing: {str(e)}"
-        print(f"❌ {error_message}")
-        import traceback
-        traceback.print_exc()
+        # Update health check status with successful batch completion
+        update_batch_status(batch_id, records_processed=records_processed)
         
-        # Mark batch as failed
+    except Exception as e:
+        error_type = type(e).__name__
+        error_message = f"Error in batch processing: {str(e)}"
+        
+        # Route to specific error handlers based on exception type
+        error_handler = ErrorHandler()
+        dlq = DeadLetterQueue()
+        
+        # Import specific exception types for routing
+        from pymongo.errors import ServerSelectionTimeoutError
+        import requests
+        from pyspark.sql.utils import AnalysisException
+        
+        try:
+            # Extract sample records from batch_df if available
+            sample_records = []
+            try:
+                if batch_df and batch_df.count() > 0:
+                    sample_df = batch_df.limit(5)
+                    sample_records = [row.asDict() for row in sample_df.collect()]
+            except:
+                pass
+            
+            # Route to appropriate handler based on exception type
+            if isinstance(e, ServerSelectionTimeoutError):
+                print(f"❌ MongoDB Connection Error in batch {batch_id}")
+                error_handler.handle_mongodb_error(
+                    batch_id=batch_id,
+                    error=e,
+                    context={'batch_id': batch_id, 'type': 'polling'}
+                )
+                dlq.write_failed_batch(
+                    batch_id=batch_id,
+                    batch_df=batch_df if batch_df else None,
+                    error_details={
+                        'type': 'ServerSelectionTimeoutError',
+                        'message': str(e),
+                        'recommendation': 'Retry after 30 seconds - Check MongoDB connection',
+                        'action': 'Continue to next batch'
+                    },
+                    sample_records=sample_records
+                )
+                
+            elif isinstance(e, requests.exceptions.Timeout):
+                print(f"❌ API Timeout Error in batch {batch_id}")
+                error_handler.handle_request_timeout(
+                    batch_id=batch_id,
+                    error=e,
+                    context={'batch_id': batch_id, 'endpoint': 'health-metrics-api'}
+                )
+                dlq.write_failed_batch(
+                    batch_id=batch_id,
+                    batch_df=batch_df if batch_df else None,
+                    error_details={
+                        'type': 'requests.Timeout',
+                        'message': str(e),
+                        'recommendation': 'Retry after 60 seconds - Check API availability',
+                        'action': 'Continue to next batch'
+                    },
+                    sample_records=sample_records
+                )
+                
+            elif isinstance(e, AnalysisException):
+                print(f"❌ Spark SQL Schema Error in batch {batch_id}")
+                error_handler.handle_schema_mismatch(
+                    batch_id=batch_id,
+                    error=e,
+                    context={'batch_id': batch_id, 'operation': 'health_metrics_processing'}
+                )
+                dlq.write_failed_batch(
+                    batch_id=batch_id,
+                    batch_df=batch_df if batch_df else None,
+                    error_details={
+                        'type': 'AnalysisException',
+                        'message': str(e),
+                        'recommendation': 'Check data schema and MongoDB collection structure',
+                        'action': 'Skip batch and write to DLQ for manual review'
+                    },
+                    sample_records=sample_records
+                )
+                
+            else:
+                # Generic error handler for unexpected exceptions
+                print(f"❌ Unexpected error in batch {batch_id}: {error_type}")
+                error_handler.handle_generic_error(
+                    batch_id=batch_id,
+                    error=e,
+                    context={'batch_id': batch_id, 'operation': 'batch_processing'}
+                )
+                dlq.write_failed_batch(
+                    batch_id=batch_id,
+                    batch_df=batch_df if batch_df else None,
+                    error_details={
+                        'type': error_type,
+                        'message': str(e),
+                        'recommendation': 'Review stack trace and DLQ entry for details',
+                        'action': 'Continue to next batch and investigate'
+                    },
+                    sample_records=sample_records
+                )
+            
+        except Exception as handler_error:
+            print(f"❌ Error in error handler: {handler_error}")
+            import traceback
+            traceback.print_exc()
+        
+        # Update health check status with error
+        update_error_status(error_type)
+        
+        # Mark batch as failed in logging
         batch_logger.fail_batch(
             batch_context=batch_context,
             error_message=error_message,
-            error_details={'exception': str(e), 'type': type(e).__name__}
+            error_details={'exception': str(e), 'type': error_type}
         )
 
 
@@ -724,6 +834,11 @@ if __name__ == "__main__":
         .format("rate") \
         .option("rowsPerSecond", 1) \
         .load()
+
+    # Start health check server in background
+    print("\n🏥 Starting health check server...")
+    start_health_check_server(port=5001)
+    print("   Endpoints available at http://localhost:5001/health*")
 
     # Configure the streaming query with:
     # - processingTime trigger to control polling interval
