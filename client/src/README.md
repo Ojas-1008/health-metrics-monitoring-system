@@ -249,6 +249,64 @@ React 19 frontend application for Health Metrics Monitoring System - A modern, r
   - Automatic data refresh on external changes
   - Debug panel integration for development
 
+#### **16. Analytics Integration with Spark** (NEW ✅ - 315 lines + augmentation)
+- **Components:**
+  - **AnalyticsInsights.jsx** (315 lines) - Real-time analytics visualization
+    - Trend indicators (↑ up, ↓ down, → stable) with color coding
+    - Rolling 7-day averages with metric icons
+    - Streak counters with 🔥 emoji
+    - Percentile progress bars (green/blue/yellow/gray)
+    - Anomaly detection badges (⚠️ warning)
+    - Last updated timestamps (relative time format)
+    - Responsive grid layout (1/2/3 columns)
+    - Empty state messaging
+    - Info banner explaining analytics
+  
+  - **SummaryStats.jsx** (augmented) - Spark analytics augmentation
+    - Freshness checking (<5 minutes old)
+    - Time range mapping (week/month/year → 7day/30day/90day)
+    - Graceful fallback to MongoDB if stale
+    - ⚡ indicator when Spark data active
+    - Automatic re-augmentation on analytics update
+
+- **Dashboard.jsx** (enhanced):
+  - Analytics state management: `analyticsData` (object keyed by metricType → timeRange)
+  - `lastAnalyticsUpdate` timestamp tracking
+  - `handleAnalyticsUpdate` callback for SSE events
+  - `useRealtimeAnalytics` hook subscription
+  - Conditional rendering of AnalyticsInsights
+  - Analytics data passed to SummaryStats for augmentation
+
+- **Features:**
+  - Real-time Spark analytics via SSE (`analytics:update`, `analytics:batch_update`)
+  - Batch event handling (up to 50 analytics per event)
+  - Data structure: `{ metricType: { timeRange: analytics } }`
+  - Event deduplication via existing LRU cache
+  - Toast notifications for batch updates ("📊 Received N analytics")
+  - Production-ready error handling and validation
+
+- **Data Flow:**
+  ```
+  Spark (Python) → POST /api/events/emit (SERVICE_TOKEN)
+    ↓
+  SSE eventEmitter → /api/events/stream
+    ↓
+  Frontend EventSource → useRealtimeAnalytics hook
+    ↓
+  handleAnalyticsUpdate callback
+    ↓
+  analyticsData state { steps: { '7day': {...} } }
+    ↓
+  AnalyticsInsights (display) + SummaryStats (augment)
+  ```
+
+- **Freshness Logic:**
+  - Analytics valid if `calculatedAt` < 5 minutes old
+  - Fallback to MongoDB aggregation if stale
+  - Automatic re-validation when new events arrive
+  - ⚡ indicator shows when Spark data active
+
+
 #### **10. Date Utilities & Formatting** (717 lines)
 - **File:** `src/utils/dateUtils.js`
 - **Features:**
@@ -369,10 +427,12 @@ client/
 │   │   │   ├── MetricsForm.jsx     # Health metrics input form
 │   │   │   ├── MetricCard.jsx      # Single metric card display
 │   │   │   ├── MetricsList.jsx     # List of metrics with filtering
-│   │   │   ├── SummaryStats.jsx    # Summary statistics display
-│   │   │   ├── GoalsSection.jsx    # Goals display and management
-│   │   │   ├── GoogleFitConnection.jsx # Google Fit status
-│   │   │   └── (additional dashboard components)
+│   │   │   ├── SummaryStats.jsx    # ✅ Summary statistics (augmented with Spark analytics)
+│   │   │   ├── GoalsSection.jsx    # ✅ Goals display and management
+│   │   │   ├── GoogleFitConnection.jsx # ✅ Google Fit status
+│   │   │   ├── AnalyticsInsights.jsx # ✅ Real-time Spark analytics display (315 lines)
+│   │   │   ├── AnalyticsMonitor.jsx # ✅ Analytics monitoring
+│   │   │   └── GoogleFitStatus.jsx # ✅ Google Fit connection status
 │   │   │
 │   │   ├── metrics/                # Metrics-specific components (future)
 │   │   │   └── (organized for metrics features)
@@ -1748,6 +1808,27 @@ Features:
 - ✅ Connection status monitoring and user-friendly error messages
 - ✅ Event deduplication debug interface for development
 - ✅ Centralized event distribution to prevent multiple subscriptions
+
+**Analytics Integration with Spark (100% - NEW ✅)**
+- ✅ AnalyticsInsights component with visual indicators (315 lines)
+  - Trend arrows (↑↓→) with color coding
+  - Rolling 7-day averages with metric icons
+  - Streak counters with 🔥 emoji
+  - Percentile progress bars with color scaling
+  - Anomaly detection badges (⚠️)
+  - Relative timestamps ("X minutes ago")
+- ✅ SummaryStats augmentation with Spark data
+  - Freshness checking (<5 minutes old)
+  - Graceful fallback to MongoDB if stale
+  - ⚡ indicator when Spark data active
+  - Automatic re-augmentation on new events
+- ✅ Dashboard analytics event subscription
+  - Batch event handling (up to 50 analytics)
+  - Analytics state management (metricType → timeRange)
+  - Event deduplication via existing LRU cache
+  - Toast notifications for batch updates
+- ✅ Real-time data flow: Spark → SSE → React → UI
+- ✅ Production-ready error handling and validation
 
 **UI Components Library (100%)**
 - ✅ Alert component with multiple types and auto-hide functionality
