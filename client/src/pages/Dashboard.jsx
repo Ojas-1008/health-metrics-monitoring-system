@@ -27,10 +27,11 @@ import * as googleFitService from '../services/googleFitService';
 import * as dateUtils from '../utils/dateUtils';
 
 // ===== NEW IMPORTS =====
-import { useRealtimeMetrics, useRealtimeSync, useConnectionStatus } from '../hooks/useRealtimeEvents';
+import { useRealtimeMetrics, useRealtimeSync, useRealtimeAnalytics, useConnectionStatus } from '../hooks/useRealtimeEvents';
 import Toast from '../components/common/Toast';
 import GoogleFitStatus from '../components/dashboard/GoogleFitStatus';
 import AnalyticsMonitor from '../components/dashboard/AnalyticsMonitor';
+import AnalyticsInsights from '../components/dashboard/AnalyticsInsights';
 
 // Existing component imports...
 import MetricsForm from '../components/dashboard/MetricsForm';
@@ -198,6 +199,14 @@ const Dashboard = () => {
 
   // ===== NEW: CONNECTION STATUS HOOK =====
   const { isConnected, connectionStatus: realtimeConnectionStatus } = useConnectionStatus();
+
+  // ===== NEW: ANALYTICS STATE =====
+  /**
+   * Analytics data keyed by metricType and timeRange
+   * Structure: { steps: { '7day': {...}, '30day': {...} }, calories: {...}, ... }
+   */
+  const [analyticsData, setAnalyticsData] = useState({});
+  const [lastAnalyticsUpdate, setLastAnalyticsUpdate] = useState(null);
 
   // ===== HELPER FUNCTIONS =====
 
@@ -878,6 +887,68 @@ const Dashboard = () => {
 
   /**
    * ============================================
+   * REAL-TIME: HANDLE ANALYTICS UPDATE EVENTS
+   * ============================================
+   *
+   * Processes analytics:update and analytics:batch_update events from Spark
+   * Stores analytics keyed by metricType and timeRange
+   */
+  const handleAnalyticsUpdate = useCallback((eventData) => {
+    console.log('[Dashboard] Received analytics event:', eventData);
+
+    const { analytics: rawAnalytics, isBatch } = eventData;
+
+    // Normalize to array (single or batch)
+    const analyticsArray = Array.isArray(rawAnalytics) ? rawAnalytics : [rawAnalytics];
+
+    console.log(`[Dashboard] Processing ${analyticsArray.length} analytics (batch: ${isBatch})`);
+
+    // Update analytics state
+    setAnalyticsData(prevData => {
+      const newData = { ...prevData };
+
+      analyticsArray.forEach(analytics => {
+        const { userId, metricType, timeRange, calculatedAt } = analytics;
+
+        // Validate required fields
+        if (!metricType || !timeRange) {
+          console.warn('[Dashboard] Invalid analytics data:', analytics);
+          return;
+        }
+
+        // Initialize metric type object if needed
+        if (!newData[metricType]) {
+          newData[metricType] = {};
+        }
+
+        // Store analytics by timeRange
+        newData[metricType][timeRange] = {
+          ...analytics,
+          receivedAt: new Date().toISOString() // Track when we received it
+        };
+
+        console.log(`[Dashboard] Stored analytics: ${metricType} / ${timeRange}`);
+      });
+
+      return newData;
+    });
+
+    // Update last analytics update timestamp
+    setLastAnalyticsUpdate(new Date().toISOString());
+
+    // Show toast notification for batch updates
+    if (isBatch && analyticsArray.length > 1) {
+      showAlert(
+        'info',
+        'Analytics Updated',
+        `📊 Received ${analyticsArray.length} analytics insights`,
+        4000
+      );
+    }
+  }, [showAlert]);
+
+  /**
+   * ============================================
    * MANUAL SYNC TRIGGER
    * ============================================
    */
@@ -1126,6 +1197,9 @@ const Dashboard = () => {
 
   // Subscribe to sync:update events
   useRealtimeSync(handleSyncUpdate, [debouncedSummaryRefetch]);
+
+  // Subscribe to analytics:update and analytics:batch_update events
+  useRealtimeAnalytics(handleAnalyticsUpdate, [showAlert]);
 
   // ===== EFFECTS =====
 
@@ -1801,9 +1875,20 @@ const Dashboard = () => {
                   period={summaryPeriod}
                   onPeriodChange={handleSummaryPeriodChange}
                   showComparison={true}
+                  analyticsData={analyticsData}
                 />
               </div>
             </div>
+
+            {/* Analytics Insights Section (Spark-powered) */}
+            {analyticsData && Object.keys(analyticsData).length > 0 && (
+              <div className="mt-6">
+                <AnalyticsInsights
+                  analyticsData={analyticsData}
+                  lastUpdated={lastAnalyticsUpdate}
+                />
+              </div>
+            )}
 
             {/* Quick Achievements Section */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">

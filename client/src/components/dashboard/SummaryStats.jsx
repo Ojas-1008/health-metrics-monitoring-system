@@ -255,6 +255,7 @@ const SummaryStats = ({
   period = 'week',
   onPeriodChange = null,
   showComparison = true,
+  analyticsData = null, // NEW: Spark analytics data
 }) => {
   // State management
   const [stats, setStats] = useState(null);
@@ -285,6 +286,70 @@ const SummaryStats = ({
     return labels[p] || p;
   };
 
+  /**
+   * Check if analytics data is fresh (< 5 minutes old)
+   */
+  const isAnalyticsFresh = (calculatedAt) => {
+    if (!calculatedAt) return false;
+    
+    const calculatedTime = new Date(calculatedAt).getTime();
+    const now = Date.now();
+    const fiveMinutesMs = 5 * 60 * 1000;
+    
+    return (now - calculatedTime) < fiveMinutesMs;
+  };
+
+  /**
+   * Get time range key for Spark analytics based on period
+   */
+  const getTimeRangeKey = (period) => {
+    const mapping = {
+      week: '7day',
+      month: '30day',
+      year: '90day', // Closest we have to year
+    };
+    return mapping[period] || '7day';
+  };
+
+  /**
+   * Augment MongoDB stats with Spark analytics when available and fresh
+   */
+  const augmentStatsWithAnalytics = (mongoStats) => {
+    if (!mongoStats || !analyticsData) return mongoStats;
+
+    const augmented = { ...mongoStats };
+    const timeRange = getTimeRangeKey(selectedPeriod);
+    let hasAugmentation = false;
+
+    // Check each metric type for fresh analytics
+    const metricTypes = ['steps', 'calories', 'distance', 'activeMinutes', 'sleepHours'];
+    
+    metricTypes.forEach(metricType => {
+      if (analyticsData[metricType]?.[timeRange]) {
+        const analytics = analyticsData[metricType][timeRange];
+        
+        // Only use if fresh
+        if (isAnalyticsFresh(analytics.calculatedAt)) {
+          // Augment with Spark analytics
+          if (analytics.rollingAverage !== undefined) {
+            const avgKey = `avg${metricType.charAt(0).toUpperCase() + metricType.slice(1)}`;
+            augmented[avgKey] = Math.round(analytics.rollingAverage);
+            augmented[`${avgKey}_source`] = 'spark';
+            hasAugmentation = true;
+          }
+        }
+      }
+    });
+
+    // Add metadata if any augmentation occurred
+    if (hasAugmentation) {
+      augmented._sparkAugmented = true;
+      augmented._lastSparkUpdate = new Date().toISOString();
+    }
+
+    return augmented;
+  };
+
   // ===== DATA FETCHING =====
 
   const loadStats = async (p) => {
@@ -294,7 +359,9 @@ const SummaryStats = ({
       const result = await metricsService.getMetricsSummary(p);
 
       if (result.success) {
-        setStats(result.data);
+        // Augment with Spark analytics if available
+        const augmentedStats = augmentStatsWithAnalytics(result.data);
+        setStats(augmentedStats);
       } else {
         showAlert('warning', 'No Data', result.message || `No metrics found for ${getPeriodLabel(p)}`);
         setStats(null);
@@ -312,6 +379,14 @@ const SummaryStats = ({
   useEffect(() => {
     loadStats(selectedPeriod);
   }, [selectedPeriod]);
+
+  // Re-augment stats when analytics data changes
+  useEffect(() => {
+    if (stats && analyticsData) {
+      const augmentedStats = augmentStatsWithAnalytics(stats);
+      setStats(augmentedStats);
+    }
+  }, [analyticsData]);
 
   // ===== EVENT HANDLERS =====
 
@@ -342,7 +417,19 @@ const SummaryStats = ({
 
       {/* Header */}
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Statistics</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-bold text-gray-900">Statistics</h2>
+          
+          {/* Spark Analytics Indicator */}
+          {stats?._sparkAugmented && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-50 border border-purple-200 rounded-lg">
+              <span className="text-lg">⚡</span>
+              <span className="text-sm font-medium text-purple-900">
+                Spark Analytics Active
+              </span>
+            </div>
+          )}
+        </div>
 
         {/* Period Selector */}
         <div className="flex gap-2 flex-wrap">
