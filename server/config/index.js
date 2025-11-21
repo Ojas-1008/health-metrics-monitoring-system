@@ -66,6 +66,7 @@ const config = {
   security: {
     maxLoginAttempts: parseInt(process.env.MAX_LOGIN_ATTEMPTS || "5"),
     lockoutDuration: parseInt(process.env.LOCKOUT_DURATION || "30"),
+    serviceToken: process.env.SERVICE_TOKEN || "",
   },
 };
 

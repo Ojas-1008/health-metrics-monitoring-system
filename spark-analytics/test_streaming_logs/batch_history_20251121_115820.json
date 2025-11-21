@@ -1,0 +1,110 @@
+{
+  "session_metrics": {
+    "batches_processed_total": 5,
+    "batches_succeeded": 4,
+    "batches_failed": 1,
+    "analytics_written_total": 95,
+    "analytics_inserted_total": 3,
+    "analytics_updated_total": 92,
+    "analytics_skipped_total": 0,
+    "records_processed_total": 95,
+    "errors_total": 1,
+    "total_processing_time_ms": 69133,
+    "session_start": "2025-11-21T11:56:37.777097",
+    "average_processing_time_ms": 13826.6
+  },
+  "batch_history": [
+    {
+      "batch_id": "streaming_batch_001",
+      "start_time": "2025-11-21T11:56:59.692103",
+      "end_time": "2025-11-21T11:57:14.540317",
+      "processing_time_ms": 14848,
+      "records_processed": 15,
+      "analytics_computed": 15,
+      "analytics_written": 15,
+      "analytics_inserted": 3,
+      "analytics_updated": 12,
+      "analytics_skipped": 0,
+      "errors_count": 0,
+      "errors": null,
+      "success": true,
+      "status": "completed"
+    },
+    {
+      "batch_id": "streaming_batch_002",
+      "start_time": "2025-11-21T11:57:17.553025",
+      "end_time": "2025-11-21T11:57:33.688064",
+      "processing_time_ms": 16135,
+      "records_processed": 20,
+      "analytics_computed": 20,
+      "analytics_written": 20,
+      "analytics_inserted": 0,
+      "analytics_updated": 20,
+      "analytics_skipped": 0,
+      "errors_count": 0,
+      "errors": null,
+      "success": true,
+      "status": "completed"
+    },
+    {
+      "batch_id": "streaming_batch_003",
+      "start_time": "2025-11-21T11:57:36.741301",
+      "end_time": "2025-11-21T11:57:54.475277",
+      "processing_time_ms": 17733,
+      "records_processed": 25,
+      "analytics_computed": 25,
+      "analytics_written": 25,
+      "analytics_inserted": 0,
+      "analytics_updated": 25,
+      "analytics_skipped": 0,
+      "errors_count": 0,
+      "errors": null,
+      "success": true,
+      "status": "completed"
+    },
+    {
+      "batch_id": "streaming_batch_004",
+      "start_time": "2025-11-21T11:57:57.486383",
+      "end_time": "2025-11-21T11:57:57.989670",
+      "processing_time_ms": 503,
+      "records_processed": 0,
+      "analytics_computed": 0,
+      "analytics_written": 0,
+      "analytics_inserted": 0,
+      "analytics_updated": 0,
+      "analytics_skipped": 0,
+      "errors_count": 1,
+      "errors": [
+        {
+          "message": "MongoDB write error: Connection timeout after 30s",
+          "details": {
+            "retry_attempts": 3,
+            "timeout_seconds": 30,
+            "last_error": "ServerSelectionTimeoutError",
+            "records_pending": 30
+          },
+          "timestamp": "2025-11-21T11:57:57.989670"
+        }
+      ],
+      "success": false,
+      "status": "failed"
+    },
+    {
+      "batch_id": "streaming_batch_005",
+      "start_time": "2025-11-21T11:58:01.003590",
+      "end_time": "2025-11-21T11:58:20.918034",
+      "processing_time_ms": 19914,
+      "records_processed": 35,
+      "analytics_computed": 35,
+      "analytics_written": 35,
+      "analytics_inserted": 0,
+      "analytics_updated": 35,
+      "analytics_skipped": 0,
+      "errors_count": 0,
+      "errors": null,
+      "success": true,
+      "status": "completed"
+    }
+  ],
+  "exported_at": "2025-11-21T11:58:20.942661"
+}

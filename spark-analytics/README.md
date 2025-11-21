@@ -7,12 +7,62 @@ This module handles real-time health metrics analytics processing for the Health
 
 **Analytics**: Comprehensive health insights including 7-day rolling averages, streak tracking, anomaly detection (2σ threshold), and percentile rankings. See [ANALYTICS_GUIDE.md](./ANALYTICS_GUIDE.md) for detailed analytics documentation.
 
+**Real-Time Events**: ✨ Automatically emits `analytics:update` events to the backend SSE system after writing analytics to MongoDB, enabling live dashboard updates without polling.
+
 **Windows Support**: ✅ Includes batch processing mode (`process_batch_windows.py`) to avoid Spark Streaming checkpoint issues on Windows. For streaming mode, WSL2 is recommended. See [WINDOWS_TESTING_SUMMARY.md](./WINDOWS_TESTING_SUMMARY.md) for details.
 
 ## Tech Stack
 - **Language**: Python 3.9+
 - **Framework**: PySpark 3.5+
 - **Database Connector**: PyMongo (for MongoDB integration)
+- **HTTP Client**: Requests (for real-time event emission)
+
+## Key Features
+
+### 🔄 Real-Time Event Emission
+After writing analytics to MongoDB, the Spark job automatically emits events to the backend's Server-Sent Events (SSE) system:
+
+- **Automatic Notification**: Users receive instant updates when new analytics are available
+- **Service Authentication**: Uses `SERVICE_TOKEN` for secure service-to-service communication
+- **Retry Logic**: Exponential backoff with up to 3 retry attempts for transient network failures
+- **Non-Blocking**: Event emission failures don't stop analytics processing
+- **Detailed Payload**: Includes metric type, time range, and complete analytics data
+
+### 📦 Intelligent Batching & Debouncing (NEW)
+For large-scale processing (e.g., 30-day initial sync), the system uses smart batching to optimize performance:
+
+- **Batch Accumulation**: Collects all analytics for a user during processing
+- **Optimized Emission**: Sends one `analytics:batch_update` event per user instead of N individual events
+- **Size Limits**: Caps batches at 50 analytics per event (prevents exceeding SSE ~10KB limit)
+- **Automatic Splitting**: Batches >50 analytics automatically split into multiple events
+- **93%+ Request Reduction**: Dramatically reduces HTTP requests and SSE events during bulk processing
+
+**Event Flow**:
+```
+Single Analytics: Spark → POST /api/events/emit → analytics:update → Frontend
+Batch Processing: Spark → Accumulate → Flush → analytics:batch_update → Frontend (1 event for 50 analytics)
+```
+
+**Performance Benefits**:
+- 30 analytics without batching: 30 HTTP requests, 30 SSE events, 30 frontend re-renders
+- 30 analytics with batching: 1 HTTP request, 1 SSE event, 1 frontend re-render
+- Frontend updates all analytics in a single render cycle
+
+**Configuration Required**:
+- `BACKEND_API_URL`: Backend server URL (e.g., `http://localhost:5000`)
+- `SERVICE_TOKEN`: Shared secret matching backend's `SERVICE_TOKEN` env var
+
+**Testing**:
+```bash
+# Test single event emission
+python test_event_emission.py
+
+# Test batched event emission (simulates large-scale processing)
+python test_batch_events.py
+
+# Test complete end-to-end flow
+python test_realtime_flow.py
+```
 
 ## Architecture
 
@@ -103,7 +153,8 @@ The application maintains two types of checkpoints:
 | `SPARK_APP_NAME` | Name of the Spark application | `HealthMetricsAnalytics` |
 | `BATCH_INTERVAL_SECONDS` | Micro-batch interval in seconds | `60` |
 | `CHECKPOINT_LOCATION` | Directory for Spark checkpoints | `./spark-checkpoints` |
-| `BACKEND_API_URL` | Node.js backend API URL for emitting events | `http://localhost:5000/api` |
+| `BACKEND_API_URL` | Node.js backend API URL for real-time events | `http://localhost:5000` |
+| `SERVICE_TOKEN` | Shared secret for service-to-service authentication | Required for event emission |
 
 ## Running Locally
 

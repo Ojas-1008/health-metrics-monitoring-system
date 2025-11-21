@@ -264,6 +264,82 @@ export const useRealtimeGoals = (callback) => {
 
 /**
  * ============================================
+ * HOOK: useRealtimeAnalytics
+ * ============================================
+ *
+ * Specialized hook for subscribing to analytics events (both single and batch)
+ * Handles both analytics:update and analytics:batch_update event types
+ * Convenience wrapper around useRealtimeEvents
+ *
+ * @param {Function} callback - Callback function for analytics updates
+ *                              Receives normalized data: { analytics: Array, isBatch: boolean }
+ *
+ * @returns {Object} Hook state (same as useRealtimeEvents)
+ *
+ * @example
+ * // Subscribe to both single and batch analytics events
+ * const { isConnected } = useRealtimeAnalytics((data) => {
+ *   if (data.isBatch) {
+ *     console.log(`Batch update: ${data.analytics.length} analytics`);
+ *     // Process multiple analytics at once
+ *     data.analytics.forEach(a => updateAnalyticsDisplay(a));
+ *   } else {
+ *     console.log('Single analytics update');
+ *     updateAnalyticsDisplay(data.analytics[0]);
+ *   }
+ * });
+ */
+export const useRealtimeAnalytics = (callback) => {
+  const { addEventListener, removeEventListener, connectionStatus } = useAuth();
+
+  useEffect(() => {
+    if (!callback || typeof callback !== 'function') return;
+
+    // Normalized callback that handles both event types
+    const normalizedCallback = (eventData) => {
+      if (import.meta.env.DEV) {
+        console.log('[useRealtimeAnalytics] Received event:', eventData);
+      }
+
+      // Normalize the data structure
+      const normalizedData = {
+        analytics: Array.isArray(eventData.analytics) 
+          ? eventData.analytics 
+          : [eventData.analytics],
+        isBatch: eventData.isBatch || false,
+        userId: eventData.userId,
+        totalCount: eventData.totalCount || (Array.isArray(eventData.analytics) ? eventData.analytics.length : 1)
+      };
+
+      callback(normalizedData);
+    };
+
+    // Subscribe to both event types
+    addEventListener('analytics:update', normalizedCallback);
+    addEventListener('analytics:batch_update', normalizedCallback);
+
+    if (import.meta.env.DEV) {
+      console.log('[useRealtimeAnalytics] Subscribed to analytics:update and analytics:batch_update');
+    }
+
+    // Cleanup
+    return () => {
+      removeEventListener('analytics:update', normalizedCallback);
+      removeEventListener('analytics:batch_update', normalizedCallback);
+      if (import.meta.env.DEV) {
+        console.log('[useRealtimeAnalytics] Unsubscribed from analytics events');
+      }
+    };
+  }, [callback, addEventListener, removeEventListener]);
+
+  return {
+    isConnected: connectionStatus?.connected || false,
+    connectionStatus
+  };
+};
+
+/**
+ * ============================================
  * HOOK: useConnectionStatus
  * ============================================
  *

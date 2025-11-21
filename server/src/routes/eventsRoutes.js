@@ -1,7 +1,7 @@
 import express from 'express';
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
-import { protect } from '../middleware/auth.js';
+import { protect, serviceAuth } from '../middleware/auth.js';
 import {
   addConnection,
   removeConnection,
@@ -253,6 +253,186 @@ router.post('/debug/test', protect, (req, res) => {
     userId,
     hasActiveConnections: sentCount > 0
   });
+});
+
+/**
+ * ============================================
+ * SERVICE ENDPOINT: /api/events/emit
+ * ============================================
+ *
+ * @route   POST /api/events/emit
+ * @desc    Emit events to specific user's active SSE connections (service-to-service)
+ * @access  Service (requires valid SERVICE_TOKEN)
+ *
+ * PURPOSE:
+ * Allows backend services (e.g., Spark analytics) to emit real-time events
+ * to users' active SSE connections without requiring user JWT authentication.
+ *
+ * AUTHENTICATION:
+ * - Uses serviceAuth middleware (validates SERVICE_TOKEN)
+ * - Shared secret between backend and Spark analytics
+ * - More secure than exposing user JWT to external services
+ *
+ * REQUEST BODY:
+ * {
+ *   userId: string (required),        // MongoDB ObjectId as string
+ *   eventType: string (required),     // e.g., 'analytics:update', 'analytics:batch_update'
+ *   data: object (required)           // Event payload data
+ * }
+ *
+ * EVENT TYPES:
+ * - analytics:update: Single analytics calculated by Spark
+ *   data: { metricType, timeRange, analytics, operationType }
+ * 
+ * - analytics:batch_update: Batched analytics for optimization (NEW)
+ *   data: { analytics: [...], count, batchIndex, totalBatches }
+ *   Used during large batch processing to send up to 50 analytics per event
+ * 
+ * - analytics:error: Analytics processing error
+ * - sync:complete: Data sync completed
+ * - Any custom event type as needed
+ *
+ * RESPONSE:
+ * {
+ *   success: true,
+ *   message: 'Event emitted successfully',
+ *   userId: '507f1f77bcf86cd799439011',
+ *   eventType: 'analytics:batch_update',
+ *   connectionsNotified: 2,
+ *   hasActiveConnections: true,
+ *   batchSize: 25  // Only for batch events
+ * }
+ *
+ * EXAMPLE FROM SPARK (Single):
+ * payload = {
+ *   'userId': '507f1f77bcf86cd799439011',
+ *   'eventType': 'analytics:update',
+ *   'data': {
+ *     'metricType': 'steps',
+ *     'timeRange': '7day',
+ *     'analytics': { ... }
+ *   }
+ * }
+ *
+ * EXAMPLE FROM SPARK (Batch):
+ * payload = {
+ *   'userId': '507f1f77bcf86cd799439011',
+ *   'eventType': 'analytics:batch_update',
+ *   'data': {
+ *     'analytics': [
+ *       { metricType: 'steps', timeRange: '7day', analytics: {...} },
+ *       { metricType: 'calories', timeRange: '7day', analytics: {...} },
+ *       ...up to 50 items
+ *     ],
+ *     'count': 25,
+ *     'batchIndex': 1,
+ *     'totalBatches': 2
+ *   }
+ * }
+ *
+ * SECURITY NOTES:
+ * - SERVICE_TOKEN must be kept secret and never exposed to clients
+ * - Should only be called by trusted backend services
+ * - Validates userId format but doesn't verify user exists (performance)
+ * - Rate limiting recommended for production
+ */
+router.post('/emit', serviceAuth, (req, res) => {
+  try {
+    // ===== STEP 1: Extract and Validate Request Body =====
+    
+    const { userId, eventType, data } = req.body;
+
+    // Validate required fields
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'userId is required',
+        error: 'MISSING_USER_ID'
+      });
+    }
+
+    if (!eventType) {
+      return res.status(400).json({
+        success: false,
+        message: 'eventType is required',
+        error: 'MISSING_EVENT_TYPE'
+      });
+    }
+
+    if (!data || typeof data !== 'object') {
+      return res.status(400).json({
+        success: false,
+        message: 'data must be a valid object',
+        error: 'INVALID_DATA'
+      });
+    }
+
+    // Validate userId format (MongoDB ObjectId: 24 hex characters)
+    const objectIdRegex = /^[0-9a-fA-F]{24}$/;
+    if (!objectIdRegex.test(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'userId must be a valid MongoDB ObjectId',
+        error: 'INVALID_USER_ID_FORMAT'
+      });
+    }
+
+    // ===== STEP 2: Emit Event to User's Active Connections =====
+
+    console.log(`[Events API] Emitting event: ${eventType} to user: ${userId}`);
+    
+    // Log batch size for batch events
+    if (eventType === 'analytics:batch_update' && data.analytics && Array.isArray(data.analytics)) {
+      console.log(`[Events API] Batch event with ${data.analytics.length} analytics (batch ${data.batchIndex}/${data.totalBatches})`);
+    } else {
+      console.log(`[Events API] Event data:`, JSON.stringify(data, null, 2));
+    }
+
+    const connectionsNotified = emitToUser(userId, eventType, data);
+
+    // ===== STEP 3: Log Result =====
+
+    if (connectionsNotified === 0) {
+      console.log(`[Events API] No active connections for user ${userId}, event queued`);
+    } else {
+      const batchInfo = eventType === 'analytics:batch_update' && data.analytics 
+        ? ` (${data.analytics.length} analytics)` 
+        : '';
+      console.log(`[Events API] Event sent to ${connectionsNotified} connection(s)${batchInfo}`);
+    }
+
+    // ===== STEP 4: Return Success Response =====
+
+    const response = {
+      success: true,
+      message: 'Event emitted successfully',
+      userId,
+      eventType,
+      connectionsNotified,
+      hasActiveConnections: connectionsNotified > 0
+    };
+    
+    // Add batch info for batch events
+    if (eventType === 'analytics:batch_update' && data.analytics) {
+      response.batchSize = data.analytics.length;
+      response.batchIndex = data.batchIndex;
+      response.totalBatches = data.totalBatches;
+    }
+
+    return res.status(200).json(response);
+
+  } catch (error) {
+    // ===== ERROR HANDLING =====
+
+    console.error('[Events API] Error emitting event:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to emit event',
+      error: 'EVENT_EMISSION_ERROR',
+      details: error.message
+    });
+  }
 });
 
 /**

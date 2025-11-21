@@ -1,0 +1,43 @@
+# HELP batches_processed_total Total number of batches processed
+# TYPE batches_processed_total counter
+batches_processed_total 6 1763706245978
+
+# HELP batches_succeeded_total Total number of successful batches
+# TYPE batches_succeeded_total counter
+batches_succeeded_total 4 1763706245978
+
+# HELP batches_failed_total Total number of failed batches
+# TYPE batches_failed_total counter
+batches_failed_total 2 1763706245978
+
+# HELP analytics_written_total Total number of analytics records written
+# TYPE analytics_written_total counter
+analytics_written_total 65 1763706245978
+
+# HELP analytics_inserted_total Total number of analytics records inserted
+# TYPE analytics_inserted_total counter
+analytics_inserted_total 42 1763706245978
+
+# HELP analytics_updated_total Total number of analytics records updated
+# TYPE analytics_updated_total counter
+analytics_updated_total 17 1763706245978
+
+# HELP analytics_skipped_total Total number of analytics records skipped
+# TYPE analytics_skipped_total counter
+analytics_skipped_total 6 1763706245978
+
+# HELP records_processed_total Total number of health metrics records processed
+# TYPE records_processed_total counter
+records_processed_total 300 1763706245978
+
+# HELP errors_total Total number of errors encountered
+# TYPE errors_total counter
+errors_total 3 1763706245978
+
+# HELP processing_time_seconds Total processing time in seconds
+# TYPE processing_time_seconds gauge
+processing_time_seconds 1.809 1763706245978
+
+# HELP average_processing_time_ms Average processing time per batch in milliseconds
+# TYPE average_processing_time_ms gauge
+average_processing_time_ms 301.50 1763706245978

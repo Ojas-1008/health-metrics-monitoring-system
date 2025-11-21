@@ -11,6 +11,15 @@ from pyspark.sql.types import (
     IntegerType, BooleanType, TimestampType, DateType
 )
 
+# Import event emitter for real-time notifications
+try:
+    from event_emitter import add_to_batch, emit_batched_analytics, flush_all_batches
+    EVENT_EMITTER_AVAILABLE = True
+except ImportError:
+    EVENT_EMITTER_AVAILABLE = False
+    print("⚠️  WARNING: event_emitter module not found. Real-time events will be skipped.")
+
+
 
 def get_analytics_schema():
     """
@@ -228,6 +237,23 @@ def save_analytics_to_mongodb(spark_session, analytics_list, batch_id=None):
                 
                 print(f"   {'🆕' if operation_type == 'insert' else '🔄'} {operation_type.upper()}: userId={doc['userId']}, metric={doc['metricType']}, range={doc['timeRange']}")
                 print(f"      Values: rollingAvg={rolling_avg}, trend={trend}, anomaly={anomaly}")
+                
+                # ===== ADD TO BATCH FOR DEBOUNCED EVENT EMISSION =====
+                # Instead of emitting individual events, collect analytics in batch
+                # This prevents overwhelming SSE clients during large batch processing
+                # Batches are automatically sent when user has enough analytics or at end of job
+                if EVENT_EMITTER_AVAILABLE:
+                    try:
+                        add_to_batch(
+                            user_id=doc['userId'],
+                            metric_type=doc['metricType'],
+                            time_range=doc['timeRange'],
+                            analytics_data=doc.get('analytics', {}),
+                            operation_type=operation_type
+                        )
+                    except Exception as batch_error:
+                        # Don't fail the entire batch if batching fails
+                        print(f"      ⚠️  Batch accumulation error: {str(batch_error)}")
         
         result['records_written'] = inserts + updates
         result['inserts'] = inserts
@@ -243,6 +269,21 @@ def save_analytics_to_mongodb(spark_session, analytics_list, batch_id=None):
         # Log batch context if provided
         if batch_id:
             print(f"   Batch ID: {batch_id}")
+        
+        # ===== FLUSH ACCUMULATED BATCHES TO SSE =====
+        # After all analytics are written to MongoDB, send batched events
+        # This sends one aggregated event per user instead of N individual events
+        if EVENT_EMITTER_AVAILABLE and (inserts + updates) > 0:
+            try:
+                print(f"\n📡 Emitting batched analytics events...")
+                batch_stats = flush_all_batches()
+                
+                if batch_stats['batches_sent'] > 0:
+                    print(f"   ✅ Sent {batch_stats['batches_sent']} batch event(s) for {batch_stats['users_processed']} user(s)")
+                    print(f"   📊 Total analytics in events: {batch_stats['analytics_sent']}")
+            except Exception as flush_error:
+                print(f"   ⚠️  Batch flush error: {str(flush_error)}")
+                print(f"      Analytics saved to DB but events may not have been sent")
         
         # Close connection
         client.close()

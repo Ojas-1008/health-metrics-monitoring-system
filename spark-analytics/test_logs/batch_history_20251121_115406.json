@@ -1,0 +1,133 @@
+{
+  "session_metrics": {
+    "batches_processed_total": 6,
+    "batches_succeeded": 4,
+    "batches_failed": 2,
+    "analytics_written_total": 65,
+    "analytics_inserted_total": 42,
+    "analytics_updated_total": 17,
+    "analytics_skipped_total": 6,
+    "records_processed_total": 300,
+    "errors_total": 3,
+    "total_processing_time_ms": 1809,
+    "session_start": "2025-11-21T11:54:03.996974",
+    "average_processing_time_ms": 301.5
+  },
+  "batch_history": [
+    {
+      "batch_id": "test_batch_001",
+      "start_time": "2025-11-21T11:54:04.001165",
+      "end_time": "2025-11-21T11:54:04.503302",
+      "processing_time_ms": 502,
+      "records_processed": 50,
+      "analytics_computed": 15,
+      "analytics_written": 15,
+      "analytics_inserted": 10,
+      "analytics_updated": 5,
+      "analytics_skipped": 0,
+      "errors_count": 0,
+      "errors": null,
+      "success": true,
+      "status": "completed"
+    },
+    {
+      "batch_id": "test_batch_002",
+      "start_time": "2025-11-21T11:54:04.553892",
+      "end_time": "2025-11-21T11:54:04.854581",
+      "processing_time_ms": 300,
+      "records_processed": 0,
+      "analytics_computed": 0,
+      "analytics_written": 0,
+      "analytics_inserted": 0,
+      "analytics_updated": 0,
+      "analytics_skipped": 0,
+      "errors_count": 1,
+      "errors": [
+        {
+          "message": "MongoDB write error: Connection timeout",
+          "details": {
+            "timeout": 30,
+            "retry_attempts": 3
+          },
+          "timestamp": "2025-11-21T11:54:04.854581"
+        }
+      ],
+      "success": false,
+      "status": "failed"
+    },
+    {
+      "batch_id": "test_batch_003",
+      "start_time": "2025-11-21T11:54:04.907701",
+      "end_time": "2025-11-21T11:54:05.110219",
+      "processing_time_ms": 202,
+      "records_processed": 60,
+      "analytics_computed": 13,
+      "analytics_written": 13,
+      "analytics_inserted": 8,
+      "analytics_updated": 3,
+      "analytics_skipped": 2,
+      "errors_count": 0,
+      "errors": null,
+      "success": true,
+      "status": "completed"
+    },
+    {
+      "batch_id": "test_batch_004",
+      "start_time": "2025-11-21T11:54:05.119638",
+      "end_time": "2025-11-21T11:54:05.322175",
+      "processing_time_ms": 202,
+      "records_processed": 70,
+      "analytics_computed": 14,
+      "analytics_written": 14,
+      "analytics_inserted": 9,
+      "analytics_updated": 3,
+      "analytics_skipped": 2,
+      "errors_count": 0,
+      "errors": null,
+      "success": true,
+      "status": "completed"
+    },
+    {
+      "batch_id": "test_batch_005",
+      "start_time": "2025-11-21T11:54:05.331301",
+      "end_time": "2025-11-21T11:54:05.533934",
+      "processing_time_ms": 202,
+      "records_processed": 80,
+      "analytics_computed": 15,
+      "analytics_written": 15,
+      "analytics_inserted": 10,
+      "analytics_updated": 3,
+      "analytics_skipped": 2,
+      "errors_count": 0,
+      "errors": null,
+      "success": true,
+      "status": "completed"
+    },
+    {
+      "batch_id": "test_batch_006",
+      "start_time": "2025-11-21T11:54:05.547020",
+      "end_time": "2025-11-21T11:54:05.948790",
+      "processing_time_ms": 401,
+      "records_processed": 40,
+      "analytics_computed": 10,
+      "analytics_written": 8,
+      "analytics_inserted": 5,
+      "analytics_updated": 3,
+      "analytics_skipped": 0,
+      "errors_count": 2,
+      "errors": [
+        {
+          "message": "Network latency detected",
+          "severity": "warning"
+        },
+        {
+          "message": "Failed to write 2 records to DLQ",
+          "type": "dlq_error"
+        }
+      ],
+      "success": false,
+      "status": "failed"
+    }
+  ],
+  "exported_at": "2025-11-21T11:54:06.076859"
+}

@@ -10,6 +10,12 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from pyspark.sql import SparkSession
 
+# Set UTF-8 encoding for Windows console
+if sys.platform == 'win32':
+    import codecs
+    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
+    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
+
 # Set up Hadoop environment for Windows
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 HADOOP_HOME = os.path.join(SCRIPT_DIR, 'hadoop')

@@ -198,12 +198,11 @@ export const addOrUpdateMetrics = asyncHandler(async (req, res, next) => {
   // Use sanitized metrics (wearable fields stripped)
   const sanitizedMetrics = validation.sanitized;
 
-  // Date validation
-  const normalizedDate = new Date(date);
-  normalizedDate.setHours(0, 0, 0, 0);
+  // Date validation - parse as UTC to match MongoDB storage
+  const normalizedDate = new Date(date + 'T00:00:00.000Z');
 
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  today.setUTCHours(0, 0, 0, 0);
 
   if (normalizedDate > today) {
     return next(
@@ -302,15 +301,13 @@ export const getMetricsByDateRange = asyncHandler(async (req, res, next) => {
     );
   }
 
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  // Parse dates as UTC to match MongoDB storage
+  const start = new Date(startDate + 'T00:00:00.000Z');
+  const end = new Date(endDate + 'T23:59:59.999Z');
 
   if (isNaN(start.getTime()) || isNaN(end.getTime())) {
     return next(new ErrorResponse("Invalid date format", 400));
   }
-
-  start.setHours(0, 0, 0, 0);
-  end.setHours(23, 59, 59, 999);
 
   if (start > end) {
     return next(
@@ -355,12 +352,12 @@ export const getMetricsByDate = asyncHandler(async (req, res, next) => {
     return next(new ErrorResponse("Date parameter is required", 400));
   }
 
-  const queryDate = new Date(date);
+  // Parse date as UTC to avoid timezone issues
+  const queryDate = new Date(date + 'T00:00:00.000Z');
+  
   if (isNaN(queryDate.getTime())) {
     return next(new ErrorResponse("Invalid date format", 400));
   }
-
-  queryDate.setHours(0, 0, 0, 0);
 
   const healthMetric = await HealthMetric.findOne({
     userId: req.user._id,
@@ -415,12 +412,11 @@ export const updateMetric = asyncHandler(async (req, res, next) => {
     );
   }
 
-  const queryDate = new Date(date);
+  // Parse date as UTC to match MongoDB storage
+  const queryDate = new Date(date + 'T00:00:00.000Z');
   if (isNaN(queryDate.getTime())) {
     return next(new ErrorResponse("Invalid date format", 400));
   }
-
-  queryDate.setHours(0, 0, 0, 0);
 
   // Find existing metric
   const existingMetric = await HealthMetric.findOne({
@@ -486,12 +482,11 @@ export const deleteMetrics = asyncHandler(async (req, res, next) => {
     return next(new ErrorResponse("Date parameter is required", 400));
   }
 
-  const queryDate = new Date(date);
+  // Parse date as UTC to match MongoDB storage
+  const queryDate = new Date(date + 'T00:00:00.000Z');
   if (isNaN(queryDate.getTime())) {
     return next(new ErrorResponse("Invalid date format", 400));
   }
-
-  queryDate.setHours(0, 0, 0, 0);
 
   const healthMetric = await HealthMetric.findOneAndDelete({
     userId: req.user._id,

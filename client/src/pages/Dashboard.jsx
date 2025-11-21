@@ -30,6 +30,7 @@ import * as dateUtils from '../utils/dateUtils';
 import { useRealtimeMetrics, useRealtimeSync, useConnectionStatus } from '../hooks/useRealtimeEvents';
 import Toast from '../components/common/Toast';
 import GoogleFitStatus from '../components/dashboard/GoogleFitStatus';
+import AnalyticsMonitor from '../components/dashboard/AnalyticsMonitor';
 
 // Existing component imports...
 import MetricsForm from '../components/dashboard/MetricsForm';
@@ -1642,6 +1643,11 @@ const Dashboard = () => {
               />
             </div>
           )}
+
+          {/* ===== NEW: ANALYTICS MONITOR SECTION ===== */}
+          <div className="mb-8">
+            <AnalyticsMonitor />
+          </div>
 
           {/* ===== ADVANCED COLLAPSIBLE FORM SECTION ===== */}
           <div className="mb-8">

@@ -183,8 +183,92 @@ const optionalAuth = async (req, res, next) => {
 
 /**
  * ============================================
+ * SERVICE AUTHENTICATION MIDDLEWARE
+ * ============================================
+ *
+ * Purpose: Validate service-to-service authentication using shared secret token
+ * Use case: Allow backend services (e.g., Spark analytics) to emit events without user JWT
+ *
+ * Security:
+ * - Uses SERVICE_TOKEN environment variable as shared secret
+ * - Token must be sent in Authorization header as "Bearer <token>"
+ * - Returns 403 Forbidden if token is missing, invalid, or doesn't match
+ *
+ * Usage in routes:
+ * router.post('/api/events/emit', serviceAuth, emitEventHandler);
+ *
+ * Example request from Spark:
+ * POST /api/events/emit
+ * Authorization: Bearer <SERVICE_TOKEN>
+ * Body: { userId, eventType: 'analytics:update', data: {...} }
+ */
+
+const serviceAuth = (req, res, next) => {
+  let token;
+
+  try {
+    // ===== STEP 1: Extract Token from Authorization Header =====
+
+    if (
+      req.headers.authorization &&
+      req.headers.authorization.startsWith("Bearer")
+    ) {
+      token = req.headers.authorization.split(" ")[1];
+    }
+
+    // ===== STEP 2: Check if Token Exists =====
+
+    if (!token) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Service token required.",
+        error: "MISSING_SERVICE_TOKEN",
+      });
+    }
+
+    // ===== STEP 3: Validate SERVICE_TOKEN Configuration =====
+
+    const serviceToken = process.env.SERVICE_TOKEN;
+
+    if (!serviceToken) {
+      console.error("❌ SERVICE_TOKEN not configured in environment variables");
+      return res.status(500).json({
+        success: false,
+        message: "Service authentication not configured.",
+        error: "SERVICE_TOKEN_NOT_CONFIGURED",
+      });
+    }
+
+    // ===== STEP 4: Verify Token Matches SERVICE_TOKEN =====
+
+    if (token !== serviceToken) {
+      console.warn("⚠️  Invalid service token attempt");
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Invalid service token.",
+        error: "INVALID_SERVICE_TOKEN",
+      });
+    }
+
+    // ===== STEP 5: Token Valid - Proceed =====
+
+    console.log("✅ Service authentication successful");
+    next();
+
+  } catch (error) {
+    console.error("Service Auth Middleware Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Service authentication failed due to server error.",
+      error: "SERVICE_AUTH_ERROR",
+    });
+  }
+};
+
+/**
+ * ============================================
  * EXPORT MIDDLEWARE FUNCTIONS
  * ============================================
  */
 
-export { protect, optionalAuth };
+export { protect, optionalAuth, serviceAuth };
