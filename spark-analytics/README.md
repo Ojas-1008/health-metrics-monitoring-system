@@ -98,6 +98,8 @@ The application maintains two types of checkpoints:
 | `MONGO_DB_NAME` | Database name | `health-metrics` |
 | `ANALYTICS_COLLECTION` | Collection for storing analytics results | `analytics` |
 | `DLQ_DIRECTORY` | Directory for dead-letter queue (failed writes) | `./dlq` |
+| `LOG_DIRECTORY` | Directory for batch processing logs | `./logs` |
+| `METRICS_DIRECTORY` | Directory for Prometheus metrics files | `./metrics` |
 | `SPARK_APP_NAME` | Name of the Spark application | `HealthMetricsAnalytics` |
 | `BATCH_INTERVAL_SECONDS` | Micro-batch interval in seconds | `60` |
 | `CHECKPOINT_LOCATION` | Directory for Spark checkpoints | `./spark-checkpoints` |
@@ -506,11 +508,45 @@ The analytics system writes processed results to MongoDB using a structured sche
 ### Key Features
 
 - ✅ **Schema Validation**: DataFrame schema matches Mongoose Analytics model exactly
-- ✅ **Append Mode**: Preserves historical analytics, TTL index handles expiration
+- ✅ **Upsert Logic**: Prevents duplicates by replacing existing analytics with newer timestamps
+- ✅ **Timestamp Comparison**: Only updates if new `calculatedAt` is newer than existing
+- ✅ **Detailed Logging**: Logs each operation as insert, update, or skip with metric values
 - ✅ **Error Handling**: Comprehensive error catching with detailed logging
 - ✅ **Dead-Letter Queue**: Failed records saved to DLQ for retry
 - ✅ **Retry Mechanism**: Automatic retry of failed writes from DLQ
 - ✅ **Batch Context**: All writes tagged with batch_id for traceability
+
+### Upsert Logic
+
+To prevent duplicate analytics entries for the same user/metric/timeRange, the system implements an intelligent upsert pattern:
+
+1. **Unique Filter**: Each document is identified by the tuple `(userId, metricType, timeRange)`
+2. **Timestamp Comparison**: Before writing, the system checks if an existing document exists
+3. **Smart Decision**:
+   - If no existing document: **INSERT** (new analytics)
+   - If existing document with older timestamp: **UPDATE** (replace with newer data)
+   - If existing document with same or newer timestamp: **SKIP** (keep existing data)
+
+This ensures:
+- Only the most recent analytics per user/metric/timeRange are stored
+- No manual deduplication needed in backend queries
+- Simple retrieval with `getLatestAnalytics` endpoint
+- Reduced storage overhead
+
+**Example Log Output**:
+```
+📊 Upserting 5 analytics records to MongoDB...
+   🆕 INSERT: userId=123, metric=steps, range=7day
+      Values: rollingAvg=8500.0, trend=up, anomaly=False
+   🔄 UPDATE: userId=123, metric=calories, range=7day
+      Values: rollingAvg=2500.0, trend=stable, anomaly=False
+   ⏭️  Skipped (userId=123, metric=weight, range=7day): existing timestamp 2025-11-21T10:00:00 >= new 2025-11-21T09:00:00
+
+✅ Successfully upserted analytics records to MongoDB
+   📥 Inserts: 3
+   🔄 Updates: 1
+   ⏭️  Skipped: 1
+```
 
 ### Quick Start
 
@@ -561,6 +597,243 @@ Analytics records have the following nested structure:
 ```powershell
 # Run comprehensive test suite
 python test_mongodb_write.py
+```
+
+## Batch Processing Logging & Monitoring
+
+The analytics system includes comprehensive logging and monitoring capabilities for tracking batch processing performance, errors, and metrics.
+
+### Features
+
+- ✅ **Structured Logging**: JSON log files for machine analysis + human-readable console output
+- ✅ **Batch Statistics**: Tracks records processed, analytics computed, write operations, errors
+- ✅ **Processing Time Metrics**: Millisecond-precision timing for each batch
+- ✅ **Emoji Indicators**: Visual success/failure indicators in console output
+- ✅ **Session Summaries**: Aggregated statistics across all batches in a session
+- ✅ **Prometheus Integration**: Metrics file in Prometheus text format for monitoring
+- ✅ **Batch History Export**: Complete processing history exported to JSON
+
+### Log Output Formats
+
+#### Console Output (Human-Readable)
+
+**Successful Batch:**
+```
+✅ Batch batch_123 completed: 50 records → 20 analytics (450ms)
+   📥 Inserts: 15 | 🔄 Updates: 5 | ⏭️  Skipped: 0
+```
+
+**Failed Batch:**
+```
+❌ Batch batch_124 failed: MongoDB write error
+   Records Processed: 50
+   Analytics Computed: 20
+   Errors: 1
+   Processing Time: 1200ms
+```
+
+#### JSON Log Files (Machine-Readable)
+
+Location: `./logs/batch_logs_YYYYMMDD.jsonl` (JSON Lines format)
+
+```json
+{
+  "batch_id": "batch_123",
+  "start_time": "2025-11-21T10:00:00.123456",
+  "end_time": "2025-11-21T10:00:00.573456",
+  "processing_time_ms": 450,
+  "records_processed": 50,
+  "analytics_computed": 20,
+  "analytics_written": 20,
+  "analytics_inserted": 15,
+  "analytics_updated": 5,
+  "analytics_skipped": 0,
+  "errors_count": 0,
+  "errors": null,
+  "success": true,
+  "status": "completed"
+}
+```
+
+### Prometheus Metrics
+
+Location: `./metrics/spark_analytics_metrics.prom`
+
+**Available Metrics:**
+- `batches_processed_total` - Total batches processed (counter)
+- `batches_succeeded_total` - Successful batches (counter)
+- `batches_failed_total` - Failed batches (counter)
+- `analytics_written_total` - Total analytics written (counter)
+- `analytics_inserted_total` - New analytics inserted (counter)
+- `analytics_updated_total` - Analytics updated (counter)
+- `analytics_skipped_total` - Analytics skipped (counter)
+- `records_processed_total` - Health metrics processed (counter)
+- `errors_total` - Total errors encountered (counter)
+- `processing_time_seconds` - Total processing time (gauge)
+- `average_processing_time_ms` - Average time per batch (gauge)
+
+**Example Metrics File:**
+```
+# HELP batches_processed_total Total number of batches processed
+# TYPE batches_processed_total counter
+batches_processed_total 42 1732188000000
+
+# HELP analytics_written_total Total number of analytics records written
+# TYPE analytics_written_total counter
+analytics_written_total 840 1732188000000
+
+# HELP average_processing_time_ms Average processing time per batch in milliseconds
+# TYPE average_processing_time_ms gauge
+average_processing_time_ms 325.50 1732188000000
+```
+
+### Monitoring Integration
+
+#### Option 1: Prometheus File Scraping
+
+Configure Prometheus to scrape the metrics file:
+
+```yaml
+# prometheus.yml
+scrape_configs:
+  - job_name: 'spark_analytics'
+    file_sd_configs:
+      - files:
+        - '/path/to/spark-analytics/metrics/*.prom'
+```
+
+#### Option 2: Custom HTTP Exporter
+
+Create a simple HTTP server to expose metrics:
+
+```python
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from pathlib import Path
+
+class MetricsHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == '/metrics':
+            metrics_file = Path('./metrics/spark_analytics_metrics.prom')
+            if metrics_file.exists():
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/plain')
+                self.end_headers()
+                self.wfile.write(metrics_file.read_bytes())
+            else:
+                self.send_response(404)
+                self.end_headers()
+
+server = HTTPServer(('0.0.0.0', 9090), MetricsHandler)
+server.serve_forever()
+```
+
+#### Option 3: Datadog Integration
+
+Parse JSON logs and send to Datadog:
+
+```python
+import json
+from datadog import initialize, api
+
+initialize(api_key='YOUR_API_KEY', app_key='YOUR_APP_KEY')
+
+# Read latest batch log
+with open('./logs/batch_logs_20251121.jsonl', 'r') as f:
+    for line in f:
+        batch = json.loads(line)
+        api.Metric.send(
+            metric='spark.batch.processing_time',
+            points=[(batch['end_time'], batch['processing_time_ms'])],
+            tags=[f"status:{batch['status']}", f"batch:{batch['batch_id']}"]
+        )
+```
+
+### Session Summary
+
+At the end of each session, a comprehensive summary is printed and exported:
+
+```
+================================================================================
+📊 BATCH PROCESSING SESSION SUMMARY
+================================================================================
+
+⏱️  Session Duration: 3600.00 seconds
+
+📦 Batches:
+   Total: 42
+   ✅ Succeeded: 40
+   ❌ Failed: 2
+   Success Rate: 95.2%
+
+📊 Analytics:
+   Total Written: 840
+   📥 Inserted: 600
+   🔄 Updated: 220
+   ⏭️  Skipped: 20
+
+📈 Processing:
+   Records Processed: 2100
+   Total Time: 13680ms
+   Average Time: 325.71ms per batch
+
+⚠️  Errors: 2
+
+================================================================================
+```
+
+### Testing the Logger
+
+```bash
+# Test batch logger functionality
+python test_batch_logger.py
+```
+
+Expected output demonstrates:
+- ✅ Successful batch logging with statistics
+- ❌ Failed batch logging with error details
+- 📦 Multiple batch processing
+- ⚠️  Partial success with warnings
+- 📊 Session summary generation
+- 📁 Log file creation and verification
+- 📈 Metrics file creation
+- 📤 Batch history export
+
+### Log Analysis
+
+#### Query Successful Batches
+```bash
+# Using jq to analyze JSON logs
+cat logs/batch_logs_*.jsonl | jq 'select(.success == true)'
+```
+
+#### Calculate Average Processing Time
+```bash
+cat logs/batch_logs_*.jsonl | jq '.processing_time_ms' | awk '{sum+=$1; count++} END {print sum/count " ms"}'
+```
+
+#### Find Failed Batches
+```bash
+cat logs/batch_logs_*.jsonl | jq 'select(.success == false) | {batch_id, errors}'
+```
+
+#### Aggregate Statistics
+```python
+import json
+
+stats = {'total': 0, 'success': 0, 'failed': 0, 'total_time': 0}
+
+with open('./logs/batch_logs_20251121.jsonl', 'r') as f:
+    for line in f:
+        batch = json.loads(line)
+        stats['total'] += 1
+        stats['total_time'] += batch['processing_time_ms']
+        if batch['success']:
+            stats['success'] += 1
+        else:
+            stats['failed'] += 1
+
+print(f"Success Rate: {stats['success']/stats['total']*100:.1f}%")
+print(f"Average Time: {stats['total_time']/stats['total']:.2f}ms")
 ```
 
 Tests include:

@@ -90,13 +90,22 @@ def get_analytics_schema():
 
 def save_analytics_to_mongodb(spark_session, analytics_list, batch_id=None):
     """
-    Convert analytics list to Spark DataFrame and write to MongoDB analytics collection.
+    Convert analytics list to properly structured documents and upsert to MongoDB analytics collection.
     
     This function:
-    1. Creates a DataFrame from the analytics list using the correct schema
-    2. Writes to MongoDB using append mode (preserves historical data)
-    3. Handles errors with comprehensive logging and DLQ for failed records
-    4. Allows TTL index to handle data expiration automatically
+    1. Creates structured documents from the analytics list using the correct schema
+    2. Uses upsert pattern to prevent duplicates - replaces documents with same (userId, metricType, timeRange)
+    3. Only updates if new calculatedAt timestamp is newer than existing document
+    4. Logs each operation as insert, update, or skip with detailed metric values
+    5. Handles errors with comprehensive logging and DLQ for failed records
+    6. Allows TTL index to handle data expiration automatically
+    
+    Upsert Logic:
+    - Filter by unique tuple: (userId, metricType, timeRange)
+    - Check existing document's calculatedAt timestamp
+    - Skip if new timestamp is older or equal to existing
+    - Replace if new timestamp is newer (update)
+    - Insert if no existing document found
     
     Args:
         spark_session: Active SparkSession instance
@@ -104,7 +113,7 @@ def save_analytics_to_mongodb(spark_session, analytics_list, batch_id=None):
         batch_id: Optional batch identifier for logging context
         
     Returns:
-        dict: Write operation results with status, count, and any errors
+        dict: Write operation results with status, count, inserts, updates, skipped, and any errors
     """
     
     # Get environment configuration
@@ -131,8 +140,8 @@ def save_analytics_to_mongodb(spark_session, analytics_list, batch_id=None):
     result['records_processed'] = len(analytics_list)
     
     try:
-        # Use PyMongo for direct write (more reliable than Spark DataFrame on Windows)
-        print(f"📊 Writing {len(analytics_list)} analytics records directly to MongoDB...")
+        # Use PyMongo for direct write with upsert logic (more reliable than Spark DataFrame on Windows)
+        print(f"📊 Upserting {len(analytics_list)} analytics records to MongoDB...")
         
         from pymongo import MongoClient
         from datetime import datetime, date
@@ -163,13 +172,73 @@ def save_analytics_to_mongodb(spark_session, analytics_list, batch_id=None):
         # Prepare records
         prepared_records = [prepare_for_mongo(r) for r in analytics_list]
         
-        # Insert many records
-        insert_result = collection.insert_many(prepared_records, ordered=False)
+        # Perform upsert for each record to prevent duplicates
+        # Only insert/update if the new calculatedAt is newer than existing
+        inserts = 0
+        updates = 0
+        skipped = 0
         
-        result['records_written'] = len(insert_result.inserted_ids)
+        for doc in prepared_records:
+            # Build unique filter for this analytics document
+            filter_query = {
+                'userId': doc['userId'],
+                'metricType': doc['metricType'],
+                'timeRange': doc['timeRange']
+            }
+            
+            # Check if document exists with newer calculatedAt
+            existing_doc = collection.find_one(filter_query, {'calculatedAt': 1})
+            
+            should_upsert = True
+            operation_type = 'insert'
+            
+            if existing_doc:
+                # Compare calculatedAt timestamps
+                existing_ts = existing_doc.get('calculatedAt')
+                new_ts = doc['calculatedAt']
+                
+                # Handle string comparison (ISO format strings compare correctly)
+                if isinstance(existing_ts, str) and isinstance(new_ts, str):
+                    if new_ts <= existing_ts:
+                        should_upsert = False
+                        skipped += 1
+                        print(f"   ⏭️  Skipped (userId={doc['userId']}, metric={doc['metricType']}, range={doc['timeRange']}): existing timestamp {existing_ts} >= new {new_ts}")
+                    else:
+                        operation_type = 'update'
+                
+            if should_upsert:
+                # Perform upsert operation
+                upsert_result = collection.replace_one(
+                    filter_query,
+                    doc,
+                    upsert=True
+                )
+                
+                if upsert_result.upserted_id:
+                    inserts += 1
+                    operation_type = 'insert'
+                elif upsert_result.modified_count > 0:
+                    updates += 1
+                    operation_type = 'update'
+                
+                # Log the upsert operation
+                rolling_avg = doc.get('analytics', {}).get('rollingAverage', 'N/A')
+                trend = doc.get('analytics', {}).get('trend', 'N/A')
+                anomaly = doc.get('analytics', {}).get('anomalyDetected', False)
+                
+                print(f"   {'🆕' if operation_type == 'insert' else '🔄'} {operation_type.upper()}: userId={doc['userId']}, metric={doc['metricType']}, range={doc['timeRange']}")
+                print(f"      Values: rollingAvg={rolling_avg}, trend={trend}, anomaly={anomaly}")
+        
+        result['records_written'] = inserts + updates
+        result['inserts'] = inserts
+        result['updates'] = updates
+        result['skipped'] = skipped
         result['success'] = True
         
-        print(f"✅ Successfully wrote {result['records_written']} analytics records to MongoDB")
+        print(f"✅ Successfully upserted analytics records to MongoDB")
+        print(f"   📥 Inserts: {inserts}")
+        print(f"   🔄 Updates: {updates}")
+        print(f"   ⏭️  Skipped: {skipped}")
         
         # Log batch context if provided
         if batch_id:

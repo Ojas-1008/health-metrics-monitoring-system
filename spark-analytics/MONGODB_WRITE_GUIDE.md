@@ -112,7 +112,9 @@ StructType([
 
 ## Write Operations
 
-### Basic Write
+### Upsert Logic (Prevents Duplicates)
+
+The system uses an intelligent **upsert pattern** to prevent duplicate analytics entries for the same user/metric/timeRange combination:
 
 ```python
 from mongodb_utils import save_analytics_to_mongodb
@@ -120,7 +122,7 @@ from mongodb_utils import save_analytics_to_mongodb
 # Convert DataFrame to structured records
 analytics_list = convert_analytics_df_to_records(analytics_df)
 
-# Write to MongoDB
+# Write to MongoDB with upsert logic
 result = save_analytics_to_mongodb(
     spark_session=spark,
     analytics_list=analytics_list,
@@ -129,29 +131,103 @@ result = save_analytics_to_mongodb(
 
 # Check results
 print(f"Success: {result['success']}")
-print(f"Records written: {result['records_written']}")
-print(f"Records failed: {result['records_failed']}")
+print(f"Inserts: {result['inserts']}")        # New documents
+print(f"Updates: {result['updates']}")        # Replaced documents
+print(f"Skipped: {result['skipped']}")        # Older timestamp ignored
+print(f"Total written: {result['records_written']}")
 ```
 
-### Write Mode
+### How Upsert Works
 
-The implementation uses **`append` mode** instead of `overwrite`:
+For each analytics document, the system:
+
+1. **Identifies the document** using unique tuple: `(userId, metricType, timeRange)`
+2. **Checks existing document** for matching tuple in MongoDB
+3. **Compares timestamps**:
+   - If no existing document → **INSERT** (new analytics)
+   - If existing document has older `calculatedAt` → **UPDATE** (replace)
+   - If existing document has same/newer `calculatedAt` → **SKIP** (keep existing)
 
 ```python
-analytics_df.write \
-    .format("mongodb") \
-    .mode("append") \              # Preserves historical data
-    .option("database", db_name) \
-    .option("collection", "analytics") \
-    .save()
+# Example upsert logic (simplified)
+filter_query = {
+    'userId': doc['userId'],
+    'metricType': doc['metricType'],
+    'timeRange': doc['timeRange']
+}
+
+existing_doc = collection.find_one(filter_query, {'calculatedAt': 1})
+
+if existing_doc and doc['calculatedAt'] <= existing_doc['calculatedAt']:
+    # Skip - existing data is newer or same
+    print("⏭️  Skipped: existing timestamp is newer")
+else:
+    # Upsert - insert new or replace with newer data
+    collection.replace_one(filter_query, doc, upsert=True)
 ```
 
-**Why append mode?**
-- Preserves historical analytics data
-- Allows multiple time ranges (7day, 30day, 90day) to coexist
-- TTL index handles automatic expiration after 90 days
-- No manual cleanup required
-- Supports incremental updates
+### Upsert Benefits
+
+- ✅ **No Duplicates**: Only one analytics entry per (user, metric, timeRange)
+- ✅ **Always Latest**: Ensures most recent calculations are stored
+- ✅ **Simple Retrieval**: Backend can query without sorting/limiting
+- ✅ **Idempotent**: Safe to re-run batches without creating duplicates
+- ✅ **Storage Efficient**: No manual cleanup of old analytics needed
+
+### Detailed Logging
+
+Each upsert operation is logged with full context:
+
+```
+📊 Upserting 5 analytics records to MongoDB...
+   🆕 INSERT: userId=507f1f77bcf86cd799439011, metric=steps, range=7day
+      Values: rollingAvg=8500.0, trend=up, anomaly=False
+   🔄 UPDATE: userId=507f1f77bcf86cd799439011, metric=calories, range=7day
+      Values: rollingAvg=2500.0, trend=stable, anomaly=False
+   ⏭️  Skipped (userId=507f1f77bcf86cd799439011, metric=weight, range=7day): 
+      existing timestamp 2025-11-21T10:00:00 >= new 2025-11-21T09:00:00
+
+✅ Successfully upserted analytics records to MongoDB
+   📥 Inserts: 3
+   🔄 Updates: 1
+   ⏭️  Skipped: 1
+   Batch ID: batch-001
+```
+
+### Testing Upsert Logic
+
+Run the comprehensive test suite:
+
+```bash
+python test_upsert_logic.py
+```
+
+Tests verify:
+1. ✅ Initial insert of new documents
+2. ✅ Update with newer timestamp (replaces)
+3. ✅ Skip with older timestamp (ignores)
+4. ✅ Mixed batch operations (inserts + updates + skips)
+5. ✅ Database state verification
+
+### Write Mode Comparison
+
+**Previous Approach** (insert_many with append):
+```python
+# Problem: Creates duplicates on re-runs
+collection.insert_many(prepared_records, ordered=False)
+```
+
+**Current Approach** (replace_one with upsert):
+```python
+# Solution: Prevents duplicates, keeps latest
+for doc in prepared_records:
+    filter_query = {
+        'userId': doc['userId'],
+        'metricType': doc['metricType'],
+        'timeRange': doc['timeRange']
+    }
+    collection.replace_one(filter_query, doc, upsert=True)
+```
 
 ### TTL Index Configuration
 

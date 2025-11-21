@@ -17,6 +17,9 @@ from mongodb_utils import (
     get_analytics_schema
 )
 
+# Import batch logger for monitoring and metrics
+from batch_logger import BatchLogger
+
 # Set Hadoop home explicitly for Windows to avoid winutils requirement
 # Spark on Windows requires these settings to bypass winutils.exe
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -50,6 +53,12 @@ SPARK_APP_NAME = os.getenv('SPARK_APP_NAME')
 
 print(f"Starting Spark Application: {SPARK_APP_NAME}")
 print(f"Connecting to MongoDB Database: {MONGO_DB_NAME}")
+
+# Initialize Batch Logger for monitoring
+batch_logger = BatchLogger(
+    log_dir=os.getenv('LOG_DIRECTORY', './logs'),
+    metrics_dir=os.getenv('METRICS_DIRECTORY', './metrics')
+)
 
 # Initialize Spark Session
 spark = SparkSession.builder \
@@ -571,7 +580,8 @@ def process_batch(batch_df, batch_id):
         batch_df: DataFrame from the rate stream (contains timestamp and value columns)
         batch_id: Unique identifier for this batch
     """
-    print(f"🔄 Starting micro-batch {batch_id} at {datetime.now().isoformat()}")
+    # Start batch tracking
+    batch_context = batch_logger.start_batch(batch_id)
     
     checkpoint_dir = os.getenv('CHECKPOINT_LOCATION', './spark-checkpoints')
     
@@ -579,6 +589,12 @@ def process_batch(batch_df, batch_id):
     last_ts = get_last_processed_timestamp(checkpoint_dir)
     
     print(f"📊 Polling for data updated after: {last_ts.isoformat()}")
+    
+    # Initialize batch tracking variables
+    records_processed = 0
+    analytics_computed = 0
+    write_result = {'success': True, 'records_written': 0}
+    errors = []
     
     try:
         # Use the spark session from the batch DataFrame
@@ -603,6 +619,7 @@ def process_batch(batch_df, batch_id):
         new_data.cache()
         
         count_new = new_data.count()
+        records_processed = count_new
         
         if count_new > 0:
             print(f"✅ Found {count_new} new/updated records")
@@ -614,6 +631,7 @@ def process_batch(batch_df, batch_id):
             
             # Display sample results
             analytics_count = analytics_results.count()
+            analytics_computed = analytics_count
             print(f"📊 Generated {analytics_count} analytics records")
             
             if analytics_count > 0:
@@ -628,22 +646,23 @@ def process_batch(batch_df, batch_id):
                 analytics_list = convert_analytics_df_to_records(analytics_results)
                 
                 # Save analytics to MongoDB using the new utility function
-                result = save_analytics_to_mongodb(
+                write_result = save_analytics_to_mongodb(
                     spark_session=spark_session,
                     analytics_list=analytics_list,
                     batch_id=batch_id
                 )
                 
                 # Log write results
-                if result['success']:
-                    print(f"✅ Successfully wrote {result['records_written']} analytics records")
+                if write_result['success']:
+                    print(f"✅ Successfully wrote {write_result['records_written']} analytics records")
                 else:
                     print(f"⚠️  Write completed with errors:")
-                    print(f"   - Processed: {result['records_processed']}")
-                    print(f"   - Written: {result['records_written']}")
-                    print(f"   - Failed: {result['records_failed']}")
-                    for error in result['errors']:
+                    print(f"   - Processed: {write_result['records_processed']}")
+                    print(f"   - Written: {write_result['records_written']}")
+                    print(f"   - Failed: {write_result['records_failed']}")
+                    for error in write_result.get('errors', []):
                         print(f"   - Error: {error['message']}")
+                        errors.append(error)
 
             
             # (4) Update the checkpoint timestamp to the max updatedAt in the current batch
@@ -662,12 +681,27 @@ def process_batch(batch_df, batch_id):
         # Clean up cached data
         new_data.unpersist()
         
-        print(f"✅ Completed micro-batch {batch_id}")
+        # Complete batch tracking with success
+        batch_logger.complete_batch(
+            batch_context=batch_context,
+            records_processed=records_processed,
+            analytics_computed=analytics_computed,
+            write_result=write_result,
+            errors=errors if errors else None
+        )
         
     except Exception as e:
-        print(f"❌ Error in batch {batch_id} processing: {e}")
+        error_message = f"Error in batch processing: {str(e)}"
+        print(f"❌ {error_message}")
         import traceback
         traceback.print_exc()
+        
+        # Mark batch as failed
+        batch_logger.fail_batch(
+            batch_context=batch_context,
+            error_message=error_message,
+            error_details={'exception': str(e), 'type': type(e).__name__}
+        )
 
 
 # Only start streaming if run as main script
@@ -716,6 +750,12 @@ if __name__ == "__main__":
         traceback.print_exc()
         query.stop()
     finally:
+        # Print session summary
+        batch_logger.print_session_summary()
+        
+        # Export batch history
+        batch_logger.export_batch_history()
+        
         print("🔌 Stopping Spark session...")
         spark.stop()
         print("✅ Spark application terminated")
