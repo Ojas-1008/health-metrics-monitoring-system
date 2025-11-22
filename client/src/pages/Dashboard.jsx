@@ -27,6 +27,7 @@ import * as googleFitService from '../services/googleFitService';
 import * as dateUtils from '../utils/dateUtils';
 
 // ===== NEW IMPORTS =====
+import { getAnalyticsSummary, getAllAnalytics } from '../services/analyticsService';
 import { useRealtimeMetrics, useRealtimeSync, useRealtimeAnalytics, useConnectionStatus } from '../hooks/useRealtimeEvents';
 import Toast from '../components/common/Toast';
 import GoogleFitStatus from '../components/dashboard/GoogleFitStatus';
@@ -532,6 +533,58 @@ const Dashboard = () => {
       setIsLoadingSummary(false);
     }
   }, [trackAction]);
+
+  /**
+   * Load initial analytics data
+   */
+  const loadAnalytics = useCallback(async () => {
+    setIsLoadingAnalytics(true);
+    try {
+      const response = await getAllAnalytics({ limit: 100, sortBy: 'calculatedAt', sortOrder: 'desc' });
+      
+      if (response.success && response.data) {
+        const analyticsArray = response.data;
+        
+        setAnalyticsData(prevData => {
+          const newData = { ...prevData };
+          
+          // Process in reverse order so newer overrides older (or just iterate normally and overwrite)
+          // Since we sort desc (newest first), we should only set if not exists to be efficient, 
+          // OR just overwrite. Overwriting is fine.
+          // Actually, if we iterate the array (newest first), the first time we see a key is the newest.
+          // So we should check if it exists before setting to avoid overwriting with older data.
+          
+          analyticsArray.forEach(analytics => {
+            const { metricType, timeRange } = analytics;
+            
+            if (!metricType || !timeRange) return;
+            
+            if (!newData[metricType]) {
+              newData[metricType] = {};
+            }
+            
+            // Only set if not already present (since we sorted by newest first)
+            if (!newData[metricType][timeRange]) {
+              newData[metricType][timeRange] = {
+                ...analytics,
+                receivedAt: new Date().toISOString()
+              };
+            }
+          });
+          
+          return newData;
+        });
+        
+        if (analyticsArray.length > 0) {
+          setLastAnalyticsUpdate(new Date().toISOString());
+        }
+      }
+    } catch (error) {
+      console.error('[Dashboard] Failed to load analytics:', error);
+    } finally {
+      setIsLoadingAnalytics(false);
+    }
+  }, []);
 
   /**
    * Master refresh function - loads all data
@@ -1266,6 +1319,7 @@ const Dashboard = () => {
     loadTodayMetrics();
     loadMetricsRange();
     loadSummaryStats('week');
+    loadAnalytics();
 
     // Note: SSE connection is handled by AuthContext
     // Real-time updates are received via useRealtimeMetrics and useRealtimeSync hooks

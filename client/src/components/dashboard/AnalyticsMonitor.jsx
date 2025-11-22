@@ -15,14 +15,61 @@
  * - Batch vs single event styling
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRealtimeAnalytics } from '../../hooks/useRealtimeEvents';
+import { getAnalyticsSummary, getAllAnalytics } from '../../services/analyticsService';
 import Card from '../common/Card';
 
 const AnalyticsMonitor = () => {
   const [analyticsHistory, setAnalyticsHistory] = useState([]);
   const [totalReceived, setTotalReceived] = useState(0);
+  const [anomaliesCount, setAnomaliesCount] = useState(0);
   const [lastUpdate, setLastUpdate] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch initial data
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      try {
+        const [summaryRes, recentRes] = await Promise.all([
+          getAnalyticsSummary(),
+          getAllAnalytics({ limit: 10, sortBy: 'calculatedAt', sortOrder: 'desc' })
+        ]);
+
+        if (summaryRes.success) {
+          setTotalReceived(summaryRes.data.totalAnalytics || 0);
+          setAnomaliesCount(summaryRes.data.anomaliesDetected || 0);
+          
+          if (summaryRes.data.latestUpdate) {
+             setLastUpdate(new Date(summaryRes.data.latestUpdate));
+          }
+        }
+
+        if (recentRes.success && recentRes.data && recentRes.data.length > 0) {
+          // If we didn't get latestUpdate from summary, use recent
+          if (!summaryRes.data.latestUpdate) {
+             setLastUpdate(new Date(recentRes.data[0].calculatedAt));
+          }
+
+          // Map recent analytics to history format
+          const history = recentRes.data.map(item => ({
+            timestamp: new Date(item.calculatedAt),
+            isBatch: false,
+            count: 1,
+            analytics: [item],
+            userId: item.userId
+          }));
+          setAnalyticsHistory(history);
+        }
+      } catch (error) {
+        console.error('[AnalyticsMonitor] Failed to fetch initial data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchInitialData();
+  }, []);
 
   // Subscribe to analytics events
   const { isConnected } = useRealtimeAnalytics(
@@ -31,6 +78,12 @@ const AnalyticsMonitor = () => {
 
       setTotalReceived(prev => prev + data.totalCount);
       setLastUpdate(new Date());
+      
+      // Check for anomalies in the new batch
+      const newAnomalies = data.analytics.filter(a => a.anomalyDetected).length;
+      if (newAnomalies > 0) {
+        setAnomaliesCount(prev => prev + newAnomalies);
+      }
 
       setAnalyticsHistory(prev => {
         const newEvent = {
@@ -90,16 +143,19 @@ const AnalyticsMonitor = () => {
             <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-500 opacity-50"></div>
           </div>
 
-          {/* Events Received */}
+          {/* Anomalies Detected */}
           <div className="relative bg-gradient-to-br from-purple-50/90 to-pink-50/90 backdrop-blur-md border-2 border-purple-300/40 rounded-xl p-6 shadow-lg overflow-hidden group hover:shadow-xl transition-shadow duration-300">
             <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-black/5 pointer-events-none"></div>
             <div className="relative">
               <div className="text-sm text-purple-700 font-bold mb-2 flex items-center gap-2">
-                <span className="text-xl">📦</span>
-                Events Received
+                <span className="text-xl">⚠️</span>
+                Anomalies Detected
               </div>
               <div className="text-4xl font-extrabold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                {analyticsHistory.length}
+                {anomaliesCount}
+              </div>
+              <div className="mt-2 text-xs text-purple-600/80 font-medium">
+                Requires attention
               </div>
             </div>
             <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-pink-500 opacity-50"></div>
@@ -121,11 +177,20 @@ const AnalyticsMonitor = () => {
           </h4>
 
           <div className="space-y-3 max-h-96 overflow-y-auto pr-2 scrollbar-thin">
-            {analyticsHistory.length === 0 ? (
+            {isLoading ? (
+              <div className="space-y-3 animate-pulse">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-24 bg-gray-200/50 rounded-xl border border-gray-200/50"></div>
+                ))}
+              </div>
+            ) : analyticsHistory.length === 0 ? (
               <div className="text-center py-12 bg-gradient-to-br from-gray-50/90 to-blue-50/90 backdrop-blur-md rounded-xl border-2 border-dashed border-gray-400/60 shadow-lg">
-                <div className="text-5xl mb-4 animate-pulse">⏳</div>
+                <div className="text-5xl mb-4 opacity-50">📊</div>
                 <p className="text-sm font-semibold text-gray-700">
-                  Waiting for analytics events...
+                  No analytics data yet
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Waiting for Spark processing...
                 </p>
               </div>
             ) : (

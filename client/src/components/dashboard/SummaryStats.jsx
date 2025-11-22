@@ -538,7 +538,7 @@ const SummaryStats = ({
                   Period Coverage
                 </h4>
                 <p className="text-3xl font-extrabold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                  {stats.daysTracked || 0} days
+                  {stats.daysLogged || 0} days
                 </p>
                 <p className="text-sm text-gray-600 mt-2 font-medium">
                   {selectedPeriod === 'week' && 'Out of 7 days'}
@@ -553,7 +553,7 @@ const SummaryStats = ({
                 </h4>
                 <p className="text-3xl font-extrabold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                   {Math.round(
-                    (stats.daysTracked /
+                    ((stats.daysLogged || 0) /
                       (selectedPeriod === 'week' ? 7 : selectedPeriod === 'month' ? 30 : 365)) *
                     100
                   )}%

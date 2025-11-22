@@ -474,6 +474,7 @@ export const getAnalyticsSummary = asyncHandler(async (req, res, next) => {
       return acc;
     }, {}) || {},
     anomaliesDetected: summary[0]?.anomaliesDetected[0]?.count || 0,
+    latestUpdate: summary[0]?.latestUpdate[0]?.calculatedAt || null,
     currentStreaks: summary[0]?.currentStreaks.reduce((acc, item) => {
       acc[item.metricType] = item.streak;
       return acc;
