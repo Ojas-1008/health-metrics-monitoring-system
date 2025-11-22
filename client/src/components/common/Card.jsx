@@ -1,25 +1,19 @@
 /**
  * ============================================
- * CARD COMPONENT
+ * CARD COMPONENT (ENHANCED)
  * ============================================
  * 
- * Reusable card container component with Tailwind CSS styling
+ * Premium card container with Modern Glassmorphism styling
  * 
  * Features:
- * - Consistent padding, shadows, and borders
- * - Optional title/header section
- * - Optional footer section
- * - Hover effect option
- * - Clickable option (for navigation cards)
- * - Responsive design
- * - Customizable styling via className
- * - Multiple variants (default, bordered, elevated)
- * 
- * Styling:
- * - Uses consistent spacing and shadows
- * - Matches Health Metrics app design system
- * - Responsive padding and layout
- * - Smooth transitions
+ * - Glassmorphism with backdrop blur
+ * - Subtle gradient overlays
+ * - Smooth hover animations with lift effect
+ * - Enhanced shadows with color tints
+ * - Premium border styling
+ * - Interactive states with scale transform
+ * - Optimized for accessibility
+ * - Industry-standard code structure
  */
 
 import { forwardRef } from 'react';
@@ -30,31 +24,16 @@ import { forwardRef } from 'react';
  * @param {Object} props - Component props
  * @param {React.ReactNode} props.children - Card content
  * @param {string|React.ReactNode} [props.title] - Card title/header
- * @param {string} [props.subtitle] - Card subtitle (shown below title)
+ * @param {string} [props.subtitle] - Card subtitle
  * @param {React.ReactNode} [props.footer] - Card footer content
- * @param {React.ReactNode} [props.headerAction] - Action element in header (e.g., button, icon)
- * @param {string} [props.variant='default'] - Card variant (default, bordered, elevated)
+ * @param {React.ReactNode} [props.headerAction] - Action element in header
+ * @param {string} [props.variant='default'] - Card variant
  * @param {boolean} [props.hoverable=false] - Enable hover effect
- * @param {boolean} [props.clickable=false] - Make card clickable (shows pointer cursor)
- * @param {Function} [props.onClick] - Click handler (makes card interactive)
+ * @param {boolean} [props.clickable=false] - Make card clickable
+ * @param {Function} [props.onClick] - Click handler
  * @param {string} [props.className] - Additional CSS classes
- * @param {boolean} [props.noPadding=false] - Remove default padding (useful for custom layouts)
- * @param {React.Ref} ref - Forward ref for direct DOM access
- * 
- * @example
- * <Card title="User Profile">
- *   <p>Card content goes here</p>
- * </Card>
- * 
- * @example
- * <Card 
- *   title="Settings"
- *   subtitle="Manage your account"
- *   footer={<Button>Save Changes</Button>}
- *   variant="elevated"
- * >
- *   <form>...</form>
- * </Card>
+ * @param {boolean} [props.noPadding=false] - Remove default padding
+ * @param {React.Ref} ref - Forward ref
  */
 const Card = forwardRef(({
   children,
@@ -71,101 +50,105 @@ const Card = forwardRef(({
   ...rest
 }, ref) => {
   // ===== BASE CLASSES =====
-  
-  /**
-   * Base classes applied to all cards
-   */
+
   const baseClasses = `
-    bg-white
-    rounded-lg
+    relative
+    bg-white/90
+    backdrop-blur-sm
+    rounded-2xl
     transition-all
-    duration-200
-    ease-in-out
+    duration-300
+    ease-out
+    transform
+    overflow-hidden
     ${clickable || onClick ? 'cursor-pointer' : ''}
   `;
 
   // ===== VARIANT CLASSES =====
-  
-  /**
-   * Variant-specific styling
-   */
+
   const variantClasses = {
     default: `
       border
-      border-gray-200
-      shadow-sm
+      border-gray-200/80
+      shadow-md
+      shadow-gray-200/50
     `,
     bordered: `
       border-2
-      border-gray-300
+      border-gray-300/60
+      shadow-sm
     `,
     elevated: `
-      shadow-md
+      shadow-xl
+      shadow-gray-300/30
       border
-      border-gray-100
+      border-gray-100/50
+    `,
+    glass: `
+      bg-white/70
+      backdrop-blur-md
+      border
+      border-white/20
+      shadow-lg
+      shadow-gray-400/20
+    `,
+    gradient: `
+      bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/30
+      border
+      border-blue-100/50
+      shadow-lg
+      shadow-blue-200/30
     `,
   };
 
-  /**
-   * Hover effect classes (if hoverable or clickable)
-   */
+  // ===== HOVER EFFECT CLASSES =====
+
   const hoverClasses = (hoverable || clickable || onClick) ? `
-    hover:shadow-lg
-    hover:border-primary-200
-    hover:-translate-y-0.5
+    hover:shadow-2xl
+    hover:shadow-gray-300/40
+    hover:-translate-y-1
+    hover:scale-[1.01]
+    hover:border-blue-200/80
+    active:scale-[0.99]
+    active:shadow-lg
   ` : '';
 
-  /**
-   * Combine all card classes
-   */
+  // ===== COMBINE CLASSES =====
+
   const cardClasses = `
     ${baseClasses}
-    ${variantClasses[variant]}
+    ${variantClasses[variant] || variantClasses.default}
     ${hoverClasses}
     ${className}
   `.trim().replace(/\s+/g, ' ');
 
   // ===== PADDING CLASSES =====
-  
-  /**
-   * Content padding (can be disabled with noPadding prop)
-   */
+
   const contentPadding = noPadding ? '' : 'p-6';
 
   // ===== HEADER CLASSES =====
-  
-  /**
-   * Header section classes
-   */
+
   const headerClasses = `
     ${noPadding ? 'px-6 pt-6 pb-4' : 'pb-4 mb-4'}
     border-b
-    border-gray-200
+    border-gray-200/60
   `.trim().replace(/\s+/g, ' ');
 
-  /**
-   * Footer section classes
-   */
   const footerClasses = `
     ${noPadding ? 'px-6 pb-6 pt-4' : 'pt-4 mt-4'}
     border-t
-    border-gray-200
+    border-gray-200/60
+    bg-gray-50/50
   `.trim().replace(/\s+/g, ' ');
 
   // ===== EVENT HANDLERS =====
-  
-  /**
-   * Handle click event
-   */
+
   const handleClick = (e) => {
     if (onClick) {
       onClick(e);
     }
   };
 
-  /**
-   * Handle keyboard events (for accessibility)
-   */
   const handleKeyDown = (e) => {
     if (onClick && (e.key === 'Enter' || e.key === ' ')) {
       e.preventDefault();
@@ -174,25 +157,14 @@ const Card = forwardRef(({
   };
 
   // ===== COMPUTED VALUES =====
-  
-  /**
-   * Determine if card has header
-   */
+
   const hasHeader = Boolean(title || subtitle || headerAction);
-
-  /**
-   * Determine if card has footer
-   */
   const hasFooter = Boolean(footer);
-
-  /**
-   * Make card interactive if it has onClick handler
-   */
   const isInteractive = Boolean(onClick);
 
   // ===== RENDER =====
-  
-  const CardElement = (
+
+  return (
     <div
       ref={ref}
       className={cardClasses}
@@ -202,25 +174,31 @@ const Card = forwardRef(({
       tabIndex={isInteractive ? 0 : undefined}
       {...rest}
     >
+      {/* Subtle Gradient Overlay */}
+      <div
+        className="absolute inset-0 bg-gradient-to-br from-blue-500/[0.02] via-transparent to-purple-500/[0.02] pointer-events-none"
+        aria-hidden="true"
+      />
+
       {/* Header Section */}
       {hasHeader && (
         <div className={headerClasses}>
-          <div className="flex items-start justify-between">
+          <div className="flex items-start justify-between relative z-10">
             {/* Title and Subtitle */}
             <div className="flex-1 min-w-0">
               {title && (
-                <h3 className="text-lg font-semibold text-gray-900 truncate">
+                <h3 className="text-lg font-bold text-gray-900 truncate tracking-tight">
                   {title}
                 </h3>
               )}
               {subtitle && (
-                <p className="mt-1 text-sm text-gray-600">
+                <p className="mt-1 text-sm text-gray-600 font-medium">
                   {subtitle}
                 </p>
               )}
             </div>
 
-            {/* Header Action (e.g., button, icon) */}
+            {/* Header Action */}
             {headerAction && (
               <div className="ml-4 flex-shrink-0">
                 {headerAction}
@@ -231,23 +209,22 @@ const Card = forwardRef(({
       )}
 
       {/* Content Section */}
-      <div className={contentPadding}>
+      <div className={`${contentPadding} relative z-10`}>
         {children}
       </div>
 
       {/* Footer Section */}
       {hasFooter && (
         <div className={footerClasses}>
-          {footer}
+          <div className="relative z-10">
+            {footer}
+          </div>
         </div>
       )}
     </div>
   );
-
-  return CardElement;
 });
 
-// Set display name for debugging
 Card.displayName = 'Card';
 
 export default Card;

@@ -1,25 +1,18 @@
 /**
  * ============================================
- * TOAST NOTIFICATION COMPONENT
+ * TOAST NOTIFICATION COMPONENT (ENHANCED)
  * ============================================
  *
- * Purpose: Display temporary auto-dismissing notifications
+ * Premium toast notifications with Modern Glassmorphism
  *
  * Features:
- * - Auto-dismiss after configurable duration
- * - Multiple variants (success, error, info, warning)
- * - Slide-in animation
- * - Close button
- * - Icon support
- * - Progress bar
- *
- * Usage:
- * <Toast
- *   message="Google Fit synced successfully"
- *   variant="success"
- *   duration={5000}
- *   onClose={() => setShowToast(false)}
- * />
+ * - Glassmorphism with backdrop blur
+ * - Smooth slide and scale animations
+ * - Animated icons with glow effects
+ * - Gradient backgrounds and progress bars
+ * - Enhanced visual feedback
+ * - Auto-dismiss with timer
+ * - Industry-standard code structure
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -33,19 +26,25 @@ const Toast = ({
   onClose = null,
   showProgress = true,
 }) => {
-  const [isVisible, setIsVisible] = useState(true);
+  const [isVisible, setIsVisible] = useState(false);
   const [progress, setProgress] = useState(100);
+
+  // Entrance animation trigger
+  useEffect(() => {
+    const timer = setTimeout(() => setIsVisible(true), 10);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Auto-dismiss timer
   const handleClose = useCallback(() => {
     setIsVisible(false);
     setTimeout(() => {
       if (onClose) onClose();
-    }, 300); // Wait for exit animation
+    }, 400); // Wait for exit animation
   }, [onClose]);
 
   useEffect(() => {
-    if (duration === 0) return; // Never auto-dismiss if duration is 0
+    if (duration === 0) return;
 
     const timer = setTimeout(() => {
       handleClose();
@@ -71,95 +70,156 @@ const Toast = ({
 
   const variantConfig = {
     success: {
-      bg: 'bg-green-50',
-      border: 'border-green-200',
+      bg: 'bg-gradient-to-br from-green-50/95 via-emerald-50/95 to-green-50/95',
+      border: 'border-green-300/40',
       text: 'text-green-900',
-      icon: '✓',
-      iconBg: 'bg-green-500',
-      progressBg: 'bg-green-500',
+      icon: (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      iconBg: 'from-green-500 to-emerald-500',
+      progressBg: 'from-green-500 to-emerald-500',
+      glowColor: 'green',
     },
     error: {
-      bg: 'bg-red-50',
-      border: 'border-red-200',
+      bg: 'bg-gradient-to-br from-red-50/95 via-rose-50/95 to-red-50/95',
+      border: 'border-red-300/40',
       text: 'text-red-900',
-      icon: '✕',
-      iconBg: 'bg-red-500',
-      progressBg: 'bg-red-500',
+      icon: (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      ),
+      iconBg: 'from-red-500 to-rose-500',
+      progressBg: 'from-red-500 to-rose-500',
+      glowColor: 'red',
     },
     warning: {
-      bg: 'bg-yellow-50',
-      border: 'border-yellow-200',
-      text: 'text-yellow-900',
-      icon: '⚠',
-      iconBg: 'bg-yellow-500',
-      progressBg: 'bg-yellow-500',
+      bg: 'bg-gradient-to-br from-amber-50/95 via-yellow-50/95 to-amber-50/95',
+      border: 'border-amber-300/40',
+      text: 'text-amber-900',
+      icon: (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+      ),
+      iconBg: 'from-amber-500 to-yellow-500',
+      progressBg: 'from-amber-500 to-yellow-500',
+      glowColor: 'amber',
     },
     info: {
-      bg: 'bg-blue-50',
-      border: 'border-blue-200',
+      bg: 'bg-gradient-to-br from-blue-50/95 via-indigo-50/95 to-blue-50/95',
+      border: 'border-blue-300/40',
       text: 'text-blue-900',
-      icon: 'ℹ',
-      iconBg: 'bg-blue-500',
-      progressBg: 'bg-blue-500',
+      icon: (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      iconBg: 'from-blue-500 to-indigo-500',
+      progressBg: 'from-blue-500 to-indigo-500',
+      glowColor: 'blue',
     },
   };
 
   const config = variantConfig[variant] || variantConfig.info;
 
-  if (!isVisible) return null;
-
   return (
     <div
       className={`
-        fixed bottom-4 right-4 z-50 max-w-md w-full mx-4
-        transform transition-all duration-300 ease-out
-        ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'}
+        fixed bottom-6 right-6 z-50 max-w-md w-full sm:w-auto min-w-[350px] mx-4 sm:mx-0
+        transition-all duration-400 ease-out
+        ${isVisible
+          ? 'translate-y-0 opacity-100 scale-100'
+          : 'translate-y-4 opacity-0 scale-95'
+        }
       `}
+      role="alert"
+      aria-live="assertive"
     >
       <div
         className={`
-          ${config.bg} ${config.border} ${config.text}
-          border-2 rounded-lg shadow-lg overflow-hidden
+          ${config.bg}
+          ${config.border}
+          ${config.text}
+          backdrop-blur-xl
+          border-2
+          rounded-2xl
+          shadow-2xl
+          overflow-hidden
+          relative
         `}
       >
+        {/* Subtle Gradient Overlay */}
+        <div
+          className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-black/5 pointer-events-none"
+          aria-hidden="true"
+        />
+
         {/* Toast Content */}
-        <div className="p-4 flex items-start space-x-3">
-          {/* Icon */}
-          <div className={`flex-shrink-0 w-6 h-6 ${config.iconBg} text-white rounded-full flex items-center justify-center text-sm font-bold`}>
-            {config.icon}
+        <div className="p-4 flex items-start gap-3 relative z-10">
+          {/* Icon with Glow */}
+          <div className="flex-shrink-0 relative">
+            <div className={`absolute inset-0 bg-${config.glowColor}-400 rounded-full blur opacity-30 animate-pulse`}></div>
+            <div className={`relative w-8 h-8 bg-gradient-to-br ${config.iconBg} text-white rounded-xl flex items-center justify-center shadow-lg transform rotate-3`}>
+              {config.icon}
+            </div>
           </div>
 
           {/* Message */}
-          <div className="flex-1 min-w-0">
-            <p className="font-medium">{message}</p>
+          <div className="flex-1 min-w-0 pt-0.5">
+            <p className="font-bold text-sm tracking-wide leading-relaxed">
+              {message}
+            </p>
             {description && (
-              <p className="text-sm opacity-75 mt-1">{description}</p>
+              <p className="text-xs opacity-80 mt-1.5 leading-relaxed font-medium">
+                {description}
+              </p>
             )}
           </div>
 
           {/* Close Button */}
           <button
             onClick={handleClose}
-            className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
-            aria-label="Close"
+            className={`
+              flex-shrink-0
+              p-1.5
+              rounded-lg
+              transition-all
+              duration-200
+              hover:bg-black/5
+              active:scale-95
+              ${config.text}
+              opacity-60
+              hover:opacity-100
+            `}
+            aria-label="Close notification"
           >
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fillRule="evenodd"
-                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                clipRule="evenodd"
-              />
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
         {/* Progress Bar */}
         {showProgress && duration > 0 && (
-          <div className="h-1 bg-gray-200">
+          <div className="h-1 bg-black/5 relative overflow-hidden">
             <div
-              className={`h-full transition-all duration-100 ease-linear ${config.progressBg}`}
+              className={`
+                h-full 
+                bg-gradient-to-r 
+                ${config.progressBg}
+                transition-all 
+                duration-100 
+                ease-linear
+                relative
+              `}
               style={{ width: `${progress}%` }}
-            />
+            >
+              {/* Progress Bar Shimmer */}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
+            </div>
           </div>
         )}
       </div>

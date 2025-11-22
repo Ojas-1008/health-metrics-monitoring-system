@@ -1,24 +1,17 @@
 /**
  * ============================================
- * ALERT COMPONENT
+ * ALERT COMPONENT (ENHANCED)
  * ============================================
  * 
- * Reusable alert/notification component with Tailwind CSS styling
+ * Reusable alert/notification component with Modern Glassmorphism styling
  * 
  * Features:
- * - Multiple types (success, error, warning, info)
- * - Optional dismiss button
+ * - Premium glassmorphism aesthetics
+ * - Smooth entrance/exit animations
+ * - Gradient backgrounds and glows
+ * - Interactive close button with hover effects
  * - Auto-dismiss with timer
- * - Icon support for each type
- * - Smooth enter/exit animations
- * - Accessible (ARIA attributes, focus management)
- * - Custom message and title support
- * 
- * Styling:
- * - Color-coded by type
- * - Consistent spacing and typography
- * - Responsive design
- * - Smooth transitions
+ * - Accessible (ARIA attributes)
  */
 
 import { useState, useEffect, forwardRef } from 'react';
@@ -28,60 +21,36 @@ import { useState, useEffect, forwardRef } from 'react';
  */
 const AlertIcons = {
   success: (
-    <svg
-      className="w-6 h-6"
-      fill="currentColor"
-      viewBox="0 0 20 20"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        fillRule="evenodd"
-        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-        clipRule="evenodd"
-      />
-    </svg>
+    <div className="relative">
+      <div className="absolute inset-0 bg-green-400 rounded-full blur opacity-20 animate-pulse"></div>
+      <svg className="w-6 h-6 relative z-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    </div>
   ),
   error: (
-    <svg
-      className="w-6 h-6"
-      fill="currentColor"
-      viewBox="0 0 20 20"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        fillRule="evenodd"
-        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-        clipRule="evenodd"
-      />
-    </svg>
+    <div className="relative">
+      <div className="absolute inset-0 bg-red-400 rounded-full blur opacity-20 animate-pulse"></div>
+      <svg className="w-6 h-6 relative z-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    </div>
   ),
   warning: (
-    <svg
-      className="w-6 h-6"
-      fill="currentColor"
-      viewBox="0 0 20 20"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        fillRule="evenodd"
-        d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-        clipRule="evenodd"
-      />
-    </svg>
+    <div className="relative">
+      <div className="absolute inset-0 bg-yellow-400 rounded-full blur opacity-20 animate-pulse"></div>
+      <svg className="w-6 h-6 relative z-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+    </div>
   ),
   info: (
-    <svg
-      className="w-6 h-6"
-      fill="currentColor"
-      viewBox="0 0 20 20"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        fillRule="evenodd"
-        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-        clipRule="evenodd"
-      />
-    </svg>
+    <div className="relative">
+      <div className="absolute inset-0 bg-blue-400 rounded-full blur opacity-20 animate-pulse"></div>
+      <svg className="w-6 h-6 relative z-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    </div>
   ),
 };
 
@@ -90,15 +59,17 @@ const AlertIcons = {
  */
 const CloseIcon = () => (
   <svg
-    className="w-5 h-5"
-    fill="currentColor"
-    viewBox="0 0 20 20"
+    className="w-4 h-4"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
     xmlns="http://www.w3.org/2000/svg"
   >
     <path
-      fillRule="evenodd"
-      d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-      clipRule="evenodd"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      d="M6 18L18 6M6 6l12 12"
     />
   </svg>
 );
@@ -116,22 +87,6 @@ const CloseIcon = () => (
  * @param {boolean} [props.showIcon=true] - Show type-specific icon
  * @param {string} [props.className] - Additional CSS classes
  * @param {React.Ref} ref - Forward ref for direct DOM access
- * 
- * @example
- * <Alert 
- *   type="success" 
- *   message="Profile updated successfully!" 
- *   dismissible
- * />
- * 
- * @example
- * <Alert 
- *   type="error"
- *   title="Error"
- *   message="Failed to save changes. Please try again."
- *   autoHideDuration={5000}
- *   onClose={() => console.log('Alert closed')}
- * />
  */
 const Alert = forwardRef(({
   message,
@@ -145,114 +100,94 @@ const Alert = forwardRef(({
   ...rest
 }, ref) => {
   // ===== STATE MANAGEMENT =====
-  
-  /**
-   * Visibility state for animations
-   */
-  const [visible, setVisible] = useState(true);
 
-  /**
-   * Mounting state for exit animation
-   */
+  const [visible, setVisible] = useState(true);
   const [isExiting, setIsExiting] = useState(false);
 
   // ===== EVENT HANDLERS =====
-  
-  /**
-   * Handle close/dismiss action
-   * Triggers exit animation then calls onClose callback
-   */
+
   const handleClose = () => {
     setIsExiting(true);
-    
+
     // Wait for exit animation to complete
     setTimeout(() => {
       setVisible(false);
       if (onClose) {
         onClose();
       }
-    }, 300); // Match transition duration
+    }, 300);
   };
 
   // ===== AUTO-HIDE LOGIC =====
-  
-  /**
-   * Auto-hide timer effect
-   * Automatically dismiss alert after specified duration
-   */
+
   useEffect(() => {
     if (autoHideDuration > 0) {
       const timer = setTimeout(() => {
         handleClose();
       }, autoHideDuration);
 
-      // Cleanup timer on unmount
       return () => clearTimeout(timer);
     }
-  }, [autoHideDuration, onClose, handleClose]);
+  }, [autoHideDuration]);
 
   // ===== TYPE CONFIGURATIONS =====
-  
-  /**
-   * Color schemes for each alert type
-   */
+
   const typeStyles = {
     success: {
-      container: 'bg-green-50 border-green-200',
-      icon: 'text-green-600',
+      container: 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 shadow-green-100',
+      icon: 'text-green-500',
       title: 'text-green-800',
       message: 'text-green-700',
-      closeButton: 'text-green-600 hover:text-green-800 hover:bg-green-100',
+      closeButton: 'text-green-400 hover:text-green-600 hover:bg-green-100',
+      progress: 'bg-green-500',
     },
     error: {
-      container: 'bg-red-50 border-red-200',
-      icon: 'text-red-600',
+      container: 'bg-gradient-to-r from-red-50 to-rose-50 border-red-200 shadow-red-100',
+      icon: 'text-red-500',
       title: 'text-red-800',
       message: 'text-red-700',
-      closeButton: 'text-red-600 hover:text-red-800 hover:bg-red-100',
+      closeButton: 'text-red-400 hover:text-red-600 hover:bg-red-100',
+      progress: 'bg-red-500',
     },
     warning: {
-      container: 'bg-yellow-50 border-yellow-200',
-      icon: 'text-yellow-600',
-      title: 'text-yellow-800',
-      message: 'text-yellow-700',
-      closeButton: 'text-yellow-600 hover:text-yellow-800 hover:bg-yellow-100',
+      container: 'bg-gradient-to-r from-amber-50 to-yellow-50 border-amber-200 shadow-amber-100',
+      icon: 'text-amber-500',
+      title: 'text-amber-800',
+      message: 'text-amber-700',
+      closeButton: 'text-amber-400 hover:text-amber-600 hover:bg-amber-100',
+      progress: 'bg-amber-500',
     },
     info: {
-      container: 'bg-blue-50 border-blue-200',
-      icon: 'text-blue-600',
+      container: 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200 shadow-blue-100',
+      icon: 'text-blue-500',
       title: 'text-blue-800',
       message: 'text-blue-700',
-      closeButton: 'text-blue-600 hover:text-blue-800 hover:bg-blue-100',
+      closeButton: 'text-blue-400 hover:text-blue-600 hover:bg-blue-100',
+      progress: 'bg-blue-500',
     },
   };
 
-  /**
-   * Get styles for current alert type
-   */
   const styles = typeStyles[type] || typeStyles.info;
 
   // ===== BASE CLASSES =====
-  
-  /**
-   * Base container classes
-   */
+
   const baseClasses = `
+    relative
+    overflow-hidden
     border
-    rounded-lg
+    rounded-xl
     p-4
-    shadow-sm
+    shadow-lg
+    backdrop-blur-sm
     transition-all
     duration-300
-    ease-in-out
-    ${isExiting ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}
+    ease-out
+    transform
+    ${isExiting ? 'opacity-0 -translate-y-2 scale-95' : 'opacity-100 translate-y-0 scale-100 animate-slideDown'}
     ${styles.container}
     ${className}
   `.trim().replace(/\s+/g, ' ');
 
-  /**
-   * Handle keyboard events for close button
-   */
   const handleKeyDown = (e) => {
     if (e.key === 'Escape' && dismissible) {
       handleClose();
@@ -260,8 +195,7 @@ const Alert = forwardRef(({
   };
 
   // ===== RENDER =====
-  
-  // Don't render if not visible
+
   if (!visible) {
     return null;
   }
@@ -271,35 +205,40 @@ const Alert = forwardRef(({
       ref={ref}
       role="alert"
       aria-live={type === 'error' ? 'assertive' : 'polite'}
-      aria-atomic="true"
       className={baseClasses}
       onKeyDown={handleKeyDown}
       {...rest}
     >
-      <div className="flex items-start gap-3">
+      {/* Auto-hide Progress Bar */}
+      {autoHideDuration > 0 && (
+        <div className="absolute bottom-0 left-0 h-1 w-full bg-gray-100/30">
+          <div
+            className={`h-full ${styles.progress} transition-all ease-linear`}
+            style={{
+              width: isExiting ? '0%' : '100%',
+              transitionDuration: `${autoHideDuration}ms`
+            }}
+          />
+        </div>
+      )}
+
+      <div className="flex items-start gap-4">
         {/* Icon */}
         {showIcon && (
-          <div className={`flex-shrink-0 ${styles.icon}`} aria-hidden="true">
+          <div className={`flex-shrink-0 mt-0.5 ${styles.icon}`}>
             {AlertIcons[type]}
           </div>
         )}
 
         {/* Content */}
-        <div className="flex-1 min-w-0">
-          {/* Title */}
+        <div className="flex-1 min-w-0 pt-0.5">
           {title && (
-            <h3 className={`text-sm font-semibold mb-1 ${styles.title}`}>
+            <h3 className={`text-sm font-bold mb-1 tracking-wide ${styles.title}`}>
               {title}
             </h3>
           )}
-
-          {/* Message */}
-          <div className={`text-sm ${styles.message}`}>
-            {typeof message === 'string' ? (
-              <p>{message}</p>
-            ) : (
-              message
-            )}
+          <div className={`text-sm leading-relaxed font-medium ${styles.message}`}>
+            {typeof message === 'string' ? <p>{message}</p> : message}
           </div>
         </div>
 
@@ -310,14 +249,18 @@ const Alert = forwardRef(({
             onClick={handleClose}
             className={`
               flex-shrink-0
-              p-1
-              rounded-md
-              transition-colors
+              -mr-1
+              -mt-1
+              p-1.5
+              rounded-lg
+              transition-all
               duration-200
               focus:outline-none
               focus:ring-2
-              focus:ring-offset-2
-              focus:ring-primary-500
+              focus:ring-offset-1
+              focus:ring-current
+              opacity-70
+              hover:opacity-100
               ${styles.closeButton}
             `.trim().replace(/\s+/g, ' ')}
             aria-label="Close alert"
@@ -330,7 +273,6 @@ const Alert = forwardRef(({
   );
 });
 
-// Set display name for debugging
 Alert.displayName = 'Alert';
 
 export default Alert;
