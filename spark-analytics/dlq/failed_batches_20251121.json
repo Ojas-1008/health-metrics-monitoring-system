@@ -1,0 +1,21 @@
+[
+  {
+    "batch_id": 5003,
+    "timestamp": "2025-11-21T10:14:23.251225",
+    "error_details": {
+      "type": "TestError",
+      "message": "Test error for DLQ I/O",
+      "recommendation": "This is a test"
+    },
+    "sample_records": [
+      {
+        "userId": "test_user_1",
+        "date": "2025-11-21"
+      },
+      {
+        "userId": "test_user_2",
+        "date": "2025-11-22"
+      }
+    ]
+  }
+]

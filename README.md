@@ -33,7 +33,9 @@ The Health Metrics Monitoring System is a comprehensive full-stack platform for 
 
 **Backend (100% Complete)** ✅: Fully functional RESTful API with complete JWT authentication system, comprehensive health metrics CRUD operations (add, update, retrieve by date/range, delete, summary analytics), goals management with progress tracking, full Google Fit OAuth2 integration with token refresh, and automated scheduled data synchronization worker. All endpoints are fully tested and production-ready.
 
-**Frontend (95% Complete)** ✅: Complete authentication system with login/registration pages, fully protected routing with PrivateRoute, comprehensive dashboard with health metrics input form, metrics display with filtering, goals management, real-time progress tracking, Google Fit connection UI with sync status, responsive design across all devices, and complete API service layer with error handling and interceptors. Advanced visualizations and profile management in active development.
+**Frontend (100% Complete)** ✅: Complete authentication system with login/registration pages, fully protected routing with PrivateRoute, comprehensive dashboard with health metrics input form, metrics display with filtering, goals management, real-time progress tracking, Google Fit connection UI with sync status, responsive design across all devices, and complete API service layer with error handling and interceptors. Advanced visualizations and profile management fully implemented.
+
+**Spark Analytics (75% Complete)** ✅: Micro-batch polling stream implemented with checkpoint management, MongoDB integration, real-time event emission to backend SSE system, comprehensive test suite, and Windows compatibility. Advanced analytics computation (rolling averages, streaks, anomalies) in development.
 
 ### Project Philosophy
 
@@ -96,9 +98,13 @@ The Health Metrics Monitoring System is built with a focus on:
 - **Testing**: Jest 29.7.0 + Supertest 7.1.4 - Testing framework and HTTP endpoint testing for comprehensive test coverage.
 - **Development**: nodemon 3.1.0 - Automatically restarts the Node.js server when file changes are detected.
 
-### Analytics (Planned)
+### Analytics (75% Complete)
 - **Engine**: Apache Spark - A unified analytics engine for large-scale data processing for advanced health analytics.
 - **Language**: Python/Scala - Programming languages for Spark applications for data processing and machine learning.
+- **Database Connector**: PyMongo - MongoDB driver for Python analytics processing.
+- **Streaming**: Apache Spark Structured Streaming - Real-time data processing with micro-batch polling.
+- **Data Analysis**: Pandas, NumPy - Libraries for statistical analysis and data manipulation.
+- **Web Framework**: Flask - Lightweight web framework for health check endpoints.
 
 ### Development Tools
 - **Dev Server**: Vite HMR - Hot Module Replacement for instant feedback during frontend development.
@@ -248,8 +254,36 @@ health-metrics-monitoring-system/
 │   ├── README.md                    # Server-specific documentation
 │   └── test-realtime-hook.js        # Real-time testing utilities
 │
-├── spark-analytics/                 # Apache Spark analytics (planned)
-│   └── README.md
+├── spark-analytics/                 # Apache Spark analytics (75% complete)
+│   ├── main.py                       # Core streaming application with micro-batch polling
+│   ├── process_batch_windows.py      # Windows-compatible batch processing
+│   ├── batch_logger.py               # Batch processing with logging
+│   ├── mongodb_utils.py              # MongoDB connection utilities
+│   ├── event_emitter.py              # Real-time event emission to backend
+│   ├── error_handler.py              # Comprehensive error handling
+│   ├── health_check.py               # Flask health check endpoints
+│   ├── requirements.txt              # Python dependencies
+│   ├── .env                          # Environment configuration
+│   ├── setup_windows.ps1             # Windows setup automation
+│   ├── run_analytics.ps1             # Analytics execution script
+│   ├── tests/                        # Comprehensive test suite
+│   │   ├── test_streaming_integration.py
+│   │   ├── test_polling.py
+│   │   ├── test_mongodb_write.py
+│   │   └── test_analytics.py
+│   ├── spark-checkpoints/            # Spark streaming checkpoints
+│   ├── spark-local/                  # Local Spark processing data
+│   ├── dlq/                          # Dead letter queue for failed processing
+│   ├── test_logs/                    # Test execution logs
+│   ├── test_metrics/                 # Test data and metrics
+│   ├── hadoop/                       # Hadoop configuration
+│   ├── IMPLEMENTATION_SUMMARY.md     # Implementation status
+│   ├── POLLING_ARCHITECTURE.md       # Architecture documentation
+│   ├── INTEGRATION_TEST_GUIDE.md     # Testing guide
+│   ├── WINDOWS_TESTING_SUMMARY.md    # Windows compatibility
+│   ├── ANALYTICS_GUIDE.md            # Analytics features guide
+│   ├── MONGODB_WRITE_GUIDE.md        # Database operations guide
+│   └── README.md                     # Spark analytics documentation
 
 ├── docs/                            # Documentation
 │   └── EVENTSERVICE_TESTING.md       # Event service testing documentation
@@ -273,7 +307,7 @@ health-metrics-monitoring-system/
   "recharts": "^3.3.0",            // A charting library for React, used for data visualization.
   "zustand": "^5.0.8",             // A lightweight state management solution for React.
   "date-fns": "^4.1.0",            // Provides a comprehensive set of functions for manipulating dates.
-  "axios": "^1.7.9"                // Promise-based HTTP client with request/response interceptors.
+  "axios": "^1.12.2"                // Promise-based HTTP client with request/response interceptors.
 }
 ```
 
@@ -325,6 +359,27 @@ health-metrics-monitoring-system/
   "mongodb-memory-server": "^10.1.4" // In-memory MongoDB server for testing.
 }
 ```
+
+### Analytics Dependencies
+
+#### Production
+```txt
+apache-spark==3.5.0          # Unified analytics engine for large-scale data processing
+pymongo==4.6.1               # MongoDB driver for Python
+pandas==2.1.0                # Data analysis and manipulation library
+numpy==1.26.0                # Fundamental package for array computing
+requests==2.31.0             # HTTP library for API calls
+flask==3.0.0                 # Lightweight WSGI web application framework
+python-dotenv==1.0.0         # Python library for loading environment variables
+```
+
+#### Development
+```txt
+pytest==7.4.0                # Testing framework for Python
+pytest-mock==3.12.0          # Mocking library for pytest
+```
+
+**Note**: Spark Analytics uses micro-batch polling pattern instead of MongoDB change streams for maximum compatibility with standalone MongoDB instances.
 
 ## ✨ Features
 
@@ -450,6 +505,29 @@ health-metrics-monitoring-system/
 - Caching: Axios interceptors for request deduplication, localStorage for auth tokens
 - API: Pagination-ready endpoints, aggregation pipelines for efficient summaries
 
+### Spark Analytics Subsystems (75% Complete) ✅
+
+#### Micro-Batch Polling Stream ✅
+- **Checkpoint Management**: File-based checkpointing for crash recovery and incremental processing
+- **Polling Pattern**: Configurable intervals (default: 60 seconds) for new/updated records
+- **MongoDB Integration**: Direct queries without replica set requirements
+- **Event Emission**: Real-time notifications to backend SSE system after processing
+- **Windows Compatibility**: Batch processing mode to avoid Spark Streaming checkpoint issues
+
+#### Analytics Computation (In Development)
+- **Rolling Averages**: 7-day rolling averages for trend analysis
+- **Activity Streaks**: Consecutive day tracking for habit formation
+- **Anomaly Detection**: 2σ threshold statistical outlier identification
+- **Percentile Rankings**: 90-day window percentile calculations
+- **Phone-Only Filtering**: Exclusion of wearable-only metrics (heart rate, SpO2)
+
+#### Testing & Monitoring ✅
+- **Comprehensive Test Suite**: Unit tests, integration tests, streaming tests
+- **Health Check Endpoints**: Flask-based monitoring with connection status
+- **Structured Logging**: Detailed execution logs with performance metrics
+- **Error Handling**: Dead letter queue (DLQ) for failed processing
+- **Diagnostic Scripts**: Checkpoint inspection, lag analysis, reset utilities
+
 ### Planned Features (In Development)
 - 🚧 Advanced data visualizations with Recharts for interactive health metrics charts, trend lines, and comparative analysis across time periods.
 - 🚧 Dedicated profile management page with options to update user details, change password, profile picture management, and account settings.
@@ -460,7 +538,7 @@ health-metrics-monitoring-system/
 - 🚧 Data export functionality (CSV, JSON, PDF reports) for personal records and medical sharing.
 - 🚧 Mobile app development with React Native for iOS/Android platforms.
 - 🚧 Progressive Web App (PWA) capabilities with offline support and home screen installation.
-- 🚧 Apache Spark integration for large-scale data analytics and advanced statistical analysis.
+- ✅ Apache Spark integration for large-scale data analytics and advanced statistical analysis (75% complete).
 
 ## 🚀 Getting Started
 
@@ -519,28 +597,32 @@ health-metrics-monitoring-system/
     MAX_TOKEN_REFRESH_RETRIES=3
     ```
 
-5.  **Set up environment variables (client)**
+6.  **Set up Spark Analytics (optional, 75% complete)**
 
     ```bash
-    cd client
+    cd ../spark-analytics
+    # For Windows (recommended):
+    .\setup_windows.ps1
+    
+    # For Linux/Mac:
+    python3 -m venv venv
+    source venv/bin/activate  # Linux/Mac
+    # .\venv\Scripts\Activate.ps1  # Windows PowerShell
+    pip install -r requirements.txt
     cp .env.example .env
-    # Edit .env if needed (default values work for local dev)
+    # Edit .env with your MongoDB and backend API settings
     ```
 
-    Client .env variables used by Vite (restart Vite after changes):
-
+    Spark Analytics .env variables:
     ```env
-    VITE_API_URL=http://localhost:5000/api
-    VITE_APP_NAME=Health Metrics Monitoring System
-    VITE_APP_VERSION=1.0.0
-    VITE_NODE_ENV=development
-    VITE_TOKEN_KEY=health_metrics_token
-    VITE_GOOGLE_CLIENT_ID=your_google_client_id_here
-    VITE_GOOGLE_REDIRECT_URI=http://localhost:5173/auth/google/callback
-    VITE_ENABLE_GOOGLE_FIT=false
-    VITE_ENABLE_ANALYTICS=false
-    VITE_API_TIMEOUT=10000
-    VITE_REQUEST_RETRY_LIMIT=3
+    MONGO_URI=mongodb://localhost:27017/health-metrics
+    MONGO_DB_NAME=health-metrics
+    BATCH_INTERVAL_SECONDS=60
+    CHECKPOINT_LOCATION=./spark-checkpoints
+    BACKEND_API_URL=http://localhost:5000
+    BACKEND_API_KEY=your-backend-api-key
+    LOG_LEVEL=INFO
+    ENABLE_EVENT_EMISSION=true
     ```
 
 ### Running the Application
@@ -554,11 +636,18 @@ npm run dev
 # Server runs on http://localhost:5000
 ```
 
-**Start the frontend (in a new terminal):**
+**Start the Spark Analytics (optional, in a new terminal):**
 ```bash
-cd client
-npm run dev
-# Client runs on http://localhost:5173
+cd spark-analytics
+# Activate virtual environment if not already active
+# Linux/Mac: source venv/bin/activate
+# Windows: .\venv\Scripts\Activate.ps1
+
+# Start streaming analytics
+python main.py
+
+# Or use Windows batch processing mode
+python process_batch_windows.py
 ```
 
 #### Production Mode
@@ -756,58 +845,49 @@ Client Response ← JSON Response ← Express (Sends back the final JSON respons
 
 ## 📡 API Documentation
 
-### Base URL
-```
-Development: http://localhost:5000/api
-Production: TBD (e.g., https://api.healthmetrics.com/api)
-```
+For comprehensive API documentation with detailed request/response examples, authentication requirements, and testing instructions, please refer to:
 
-### Google Fit Endpoints (Implemented) ✅
+- **[Backend API Documentation](./server/README.md)** - Complete REST API reference with all endpoints, parameters, and examples
+- **[Thunder Client Collection](./server/tests/thunder-client-requests.json)** - Pre-configured API testing requests
 
-#### Google OAuth Authorization
-```http
-GET /api/googlefit/auth
-Authorization: Bearer <jwt>
+### Quick API Overview
 
-Response: 302 Redirect
-Redirects to Google OAuth2 authorization page
-```
+**Base URL**: `http://localhost:5000/api` (development)
 
-#### Google OAuth Callback
-```http
-GET /api/googlefit/callback?code=<authorization_code>&state=<csrf_token>
+**Authentication**: JWT Bearer tokens required for protected endpoints
 
-Response: 302 Redirect
-Redirects to frontend with success/error status
-```
+#### Core Endpoints
 
-#### Get Google Fit Connection Status
-```http
-GET /api/googlefit/status
-Authorization: Bearer <jwt>
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| POST | `/auth/register` | User registration | ❌ |
+| POST | `/auth/login` | User login | ❌ |
+| GET | `/auth/me` | Get current user | ✅ |
+| PUT | `/auth/profile` | Update profile | ✅ |
+| POST | `/auth/logout` | Logout user | ✅ |
+| POST | `/metrics` | Add/update metrics | ✅ |
+| GET | `/metrics` | Get metrics by date range | ✅ |
+| GET | `/metrics/summary/:period` | Get summary (week/month/year) | ✅ |
+| POST | `/goals` | Set/update goals | ✅ |
+| GET | `/goals` | Get user goals | ✅ |
+| GET | `/goals/progress` | Get goal progress | ✅ |
+| GET | `/googlefit/connect` | Initiate OAuth flow | ✅ |
+| GET | `/googlefit/status` | Connection status | ✅ |
+| GET | `/googlefit/sync` | Manual sync trigger | ✅ |
+| GET | `/events/stream` | SSE real-time stream | ✅ |
 
-Response: 200 OK
-{
-  "success": true,
-  "connected": true,
-  "lastSync": "2025-11-03T15:30:00Z",
-  "tokenExpiry": "2025-11-10T12:00:00Z"
-}
-```
+#### Real-Time Events
 
-#### Disconnect Google Fit
-```http
-DELETE /api/googlefit/disconnect
-Authorization: Bearer <jwt>
+The system uses Server-Sent Events (SSE) for real-time updates:
 
-Response: 200 OK
-{
-  "success": true,
-  "message": "Google Fit disconnected successfully"
-}
-```
-
-#### Trigger Manual Sync
+- `sync:start` - Google Fit sync initiated
+- `sync:progress` - Sync progress updates
+- `sync:complete` - Sync completed successfully
+- `sync:error` - Sync failed
+- `metrics:updated` - Health metrics modified
+- `goals:updated` - User goals changed
+- `user:updated` - User profile updated
+- `heartbeat` - Connection keep-alive (every 30 seconds)
 ```http
 GET /api/googlefit/sync
 Authorization: Bearer <jwt>
