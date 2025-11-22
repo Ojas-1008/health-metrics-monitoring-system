@@ -543,10 +543,10 @@ export const getMetricsSummary = asyncHandler(async (req, res, next) => {
   }
 
   const endDate = new Date();
-  endDate.setHours(23, 59, 59, 999);
+  endDate.setUTCHours(23, 59, 59, 999);
 
   const startDate = new Date();
-  startDate.setHours(0, 0, 0, 0);
+  startDate.setUTCHours(0, 0, 0, 0);
 
   switch (period) {
     case "week":

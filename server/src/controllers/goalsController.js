@@ -221,7 +221,7 @@ export const getGoalProgress = asyncHandler(async (req, res, next) => {
   }
 
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  today.setUTCHours(0, 0, 0, 0);
 
   const todayMetrics = await HealthMetric.findOne({
     userId: req.user._id,

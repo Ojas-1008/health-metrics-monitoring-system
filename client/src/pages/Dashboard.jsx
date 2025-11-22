@@ -395,16 +395,20 @@ const Dashboard = () => {
         setTodayMetrics(result.data);
         trackAction('LOAD_TODAY_METRICS', { success: true });
       } else {
-        // For today's metrics, 404 is normal (no metrics entered yet)
-        // Only treat as error if it's not a "no metrics found" message
-        if (result.message && result.message.includes('No metrics found')) {
+        // If no data for today, try yesterday (common case after midnight)
+        const yesterday = dateUtils.subtractDays(new Date(), 1);
+        const yesterdayDate = dateUtils.formatDateISO(yesterday);
+        const yesterdayResult = await metricsService.getMetricByDate(yesterdayDate);
+        
+        if (yesterdayResult.success) {
+          console.log('[Dashboard] No data for today, showing yesterday\'s metrics');
+          setTodayMetrics(yesterdayResult.data);
+          trackAction('LOAD_TODAY_METRICS', { success: true, fallbackToYesterday: true });
+        } else {
+          // No data for today or yesterday
           setTodayMetrics(null);
           setMetricsError(null); // Clear any previous errors
           trackAction('LOAD_TODAY_METRICS', { success: true, noData: true });
-        } else {
-          setTodayMetrics(null);
-          setMetricsError(result.message);
-          trackAction('LOAD_TODAY_METRICS', { success: false, error: result.message });
         }
       }
     } catch (error) {
@@ -717,16 +721,24 @@ const Dashboard = () => {
           }
         });
 
-        // Update todayMetrics if it's today's date
+        // Update todayMetrics if it's today OR if todayMetrics is empty
         const today = dateUtils.formatDateISO(new Date());
-        if (date === today) {
-          setTodayMetrics(prev => ({
-            ...(prev || {}),
-            date,
-            metrics: eventMetrics,
-            source: source || 'unknown',
-            lastUpdated: new Date().toISOString()
-          }));
+        const yesterday = dateUtils.formatDateISO(dateUtils.subtractDays(new Date(), 1));
+        
+        if (date === today || date === yesterday || !todayMetrics) {
+          setTodayMetrics(prev => {
+            // Only update if this is today, yesterday, or we have no current data
+            if (date === today || !prev) {
+              return {
+                ...(prev || {}),
+                date,
+                metrics: eventMetrics,
+                source: source || 'unknown',
+                lastUpdated: new Date().toISOString()
+              };
+            }
+            return prev;
+          });
         }
 
         // Show toast notification
@@ -798,7 +810,7 @@ const Dashboard = () => {
       default:
         console.warn(`[Dashboard] Unknown operation: ${operation}`);
     }
-  }, [isDuplicateEvent, optimisticMetrics, debouncedSummaryRefetch, showAlert]);
+  }, [isDuplicateEvent, optimisticMetrics, todayMetrics, debouncedSummaryRefetch, showAlert]);
 
   /**
    * ============================================
@@ -842,9 +854,12 @@ const Dashboard = () => {
 
     try {
       // Refetch all metrics to ensure consistency
+      // Fetch last 30 days INCLUDING today
       const endDate = new Date();
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - 30);
+
+      console.log('[Dashboard] Fetching metrics from', dateUtils.formatDateISO(startDate), 'to', dateUtils.formatDateISO(endDate));
 
       const result = await metricsService.getMetrics(
         dateUtils.formatDateISO(startDate),
@@ -852,11 +867,28 @@ const Dashboard = () => {
       );
 
       if (result.success) {
-        setAllMetrics(result.data || []);
+        const fetchedMetrics = result.data || [];
+        console.log('[Dashboard] Fetched', fetchedMetrics.length, 'metrics');
+        
+        setAllMetrics(fetchedMetrics);
 
-        // Update today's metrics
+        // Update today's metrics - fallback to most recent if today has no data
         const today = dateUtils.formatDateISO(new Date());
-        const todayData = result.data?.find(m => m.date === today);
+        console.log('[Dashboard] Looking for today:', today);
+        
+        let todayData = fetchedMetrics.find(m => m.date === today);
+        
+        // If no data for today, use the most recent metrics
+        if (!todayData && fetchedMetrics.length > 0) {
+          // Sort by date descending to get the most recent
+          const sortedMetrics = [...fetchedMetrics].sort((a, b) => 
+            new Date(b.date) - new Date(a.date)
+          );
+          todayData = sortedMetrics[0];
+          console.log('[Dashboard] No data for today, using most recent:', todayData.date, 'from', sortedMetrics.length, 'metrics');
+          console.log('[Dashboard] All dates:', sortedMetrics.map(m => m.date));
+        }
+        
         setTodayMetrics(todayData || null);
 
         console.log('[Dashboard] ✓ Metrics refreshed after sync');
@@ -943,6 +975,30 @@ const Dashboard = () => {
       );
     }
   }, [showAlert]);
+
+  /**
+   * ============================================
+   * GOOGLE FIT CONNECTION
+   * ============================================
+   */
+  const handleConnectGoogleFit = async () => {
+    try {
+      console.log('[Dashboard] Initiating Google Fit connection...');
+      
+      // Call the initiateConnect function which returns the OAuth URL
+      const authUrl = await googleFitService.initiateConnect();
+      
+      if (authUrl) {
+        // Redirect to Google OAuth page
+        window.location.href = authUrl;
+      } else {
+        showAlert('error', 'Connection Failed', 'Failed to get authorization URL');
+      }
+    } catch (error) {
+      console.error('[Dashboard] Google Fit connection error:', error);
+      showAlert('error', 'Connection Failed', error.message || 'An error occurred while connecting to Google Fit');
+    }
+  };
 
   /**
    * ============================================
@@ -1260,8 +1316,14 @@ const Dashboard = () => {
           if (result.data?.lastSyncAt) {
             setLastSyncAt(result.data.lastSyncAt);
           }
+        } else {
+          // Set a default disconnected status if API fails
+          setGoogleFitStatus({ connected: false });
+          console.warn('[Dashboard] Google Fit status check failed:', result.message);
         }
       } catch (error) {
+        // Always set a status even on error
+        setGoogleFitStatus({ connected: false });
         console.error('[Dashboard] Failed to load Google Fit status:', error);
       }
     };
@@ -1551,22 +1613,80 @@ const Dashboard = () => {
                 <div className="text-6xl mb-6 animate-bounce">📊</div>
 
                 <h3 className="text-2xl font-bold text-gray-900 mb-3">
-                  Start Tracking Today
+                  No Metrics Yet
                 </h3>
 
-                <p className="text-gray-600 mb-8 max-w-md mx-auto text-lg">
-                  Begin logging your health metrics to see your daily performance,
-                  track progress, and achieve your goals!
+                <p className="text-gray-600 mb-6 max-w-md mx-auto text-lg">
+                  Start tracking your health journey! You have two options:
                 </p>
 
+                <div className="mb-8 max-w-lg mx-auto">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                    {/* Google Fit Option */}
+                    <div className="bg-white/80 backdrop-blur-sm p-4 rounded-lg border border-blue-200 shadow-sm">
+                      <div className="text-3xl mb-2">🏃</div>
+                      <h4 className="font-bold text-gray-900 mb-2">Automatic Sync</h4>
+                      <p className="text-xs text-gray-600 mb-3">
+                        Connect Google Fit for automatic data sync every 15 minutes
+                      </p>
+                      <div className="text-xs text-green-600 font-medium">
+                        ✓ Recommended
+                      </div>
+                    </div>
+
+                    {/* Manual Entry Option */}
+                    <div className="bg-white/80 backdrop-blur-sm p-4 rounded-lg border border-blue-200 shadow-sm">
+                      <div className="text-3xl mb-2">✍️</div>
+                      <h4 className="font-bold text-gray-900 mb-2">Manual Entry</h4>
+                      <p className="text-xs text-gray-600 mb-3">
+                        Manually log your metrics like steps, weight, and sleep
+                      </p>
+                      <div className="text-xs text-blue-600 font-medium">
+                        ✓ Quick & Easy
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  {googleFitStatus?.connected ? (
+                    <Button
+                      variant="primary"
+                      size="lg"
+                      onClick={handleManualSync}
+                      disabled={isSyncing}
+                      className="shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1"
+                    >
+                      {isSyncing ? (
+                        <span className="flex items-center gap-2">
+                          <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          Syncing...
+                        </span>
+                      ) : (
+                        '🔄 Sync from Google Fit'
+                      )}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="primary"
+                      size="lg"
+                      onClick={handleConnectGoogleFit}
+                      className="shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 bg-gradient-to-r from-blue-500 to-blue-600"
+                    >
+                      🔗 Connect Google Fit
+                    </Button>
+                  )}
+                  
                   <Button
-                    variant="primary"
+                    variant="secondary"
                     size="lg"
                     onClick={() => setShowForm(true)}
                     className="shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1"
                   >
-                    + Log First Metric
+                    ✍️ Log Manually
                   </Button>
                 </div>
               </div>
@@ -1643,19 +1763,19 @@ const Dashboard = () => {
             )}
           </div>
 
-          {/* ===== NEW: GOOGLE FIT STATUS SECTION ===== */}
-          {
-            googleFitStatus && (
-              <div className="mb-8">
-                <GoogleFitStatus
-                  googleFitStatus={googleFitStatus}
-                  lastSyncAt={lastSyncAt}
-                  onSyncClick={handleManualSync}
-                  isSyncing={isSyncing}
-                />
-              </div>
-            )
-          }
+          {/* ===== GOOGLE FIT SYNC STATUS & TRIGGER SECTION ===== */}
+          <div className="mb-8">
+            <div className="mb-3 flex items-center gap-2">
+              <h2 className="text-xl font-bold text-gray-900">🏃 Google Fit Integration</h2>
+            </div>
+            <GoogleFitStatus
+              googleFitStatus={googleFitStatus}
+              lastSyncAt={lastSyncAt}
+              onSyncClick={handleManualSync}
+              onConnectClick={handleConnectGoogleFit}
+              isSyncing={isSyncing}
+            />
+          </div>
 
           {/* ===== NEW: ANALYTICS MONITOR SECTION ===== */}
           <div className="mb-8">

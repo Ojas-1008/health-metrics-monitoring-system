@@ -538,9 +538,20 @@ export const triggerSync = async () => {
 export const getGoogleFitStatus = async () => {
   try {
     const response = await axiosInstance.get('/googlefit/status');
+    
+    // Backend returns flat structure: { success, connected, isActive, lastSync, ... }
+    // We wrap it in 'data' property to match service pattern expected by Dashboard
+    const statusData = {
+      connected: response.data.connected,
+      isActive: response.data.isActive,
+      daysUntilExpiry: response.data.daysUntilExpiry,
+      lastSyncAt: response.data.lastSync, // Map backend 'lastSync' to frontend 'lastSyncAt'
+      syncPreferences: response.data.syncPreferences
+    };
+
     return {
       success: true,
-      data: response.data.data,
+      data: statusData,
       message: 'Status retrieved successfully',
     };
   } catch (error) {

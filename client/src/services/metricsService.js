@@ -51,7 +51,7 @@ export const validateDate = (date) => {
 
   // Normalize to midnight UTC
   const normalized = new Date(dateObj);
-  normalized.setHours(0, 0, 0, 0);
+  normalized.setUTCHours(0, 0, 0, 0);
 
   return {
     isValid: true,
@@ -262,8 +262,8 @@ export const getMetrics = async (startDate, endDate) => {
 
     const start = new Date(startDate);
     const end = new Date(endDate);
-    start.setHours(0, 0, 0, 0);
-    end.setHours(0, 0, 0, 0);
+    start.setUTCHours(0, 0, 0, 0);
+    end.setUTCHours(0, 0, 0, 0);
 
     const startISOString = start.toISOString().split('T')[0];
     const endISOString = end.toISOString().split('T')[0];

@@ -634,8 +634,8 @@ const normalizeDate = (date) => {
       return null;
     }
 
-    // Set to midnight UTC
-    dateObj.setHours(0, 0, 0, 0);
+    // Set to midnight UTC (use UTC methods to avoid timezone issues)
+    dateObj.setUTCHours(0, 0, 0, 0);
 
     return dateObj;
   } catch (error) {

@@ -23,6 +23,7 @@ const GoogleFitStatus = ({
   googleFitStatus = null,
   lastSyncAt = null,
   onSyncClick = null,
+  onConnectClick = null,
   isSyncing = false,
 }) => {
   const isConnected = googleFitStatus?.connected || false;
@@ -48,8 +49,21 @@ const GoogleFitStatus = ({
     return dateUtils.formatDateShort(lastSyncAt);
   }, [lastSyncAt]);
 
+  // Show loading state while fetching status
   if (!googleFitStatus) {
-    return null;
+    return (
+      <div className="relative bg-gradient-to-br from-gray-50/90 to-slate-50/90 backdrop-blur-md rounded-2xl shadow-xl border-2 border-gray-300/40 p-6 overflow-hidden">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-full bg-gray-200 animate-pulse"></div>
+            <div>
+              <div className="h-6 w-40 bg-gray-200 rounded animate-pulse mb-2"></div>
+              <div className="h-4 w-32 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -75,9 +89,9 @@ const GoogleFitStatus = ({
 
       <div className="relative flex items-center justify-between gap-4 flex-wrap">
         {/* Connection Status */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-1">
           {/* Animated Icon Container */}
-          <div className="relative">
+          <div className="relative flex-shrink-0">
             {/* Pulsing Glow */}
             {isConnected && (
               <div className={`absolute inset-0 bg-gradient-to-r from-green-400 to-emerald-400 rounded-full blur opacity-40 ${isSyncing ? 'animate-pulse' : ''}`}></div>
@@ -154,8 +168,8 @@ const GoogleFitStatus = ({
           </div>
         </div>
 
-        {/* Sync Button */}
-        {isConnected && (
+        {/* Action Buttons */}
+        {isConnected ? (
           <Button
             variant="primary"
             size="small"
@@ -180,8 +194,45 @@ const GoogleFitStatus = ({
               </span>
             )}
           </Button>
+        ) : (
+          <Button
+            variant="primary"
+            size="small"
+            onClick={onConnectClick}
+            className="shadow-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+          >
+            <span className="flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+              </svg>
+              Connect Google Fit
+            </span>
+          </Button>
         )}
       </div>
+
+      {/* Info Section for Disconnected State */}
+      {!isConnected && (
+        <div className="relative mt-4 pt-4 border-t border-gray-300/40">
+          <p className="text-sm text-gray-700 mb-2 font-medium">
+            ✨ <strong>Why connect Google Fit?</strong>
+          </p>
+          <ul className="text-xs text-gray-600 space-y-1.5 ml-4">
+            <li className="flex items-start gap-2">
+              <span className="text-green-500 mt-0.5">●</span>
+              <span>Automatically sync your steps, distance, calories, and active minutes</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-green-500 mt-0.5">●</span>
+              <span>Background sync every 15 minutes keeps your data up-to-date</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-green-500 mt-0.5">●</span>
+              <span>No manual entry needed - focus on your health, not data entry</span>
+            </li>
+          </ul>
+        </div>
+      )}
 
       {/* Bottom Accent Line */}
       <div className={`
@@ -202,6 +253,7 @@ GoogleFitStatus.propTypes = {
   }),
   lastSyncAt: PropTypes.string,
   onSyncClick: PropTypes.func,
+  onConnectClick: PropTypes.func,
   isSyncing: PropTypes.bool,
 };
 
