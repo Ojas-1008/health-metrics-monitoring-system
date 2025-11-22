@@ -1,21 +1,18 @@
 /**
  * ============================================
- * ANALYTICS TREND CHART COMPONENT
+ * ANALYTICS TREND CHART COMPONENT (ENHANCED)
  * ============================================
  * 
- * Purpose: Mini chart component for displaying 7-day rolling average trends
+ * Premium mini chart with Modern Glassmorphism
  * 
  * Features:
- * - Responsive LineChart using Recharts
- * - Accepts data array of {date, value} points
- * - Customizable color per metric type
- * - Compact design for inline display with analytics badges
- * - Tooltip for data point inspection
- * 
- * Props:
- * - data: Array of {date, value} points (required)
- * - metricType: String identifier for metric (required)
- * - color: Hex color for line (optional, defaults to blue)
+ * - Enhanced LineChart with gradient fills
+ * - Premium glassmorphism tooltip
+ * - Customizable colors per metric type
+ * - Smooth animations
+ * - Gradient stroke for lines
+ * - Enhanced empty state
+ * - Responsive design
  */
 
 import PropTypes from 'prop-types';
@@ -26,31 +23,33 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
+  Area,
+  AreaChart,
 } from 'recharts';
 import { formatDateShort } from '../../utils/dateUtils';
 
 /**
- * Get default color for metric type
+ * Get gradient colors for metric type
  */
-const getDefaultColor = (metricType) => {
-  const colors = {
-    steps: '#3b82f6',        // blue
-    calories: '#ef4444',     // red
-    activeMinutes: '#8b5cf6', // purple
-    distance: '#10b981',     // green
-    weight: '#f59e0b',       // amber
-    sleepHours: '#6366f1',   // indigo
-    heartPoints: '#ec4899',  // pink
+const getMetricGradient = (metricType) => {
+  const gradients = {
+    steps: { from: '#3b82f6', to: '#6366f1', id: 'stepsGradient' },        // blue to indigo
+    calories: { from: '#ef4444', to: '#f97316', id: 'caloriesGradient' },   // red to orange
+    activeMinutes: { from: '#8b5cf6', to: '#a855f7', id: 'activeGradient' }, // purple to fuchsia
+    distance: { from: '#10b981', to: '#14b8a6', id: 'distanceGradient' },   // green to teal
+    weight: { from: '#f59e0b', to: '#f97316', id: 'weightGradient' },       // amber to orange
+    sleepHours: { from: '#6366f1', to: '#8b5cf6', id: 'sleepGradient' },    // indigo to purple
+    heartPoints: { from: '#ec4899', to: '#f43f5e', id: 'heartGradient' },   // pink to rose
   };
-  return colors[metricType] || '#3b82f6';
+  return gradients[metricType] || { from: '#3b82f6', to: '#6366f1', id: 'defaultGradient' };
 };
 
 /**
- * Format value for tooltip based on metric type
+ * Format value for tooltip
  */
 const formatTooltipValue = (value, metricType) => {
   if (value === null || value === undefined) return '—';
-  
+
   switch (metricType) {
     case 'steps':
     case 'calories':
@@ -83,7 +82,7 @@ const getUnit = (metricType) => {
 };
 
 /**
- * Custom Tooltip Component
+ * Enhanced Custom Tooltip
  */
 const CustomTooltip = ({ active, payload, metricType }) => {
   if (!active || !payload || !payload.length) return null;
@@ -91,15 +90,34 @@ const CustomTooltip = ({ active, payload, metricType }) => {
   const data = payload[0].payload;
   const value = data.value;
   const date = data.date;
+  const gradient = getMetricGradient(metricType);
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-2">
-      <p className="text-xs text-gray-500 mb-1">
-        {formatDateShort(date)}
-      </p>
-      <p className="text-sm font-semibold text-gray-900">
-        {formatTooltipValue(value, metricType)} {getUnit(metricType)}
-      </p>
+    <div className="relative bg-white/95 backdrop-blur-xl border-2 border-gray-300/40 rounded-xl shadow-2xl px-4 py-3 overflow-hidden animate-scaleIn">
+      {/* Gradient Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-black/5 pointer-events-none"></div>
+
+      <div className="relative">
+        <p className="text-xs text-gray-600 font-semibold mb-1">
+          {formatDateShort(date)}
+        </p>
+        <p className="text-lg font-extrabold" style={{
+          background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`,
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text',
+        }}>
+          {formatTooltipValue(value, metricType)} {getUnit(metricType)}
+        </p>
+      </div>
+
+      {/* Bottom Accent */}
+      <div
+        className="absolute bottom-0 left-0 right-0 h-1 opacity-50"
+        style={{
+          background: `linear-gradient(to right, ${gradient.from}, ${gradient.to})`
+        }}
+      ></div>
     </div>
   );
 };
@@ -111,22 +129,24 @@ CustomTooltip.propTypes = {
 };
 
 /**
- * Main AnalyticsTrendChart Component
+ * Enhanced AnalyticsTrendChart Component
  */
 const AnalyticsTrendChart = ({ data, metricType, color }) => {
   // Validate data
   if (!data || !Array.isArray(data) || data.length === 0) {
     return (
-      <div className="flex items-center justify-center h-24 text-xs text-gray-400">
-        No trend data available
+      <div className="flex flex-col items-center justify-center h-24 text-center">
+        <div className="text-2xl mb-1 opacity-50">📊</div>
+        <p className="text-xs text-gray-500 font-medium">No trend data</p>
       </div>
     );
   }
 
-  // Get color
-  const lineColor = color || getDefaultColor(metricType);
+  // Get gradient colors
+  const gradient = getMetricGradient(metricType);
+  const strokeColor = color || gradient.from;
 
-  // Sort data by date (oldest first)
+  // Sort data by date
   const sortedData = [...data].sort((a, b) => {
     const dateA = new Date(a.date);
     const dateB = new Date(b.date);
@@ -136,39 +156,58 @@ const AnalyticsTrendChart = ({ data, metricType, color }) => {
   return (
     <div className="w-full h-24">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart
+        <AreaChart
           data={sortedData}
           margin={{ top: 5, right: 5, left: -20, bottom: 5 }}
         >
-          {/* X-Axis - Hidden but used for positioning */}
-          <XAxis
-            dataKey="date"
-            hide
-          />
-          
-          {/* Y-Axis - Hidden but used for scaling */}
-          <YAxis
-            hide
-            domain={['auto', 'auto']}
-          />
-          
+          {/* Gradient Definition */}
+          <defs>
+            <linearGradient id={gradient.id} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={gradient.from} stopOpacity={0.3} />
+              <stop offset="95%" stopColor={gradient.to} stopOpacity={0.05} />
+            </linearGradient>
+            <linearGradient id={`${gradient.id}Stroke`} x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor={gradient.from} />
+              <stop offset="100%" stopColor={gradient.to} />
+            </linearGradient>
+          </defs>
+
+          {/* X-Axis */}
+          <XAxis dataKey="date" hide />
+
+          {/* Y-Axis */}
+          <YAxis hide domain={['auto', 'auto']} />
+
           {/* Tooltip */}
           <Tooltip
             content={<CustomTooltip metricType={metricType} />}
-            cursor={{ stroke: lineColor, strokeWidth: 1, strokeDasharray: '3 3' }}
+            cursor={{
+              stroke: gradient.from,
+              strokeWidth: 2,
+              strokeDasharray: '5 5',
+              opacity: 0.5
+            }}
           />
-          
-          {/* Line */}
-          <Line
+
+          {/* Area with gradient fill */}
+          <Area
             type="monotone"
             dataKey="value"
-            stroke={lineColor}
-            strokeWidth={2}
+            stroke={`url(#${gradient.id}Stroke)`}
+            strokeWidth={3}
+            fill={`url(#${gradient.id})`}
             dot={false}
-            activeDot={{ r: 4, fill: lineColor }}
-            animationDuration={500}
+            activeDot={{
+              r: 6,
+              fill: gradient.from,
+              stroke: '#fff',
+              strokeWidth: 2,
+              style: { filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }
+            }}
+            animationDuration={800}
+            animationEasing="ease-in-out"
           />
-        </LineChart>
+        </AreaChart>
       </ResponsiveContainer>
     </div>
   );

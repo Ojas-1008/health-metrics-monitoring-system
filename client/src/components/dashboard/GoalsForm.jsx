@@ -1,23 +1,18 @@
 /**
  * ============================================
- * GOALS FORM COMPONENT
+ * GOALS FORM COMPONENT (ENHANCED)
  * ============================================
  *
- * Purpose: Form for creating and editing user fitness goals
+ * Premium form with Modern Glassmorphism
  *
  * Features:
- * - Input fields for all goal types
- * - Client-side validation with feedback
- * - Loading state during submission
- * - Error handling
- * - Success callback
- * - Pre-fill with existing goals
- * - Range validation helpers
- *
- * Props:
- * - initialGoals: Pre-filled goal values (optional)
- * - onSuccess: Callback when goals saved successfully
- * - onError: Callback when save fails
+ * - Glassmorphism input fields with focus glow
+ * - Real-time validation with visual feedback
+ * - Success checkmarks on valid inputs
+ * - Animated error messages
+ * - Enhanced buttons with gradients
+ * - Beautiful tip card
+ * - Smooth transitions
  */
 
 import { useState, useCallback } from 'react';
@@ -25,19 +20,12 @@ import * as goalsService from '../../services/goalsService';
 import Button from '../common/Button';
 import Alert from '../common/Alert';
 
-/**
- * ============================================
- * GOALS FORM COMPONENT
- * ============================================
- */
-
 const GoalsForm = ({
   initialGoals = null,
   onSuccess = null,
   onError = null,
 }) => {
-  // ===== STATE MANAGEMENT =====
-
+  // ===== STATE =====
   const [formData, setFormData] = useState({
     weightGoal: initialGoals?.weightGoal || '',
     stepGoal: initialGoals?.stepGoal || '',
@@ -51,22 +39,16 @@ const GoalsForm = ({
   const [alert, setAlert] = useState({ visible: false, type: 'info', message: '' });
 
   // ===== VALIDATION RULES =====
-
   const validationRules = {
-    weightGoal: { min: 30, max: 300, label: 'Weight Goal', unit: 'kg' },
-    stepGoal: { min: 1000, max: 50000, label: 'Step Goal', unit: 'steps' },
-    sleepGoal: { min: 4, max: 12, label: 'Sleep Goal', unit: 'hours' },
-    calorieGoal: { min: 500, max: 5000, label: 'Calorie Goal', unit: 'cal' },
-    distanceGoal: { min: 0.5, max: 100, label: 'Distance Goal', unit: 'km' },
+    weightGoal: { min: 30, max: 300, label: 'Weight Goal', unit: 'kg', icon: '⚖️', gradient: 'from-purple-500 to-pink-600' },
+    stepGoal: { min: 1000, max: 50000, label: 'Step Goal', unit: 'steps', icon: '👟', gradient: 'from-blue-500 to-indigo-600' },
+    sleepGoal: { min: 4, max: 12, label: 'Sleep Goal', unit: 'hours', icon: '😴', gradient: 'from-green-500 to-emerald-600' },
+    calorieGoal: { min: 500, max: 5000, label: 'Calorie Goal', unit: 'cal', icon: '🔥', gradient: 'from-orange-500 to-red-600' },
+    distanceGoal: { min: 0.5, max: 100, label: 'Distance Goal', unit: 'km', icon: '🏃', gradient: 'from-teal-500 to-cyan-600' },
   };
 
-  // ===== HELPER FUNCTIONS =====
-
-  /**
-   * Validate field value
-   */
+  // ===== VALIDATION =====
   const validateField = useCallback((name, value) => {
-    // Allow empty values
     if (value === '' || value === null || value === undefined) {
       return '';
     }
@@ -91,13 +73,9 @@ const GoalsForm = ({
     return '';
   }, []);
 
-  /**
-   * Validate entire form
-   */
   const validateForm = useCallback(() => {
     const newErrors = {};
 
-    // Check if at least one goal is provided
     const hasAnyGoal = Object.entries(formData).some(
       ([, value]) => value !== '' && value !== null && value !== undefined
     );
@@ -106,7 +84,6 @@ const GoalsForm = ({
       return { hasErrors: true, message: 'Please set at least one goal' };
     }
 
-    // Validate each field
     Object.entries(formData).forEach(([name, value]) => {
       const error = validateField(name, value);
       if (error) {
@@ -119,10 +96,6 @@ const GoalsForm = ({
   }, [formData, validateField]);
 
   // ===== EVENT HANDLERS =====
-
-  /**
-   * Handle input change
-   */
   const handleInputChange = (e) => {
     const { name, value } = e.target;
 
@@ -131,7 +104,6 @@ const GoalsForm = ({
       [name]: value === '' ? '' : Number(value),
     }));
 
-    // Clear error for this field when user starts typing
     if (errors[name]) {
       setErrors((prev) => ({
         ...prev,
@@ -140,9 +112,6 @@ const GoalsForm = ({
     }
   };
 
-  /**
-   * Handle form submission
-   */
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -160,7 +129,6 @@ const GoalsForm = ({
     setAlert({ visible: false, type: 'info', message: '' });
 
     try {
-      // Filter out empty values
       const goalsToSave = {};
       Object.entries(formData).forEach(([key, value]) => {
         if (value !== '' && value !== null && value !== undefined) {
@@ -168,7 +136,6 @@ const GoalsForm = ({
         }
       });
 
-      // Call appropriate service function
       const result = initialGoals
         ? await goalsService.updateGoals(goalsToSave)
         : await goalsService.setGoals(goalsToSave);
@@ -205,9 +172,6 @@ const GoalsForm = ({
     }
   };
 
-  /**
-   * Handle clear form
-   */
   const handleClear = () => {
     setFormData({
       weightGoal: '',
@@ -221,175 +185,106 @@ const GoalsForm = ({
   };
 
   // ===== RENDER =====
-
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-6">
       {/* Alert */}
       {alert.visible && (
-        <Alert
-          type={alert.type}
-          message={alert.message}
-          onClose={() => setAlert((prev) => ({ ...prev, visible: false }))}
-          dismissible
-        />
+        <div className="animate-slideDown">
+          <Alert
+            type={alert.type}
+            message={alert.message}
+            onClose={() => setAlert((prev) => ({ ...prev, visible: false }))}
+            dismissible
+          />
+        </div>
       )}
 
-      {/* Weight Goal */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          ⚖️ Weight Goal (kg)
-        </label>
-        <input
-          type="number"
-          name="weightGoal"
-          value={formData.weightGoal}
-          onChange={handleInputChange}
-          placeholder="e.g., 70"
-          min="30"
-          max="300"
-          step="0.5"
-          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition ${
-            errors.weightGoal ? 'border-red-500' : 'border-gray-300'
-          }`}
-        />
-        <p className="text-xs text-gray-500 mt-1">Range: 30 - 300 kg</p>
-        {errors.weightGoal && (
-          <p className="text-xs text-red-600 mt-1 font-medium">
-            {errors.weightGoal}
-          </p>
-        )}
-      </div>
+      {/* Form Fields */}
+      {Object.entries(validationRules).map(([fieldName, rule]) => (
+        <div key={fieldName}>
+          <label className="block text-sm font-bold text-gray-900 mb-2">
+            <span className="text-xl mr-2">{rule.icon}</span>
+            {rule.label}
+            <span className="text-gray-600 text-xs ml-2 font-normal">
+              ({rule.unit})
+            </span>
+          </label>
 
-      {/* Step Goal */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          👟 Step Goal (steps/day)
-        </label>
-        <input
-          type="number"
-          name="stepGoal"
-          value={formData.stepGoal}
-          onChange={handleInputChange}
-          placeholder="e.g., 10000"
-          min="1000"
-          max="50000"
-          step="100"
-          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition ${
-            errors.stepGoal ? 'border-red-500' : 'border-gray-300'
-          }`}
-        />
-        <p className="text-xs text-gray-500 mt-1">Range: 1,000 - 50,000 steps</p>
-        {errors.stepGoal && (
-          <p className="text-xs text-red-600 mt-1 font-medium">
-            {errors.stepGoal}
-          </p>
-        )}
-      </div>
+          <div className="relative">
+            <input
+              type="number"
+              name={fieldName}
+              value={formData[fieldName]}
+              onChange={handleInputChange}
+              placeholder={`e.g., ${fieldName === 'stepGoal' ? '10000' : fieldName === 'weightGoal' ? '70' : fieldName === 'sleepGoal' ? '8' : fieldName === 'calorieGoal' ? '2000' : '5'}`}
+              min={rule.min}
+              max={rule.max}
+              step={fieldName === 'stepGoal' || fieldName === 'calorieGoal' ? (fieldName === 'stepGoal' ? '100' : '50') : '0.5'}
+              className={`
+                w-full px-4 py-3
+                bg-white/80 backdrop-blur-sm
+                border-2 rounded-xl
+                font-medium text-gray-900
+                transition-all duration-300
+                focus:outline-none focus:ring-4 focus:shadow-lg
+                placeholder:text-gray-400 placeholder:font-normal
+                ${errors[fieldName]
+                  ? 'border-red-400 focus:border-red-500 focus:ring-red-200/30'
+                  : 'border-gray-300 focus:border-blue-500 focus:ring-blue-200/30'
+                }
+              `}
+            />
 
-      {/* Sleep Goal */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          😴 Sleep Goal (hours)
-        </label>
-        <input
-          type="number"
-          name="sleepGoal"
-          value={formData.sleepGoal}
-          onChange={handleInputChange}
-          placeholder="e.g., 8"
-          min="4"
-          max="12"
-          step="0.5"
-          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition ${
-            errors.sleepGoal ? 'border-red-500' : 'border-gray-300'
-          }`}
-        />
-        <p className="text-xs text-gray-500 mt-1">Range: 4 - 12 hours</p>
-        {errors.sleepGoal && (
-          <p className="text-xs text-red-600 mt-1 font-medium">
-            {errors.sleepGoal}
-          </p>
-        )}
-      </div>
+            {/* Success Checkmark */}
+            {formData[fieldName] && !errors[fieldName] && (
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500 text-xl animate-scaleIn">
+                ✓
+              </span>
+            )}
+          </div>
 
-      {/* Calorie Goal */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          🔥 Calorie Goal (cal/day)
-        </label>
-        <input
-          type="number"
-          name="calorieGoal"
-          value={formData.calorieGoal}
-          onChange={handleInputChange}
-          placeholder="e.g., 2000"
-          min="500"
-          max="5000"
-          step="50"
-          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition ${
-            errors.calorieGoal ? 'border-red-500' : 'border-gray-300'
-          }`}
-        />
-        <p className="text-xs text-gray-500 mt-1">Range: 500 - 5,000 calories</p>
-        {errors.calorieGoal && (
-          <p className="text-xs text-red-600 mt-1 font-medium">
-            {errors.calorieGoal}
+          <p className="text-xs text-gray-600 mt-1.5 font-medium">
+            Range: {rule.min.toLocaleString()} - {rule.max.toLocaleString()} {rule.unit}
           </p>
-        )}
-      </div>
 
-      {/* Distance Goal */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          🏃 Distance Goal (km)
-        </label>
-        <input
-          type="number"
-          name="distanceGoal"
-          value={formData.distanceGoal}
-          onChange={handleInputChange}
-          placeholder="e.g., 5"
-          min="0.5"
-          max="100"
-          step="0.5"
-          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition ${
-            errors.distanceGoal ? 'border-red-500' : 'border-gray-300'
-          }`}
-        />
-        <p className="text-xs text-gray-500 mt-1">Range: 0.5 - 100 km</p>
-        {errors.distanceGoal && (
-          <p className="text-xs text-red-600 mt-1 font-medium">
-            {errors.distanceGoal}
-          </p>
-        )}
-      </div>
+          {errors[fieldName] && (
+            <p className="mt-2 text-sm text-red-600 font-semibold flex items-center gap-1 animate-slideDown">
+              <span>❌</span> {errors[fieldName]}
+            </p>
+          )}
+        </div>
+      ))}
 
-      {/* Helper Text */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900">
-        <p className="font-medium mb-1">💡 Tip:</p>
-        <p>Leave any fields empty to keep current values. Set at least one goal to save.</p>
+      {/* Tip Card */}
+      <div className="p-6 bg-gradient-to-br from-blue-50/90 to-indigo-50/90 backdrop-blur-md border-2 border-blue-300/40 rounded-xl shadow-lg">
+        <p className="text-sm text-blue-900 font-medium flex items-start gap-3">
+          <span className="text-2xl">💡</span>
+          <span>
+            <strong className="font-bold">Tip:</strong> Leave any fields empty to keep current values. Set at least one goal to save.
+          </span>
+        </p>
       </div>
 
       {/* Form Actions */}
-      <div className="flex gap-2 pt-4 border-t border-gray-200">
+      <div className="flex gap-4 pt-6 border-t-2 border-gray-300/40">
         <Button
           type="submit"
           variant="primary"
           disabled={isLoading}
+          loading={isLoading}
           className="flex-1"
         >
           {isLoading ? '💾 Saving...' : '💾 Save Goals'}
         </Button>
 
-        <Button
+        <button
           type="button"
-          variant="secondary"
           onClick={handleClear}
           disabled={isLoading}
-          className="flex-1"
+          className="flex-1 px-8 py-3 bg-white/80 backdrop-blur-sm border-2 border-gray-300 text-gray-800 font-bold rounded-xl hover:bg-gray-50 hover:border-gray-400 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg transform hover:scale-105"
         >
-          Clear
-        </Button>
+          🔄 Clear
+        </button>
       </div>
     </form>
   );

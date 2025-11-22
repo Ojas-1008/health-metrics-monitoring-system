@@ -1,23 +1,17 @@
 /**
  * ============================================
- * GOALS SECTION COMPONENT
+ * GOALS SECTION COMPONENT (ENHANCED)
  * ============================================
  *
- * Purpose: Display current goals and progress
- * in the dashboard
+ * Premium goals display with Modern Glassmorphism
  *
  * Features:
- * - Show current goals with progress bars
- * - Display achievement status
- * - Edit button to open GoalsForm modal
- * - Load goals on mount
- * - Refresh goals
- * - Progress calculation based on today's metrics
- * - Empty state when no goals set
- *
- * Props:
- * - onGoalsUpdate: Callback when goals updated
- * - todayMetrics: Current day's metrics for progress
+ * - Glassmorphism goal cards with gradients
+ * - Animated progress bars with shimmer
+ * - Achievement celebration effects
+ * - Enhanced modal with backdrop blur
+ * - Beautiful empty state with animations
+ * - Real-time progress tracking
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -28,7 +22,7 @@ import Alert from '../common/Alert';
 
 /**
  * ============================================
- * GOAL PROGRESS CARD COMPONENT
+ * ENHANCED GOAL PROGRESS CARD
  * ============================================
  */
 
@@ -45,70 +39,96 @@ const GoalProgressCard = ({
   const percentage = Math.min((current / goal) * 100, 100);
   const achieved = percentage >= 100;
 
-  const colorClasses = {
+  const colorSchemes = {
     blue: {
-      bg: 'bg-blue-50',
-      border: 'border-blue-200',
+      gradient: 'from-blue-500 via-indigo-500 to-purple-500',
+      bg: 'from-blue-50/90 to-indigo-50/90',
+      border: 'border-blue-300/40',
       text: 'text-blue-900',
-      progress: 'bg-blue-600',
+      iconBg: 'from-blue-500 to-indigo-500',
     },
     green: {
-      bg: 'bg-green-50',
-      border: 'border-green-200',
+      gradient: 'from-green-500 via-emerald-500 to-teal-500',
+      bg: 'from-green-50/90 to-emerald-50/90',
+      border: 'border-green-300/40',
       text: 'text-green-900',
-      progress: 'bg-green-600',
+      iconBg: 'from-green-500 to-emerald-500',
     },
     purple: {
-      bg: 'bg-purple-50',
-      border: 'border-purple-200',
+      gradient: 'from-purple-500 via-pink-500 to-rose-500',
+      bg: 'from-purple-50/90 to-pink-50/90',
+      border: 'border-purple-300/40',
       text: 'text-purple-900',
-      progress: 'bg-purple-600',
+      iconBg: 'from-purple-500 to-pink-500',
     },
   };
 
-  const colors = colorClasses[color] || colorClasses.blue;
+  const colors = colorSchemes[color] || colorSchemes.blue;
 
   return (
-    <div className={`${colors.bg} border-2 ${colors.border} rounded-lg p-4`}>
+    <div className={`group relative bg-gradient-to-br ${colors.bg} backdrop-blur-md border-2 ${colors.border} rounded-2xl p-6 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 overflow-hidden`}>
+      {/* Gradient Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-black/5 pointer-events-none"></div>
+
       {/* Header */}
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">{icon}</span>
+      <div className="relative flex items-start justify-between mb-4">
+        <div className="flex items-center gap-3">
+          {/* Animated Icon */}
+          <div className="relative">
+            <div className={`absolute inset-0 bg-gradient-to-r ${colors.iconBg} rounded-xl blur opacity-30 group-hover:opacity-50 transition-opacity`}></div>
+            <div className={`relative w-12 h-12 bg-gradient-to-br ${colors.iconBg} rounded-xl flex items-center justify-center shadow-lg transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-300`}>
+              <span className="text-2xl">{icon}</span>
+            </div>
+          </div>
+
           <div>
-            <h4 className={`${colors.text} font-semibold text-sm`}>{title}</h4>
-            <p className={`${colors.text} text-xs opacity-75`}>
+            <h4 className={`${colors.text} font-bold text-base mb-0.5`}>{title}</h4>
+            <p className={`${colors.text} text-xs opacity-75 font-medium`}>
               Goal: {goal} {unit}
             </p>
           </div>
         </div>
 
+        {/* Achievement Badge */}
         {achieved && (
-          <div className="flex items-center gap-1 px-2 py-1 bg-green-100 rounded-full">
-            <span className="text-lg">✓</span>
-            <span className="text-xs font-bold text-green-700">Achieved!</span>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-green-400 to-emerald-400 text-white rounded-full shadow-md animate-bounce">
+            <span className="text-base font-bold">✓</span>
+            <span className="text-xs font-bold">Achieved!</span>
           </div>
         )}
       </div>
 
       {/* Progress Bar */}
-      <div className="mb-2">
-        <div className="w-full bg-gray-300 rounded-full h-2 overflow-hidden">
+      <div className="relative mb-4">
+        <div className="w-full h-4 bg-gray-200/60 backdrop-blur-sm rounded-full overflow-hidden shadow-inner">
+          {/* Progress Fill */}
           <div
-            className={`${colors.progress} h-full transition-all duration-500 rounded-full`}
+            className={`h-full bg-gradient-to-r ${colors.gradient} transition-all duration-700 ease-out relative overflow-hidden`}
             style={{ width: `${percentage}%` }}
-          />
+          >
+            {/* Shimmer Effect */}
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
+          </div>
+
+          {/* Achievement Glow */}
+          {achieved && (
+            <div className="absolute inset-0 bg-green-400/20 animate-pulse rounded-full"></div>
+          )}
         </div>
       </div>
 
       {/* Stats */}
-      <div className="flex justify-between items-center">
-        <div className={`${colors.text} text-sm font-bold`}>
+      <div className="relative flex justify-between items-center">
+        <div className={`text-2xl font-extrabold bg-gradient-to-r ${colors.gradient} bg-clip-text text-transparent`}>
           {current.toLocaleString()} {unit}
         </div>
-        <div className={`${colors.text} text-sm font-semibold opacity-75`}>
+        <div className={`${colors.text} text-lg font-bold opacity-75`}>
           {Math.round(percentage)}%
         </div>
       </div>
+
+      {/* Bottom Accent */}
+      <div className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${colors.gradient} opacity-50`}></div>
     </div>
   );
 };
@@ -123,19 +143,13 @@ const GoalsSection = ({
   onGoalsUpdate = null,
   todayMetrics = null,
 }) => {
-  // ===== STATE MANAGEMENT =====
-
   const [goals, setGoals] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
   const [alert, setAlert] = useState({ visible: false, type: 'info', title: '', message: '' });
 
-  // ===== HELPER FUNCTIONS =====
-
-  /**
-   * Show alert notification
-   */
+  // Show alert
   const showAlert = useCallback((type, title, message, duration = 4000) => {
     setAlert({ visible: true, type, title, message });
 
@@ -146,18 +160,12 @@ const GoalsSection = ({
     }
   }, []);
 
-  /**
-   * Hide alert
-   */
+  // Hide alert
   const hideAlert = useCallback(() => {
     setAlert((prev) => ({ ...prev, visible: false }));
   }, []);
 
-  // ===== DATA LOADING =====
-
-  /**
-   * Load goals from API
-   */
+  // Load goals
   const loadGoals = useCallback(async () => {
     setIsRefreshing(true);
 
@@ -177,9 +185,7 @@ const GoalsSection = ({
     }
   }, []);
 
-  /**
-   * Handle goals form success
-   */
+  // Handle goals success
   const handleGoalsSuccess = useCallback((updatedGoals) => {
     setGoals(updatedGoals);
     setShowEditForm(false);
@@ -190,23 +196,17 @@ const GoalsSection = ({
     }
   }, [showAlert, onGoalsUpdate]);
 
-  // ===== EFFECTS =====
-
-  /**
-   * Load goals on mount
-   */
+  // Load on mount
   useEffect(() => {
     setIsLoading(true);
     loadGoals().finally(() => setIsLoading(false));
   }, [loadGoals]);
 
-  // ===== RENDER =====
-
   return (
     <div className="w-full">
       {/* Alert */}
       {alert.visible && (
-        <div className="mb-4">
+        <div className="mb-6 animate-slideDown">
           <Alert
             type={alert.type}
             title={alert.title}
@@ -219,12 +219,12 @@ const GoalsSection = ({
 
       {/* Loading State */}
       {isLoading ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="space-y-4">
+        <div className="bg-gradient-to-br from-white/90 to-blue-50/90 backdrop-blur-md rounded-2xl border-2 border-gray-300/40 p-8 shadow-xl">
+          <div className="space-y-6">
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="animate-pulse">
-                <div className="h-4 bg-gray-300 rounded w-32 mb-2"></div>
-                <div className="h-2 bg-gray-200 rounded w-full"></div>
+                <div className="h-6 bg-gray-300 rounded-lg w-32 mb-3"></div>
+                <div className="h-4 bg-gray-200 rounded-full w-full"></div>
               </div>
             ))}
           </div>
@@ -232,35 +232,38 @@ const GoalsSection = ({
       ) : goals && Object.keys(goals).some(key => goals[key]) ? (
         <>
           {/* Goals Section */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="relative bg-gradient-to-br from-white/90 to-blue-50/90 backdrop-blur-md rounded-2xl border-2 border-gray-300/40 p-8 shadow-2xl overflow-hidden">
+            {/* Gradient Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-black/5 pointer-events-none"></div>
+
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6 pb-4 border-b border-gray-200">
+            <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8 pb-6 border-b-2 border-gray-300/40">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">
+                <h2 className="text-3xl font-extrabold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
                   🎯 Your Goals
                 </h2>
-                <p className="text-sm text-gray-600 mt-1">
+                <p className="text-sm text-gray-700 font-medium">
                   Track your progress toward your health targets
                 </p>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex gap-3">
                 <Button
                   variant="secondary"
-                  size="sm"
+                  size="small"
                   onClick={loadGoals}
                   disabled={isRefreshing}
-                  className="flex items-center gap-1"
+                  className="flex items-center gap-2"
                 >
-                  <span>{isRefreshing ? '⟳' : '🔄'}</span>
+                  <span className={isRefreshing ? 'animate-spin' : ''}>🔄</span>
                   <span className="hidden sm:inline">Refresh</span>
                 </Button>
 
                 <Button
                   variant="primary"
-                  size="sm"
+                  size="small"
                   onClick={() => setShowEditForm(true)}
-                  className="flex items-center gap-1"
+                  className="flex items-center gap-2"
                 >
                   <span>✎</span>
                   <span className="hidden sm:inline">Edit Goals</span>
@@ -269,7 +272,7 @@ const GoalsSection = ({
             </div>
 
             {/* Goals Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="relative grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               {goals.weightGoal && (
                 <GoalProgressCard
                   icon="⚖️"
@@ -304,30 +307,34 @@ const GoalsSection = ({
               )}
             </div>
 
-            {/* Goals Summary */}
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-900">
-                <span className="font-semibold">💡 Pro Tip:</span> Keep your goals
-                realistic and adjust them as you progress. Small, consistent steps
-                lead to big changes!
+            {/* Pro Tip */}
+            <div className="relative p-6 bg-gradient-to-br from-blue-50/90 to-indigo-50/90 backdrop-blur-md border-2 border-blue-300/40 rounded-xl shadow-lg">
+              <p className="text-sm text-blue-900 font-medium flex items-start gap-3">
+                <span className="text-2xl">💡</span>
+                <span>
+                  <strong className="font-bold">Pro Tip:</strong> Keep your goals realistic and adjust them as you progress. Small, consistent steps lead to big changes!
+                </span>
               </p>
             </div>
+
+            {/* Bottom Accent */}
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 opacity-50"></div>
           </div>
 
           {/* Edit Form Modal */}
           {showEditForm && (
-            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
+              <div className="bg-gradient-to-br from-white/95 to-gray-50/95 backdrop-blur-xl rounded-2xl shadow-2xl max-w-md w-full p-8 max-h-[90vh] overflow-y-auto border-2 border-gray-300/40 animate-scaleIn">
                 {/* Modal Header */}
-                <div className="flex items-center justify-between mb-4 pb-4 border-b border-gray-200">
-                  <h3 className="text-lg font-bold text-gray-900">
+                <div className="flex items-center justify-between mb-6 pb-6 border-b-2 border-gray-300/40">
+                  <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                     Edit Your Goals
                   </h3>
                   <button
                     onClick={() => setShowEditForm(false)}
-                    className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
+                    className="p-2 text-gray-500 hover:text-gray-900 bg-white/80 backdrop-blur-sm hover:bg-white rounded-xl transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-110"
                   >
-                    ✕
+                    <span className="text-2xl leading-none">✕</span>
                   </button>
                 </div>
 
@@ -347,56 +354,60 @@ const GoalsSection = ({
         </>
       ) : (
         /* Empty State */
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-dashed border-blue-300 rounded-lg p-8 text-center">
-          <div className="text-5xl mb-4">🎯</div>
+        <div className="relative bg-gradient-to-br from-blue-50/90 to-indigo-50/90 backdrop-blur-md border-2 border-dashed border-blue-400/60 rounded-2xl p-12 text-center shadow-xl overflow-hidden">
+          {/* Gradient Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-black/5 pointer-events-none"></div>
 
-          <h3 className="text-xl font-bold text-gray-900 mb-2">
-            No Goals Set Yet
-          </h3>
+          <div className="relative">
+            <div className="text-7xl mb-6 animate-float">🎯</div>
 
-          <p className="text-gray-600 mb-6 max-w-md mx-auto">
-            Set your health goals to get motivated and track your progress toward
-            better health!
-          </p>
+            <h3 className="text-2xl font-bold text-gray-900 mb-3">
+              No Goals Set Yet
+            </h3>
 
-          <Button
-            variant="primary"
-            onClick={() => setShowEditForm(true)}
-            className="inline-flex items-center gap-2"
-          >
-            <span>+</span>
-            <span>Set Your First Goal</span>
-          </Button>
+            <p className="text-gray-700 font-medium mb-8 max-w-md mx-auto">
+              Set your health goals to get motivated and track your progress toward better health!
+            </p>
 
-          {/* Edit Form Modal */}
-          {showEditForm && (
-            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
-                {/* Modal Header */}
-                <div className="flex items-center justify-between mb-4 pb-4 border-b border-gray-200">
-                  <h3 className="text-lg font-bold text-gray-900">
-                    Set Your Goals
-                  </h3>
-                  <button
-                    onClick={() => setShowEditForm(false)}
-                    className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
-                  >
-                    ✕
-                  </button>
-                </div>
+            <Button
+              variant="primary"
+              onClick={() => setShowEditForm(true)}
+              className="inline-flex items-center gap-2 shadow-xl"
+            >
+              <span className="text-xl">+</span>
+              <span>Set Your First Goal</span>
+            </Button>
 
-                {/* Modal Content */}
-                <div>
-                  <GoalsForm
-                    onSuccess={handleGoalsSuccess}
-                    onError={() => {
-                      showAlert('error', 'Error', 'Failed to set goals');
-                    }}
-                  />
+            {/* Edit Form Modal */}
+            {showEditForm && (
+              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
+                <div className="bg-gradient-to-br from-white/95 to-gray-50/95 backdrop-blur-xl rounded-2xl shadow-2xl max-w-md w-full p-8 max-h-[90vh] overflow-y-auto border-2 border-gray-300/40 animate-scaleIn">
+                  {/* Modal Header */}
+                  <div className="flex items-center justify-between mb-6 pb-6 border-b-2 border-gray-300/40">
+                    <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                      Set Your Goals
+                    </h3>
+                    <button
+                      onClick={() => setShowEditForm(false)}
+                      className="p-2 text-gray-500 hover:text-gray-900 bg-white/80 backdrop-blur-sm hover:bg-white rounded-xl transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-110"
+                    >
+                      <span className="text-2xl leading-none">✕</span>
+                    </button>
+                  </div>
+
+                  {/* Modal Content */}
+                  <div>
+                    <GoalsForm
+                      onSuccess={handleGoalsSuccess}
+                      onError={() => {
+                        showAlert('error', 'Error', 'Failed to set goals');
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
     </div>
