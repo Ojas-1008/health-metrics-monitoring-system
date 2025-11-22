@@ -32,10 +32,31 @@ export default {
           from: { opacity: '0', transform: 'translateY(-20px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
+        slideUp: {
+          from: { opacity: '0', transform: 'translateY(20px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        scaleIn: {
+          from: { opacity: '0', transform: 'scale(0.9)' },
+          to: { opacity: '1', transform: 'scale(1)' },
+        },
+        'pulse-slow': {
+          '0%, 100%': { opacity: '0.3' },
+          '50%': { opacity: '0.6' },
+        },
+        'bounce-subtle': {
+          '0%, 100%': { transform: 'translateY(-5%)' },
+          '50%': { transform: 'translateY(0)' },
+        }
       },
       animation: {
-        shimmer: 'shimmer 1s ease-in-out',
+        shimmer: 'shimmer 2s infinite',
         slideInDown: 'slideInDown 0.5s ease-out',
+        slideUp: 'slideUp 0.5s ease-out forwards',
+        scaleIn: 'scaleIn 0.3s ease-out forwards',
+        'pulse-slow': 'pulse-slow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'bounce-slow': 'bounce 3s infinite',
+        'bounce-subtle': 'bounce-subtle 2s infinite',
       },
     },
   },

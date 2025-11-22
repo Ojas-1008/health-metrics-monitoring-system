@@ -1490,63 +1490,88 @@ const Dashboard = () => {
           </div>
 
           {/* ===== ADVANCED QUICK STATS SECTION ===== */}
-          <div className="mb-8">
-            {/* Section Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Today&apos;s Stats</h2>
-                <p className="text-sm text-gray-600 mt-1">
-                  {dateUtils.formatDateLong(new Date())} •{' '}
-                  {todayMetrics ? 'Updated' : 'No data logged yet'}
-                </p>
-              </div>
+          <div className="mb-12 relative group">
+            {/* Decorative Background Elements */}
+            <div className="absolute -top-20 -left-20 w-96 h-96 bg-blue-400/20 rounded-full blur-3xl opacity-30 animate-pulse-slow pointer-events-none"></div>
+            <div className="absolute -bottom-20 -right-20 w-96 h-96 bg-purple-400/20 rounded-full blur-3xl opacity-30 animate-pulse-slow pointer-events-none" style={{ animationDelay: '1s' }}></div>
 
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={loadTodayMetrics}
-                  disabled={isLoadingMetrics}
-                  className="flex items-center gap-2"
-                >
-                  <span>{isLoadingMetrics ? '⟳' : '🔄'}</span>
-                  <span className="hidden sm:inline">Refresh</span>
-                </Button>
+            <div className="relative bg-white/40 backdrop-blur-2xl rounded-[2.5rem] p-8 border border-white/50 shadow-xl overflow-hidden">
+              {/* Glass Reflection */}
+              <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-transparent opacity-50 pointer-events-none"></div>
 
-                <Button
-                  size="sm"
-                  variant="primary"
-                  onClick={() => setShowForm(true)}
-                  className="flex items-center gap-2"
-                >
-                  <span>+</span>
-                  <span className="hidden sm:inline">Add Metrics</span>
-                </Button>
+              {/* Section Header */}
+              <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 mb-8 z-10">
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-gray-700">
+                      Today&apos;s Overview
+                    </h2>
+                    <span className="px-3 py-1 rounded-full bg-green-100/80 text-green-700 text-xs font-bold border border-green-200 backdrop-blur-sm">
+                      Live
+                    </span>
+                  </div>
+                  <p className="text-gray-600 font-medium flex items-center gap-2">
+                    <span className="text-xl">📅</span>
+                    {dateUtils.formatDateLong(new Date())}
+                    <span className="mx-2 text-gray-300">|</span>
+                    <span className={`flex items-center gap-1.5 ${todayMetrics ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      <span className={`w-2 h-2 rounded-full ${todayMetrics ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
+                      {todayMetrics ? 'Data Synced' : 'Waiting for data'}
+                    </span>
+                  </p>
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={loadTodayMetrics}
+                    disabled={isLoadingMetrics}
+                    className="flex items-center gap-2 bg-white/60 hover:bg-white/80 border-white/50 shadow-sm backdrop-blur-md transition-all duration-300 hover:scale-105"
+                  >
+                    <span className={`text-lg ${isLoadingMetrics ? 'animate-spin' : ''}`}>
+                      {isLoadingMetrics ? '⟳' : '🔄'}
+                    </span>
+                    <span className="hidden sm:inline font-semibold">Refresh</span>
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onClick={() => setShowForm(true)}
+                    className="flex items-center gap-2 shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transition-all duration-300 hover:scale-105 hover:-translate-y-0.5"
+                  >
+                    <span className="text-xl font-light">+</span>
+                    <span className="hidden sm:inline font-bold tracking-wide">Log Data</span>
+                  </Button>
+                </div>
               </div>
-            </div>
 
             {/* Stats Grid */}
             {isLoadingMetrics && !todayMetrics ? (
               /* Loading Skeleton */
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="animate-pulse animate-slideUp" style={{ animationDelay: `${i * 100}ms` }}>
-                    <div className="bg-white rounded-xl h-40 border border-gray-100 shadow-sm p-4">
-                      <div className="h-8 w-8 bg-gray-200 rounded-full mb-4"></div>
-                      <div className="h-4 w-24 bg-gray-200 rounded mb-2"></div>
-                      <div className="h-8 w-16 bg-gray-200 rounded"></div>
+                  <div key={i} className="animate-pulse" style={{ animationDelay: `${i * 100}ms` }}>
+                    <div className="bg-white/50 rounded-3xl h-48 border border-white/60 shadow-sm p-6 backdrop-blur-sm">
+                      <div className="flex justify-between mb-6">
+                        <div className="h-12 w-12 bg-gray-200/50 rounded-2xl"></div>
+                        <div className="h-6 w-16 bg-gray-200/50 rounded-full"></div>
+                      </div>
+                      <div className="h-4 w-24 bg-gray-200/50 rounded mb-3"></div>
+                      <div className="h-10 w-32 bg-gray-200/50 rounded-lg"></div>
                     </div>
                   </div>
                 ))}
               </div>
             ) : todayMetrics ? (
               /* Stats Cards */
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
                 {/* Steps */}
-                <div className="animate-slideUp" style={{ animationDelay: '0ms' }}>
+                <div className="animate-slideUp hover:z-20 transition-all" style={{ animationDelay: '0ms' }}>
                   <MetricCard
                     icon="👟"
-                    title="Steps Taken"
+                    title="Steps"
                     value={todayMetrics.metrics?.steps || 0}
                     unit="steps"
                     color="steps"
@@ -1554,14 +1579,15 @@ const Dashboard = () => {
                     trend={trendData.steps}
                     lastValue={previousDayMetrics?.metrics?.steps}
                     isOptimistic={todayMetrics._optimistic}
+                    className="h-full"
                   />
                 </div>
 
                 {/* Calories */}
-                <div className="animate-slideUp" style={{ animationDelay: '100ms' }}>
+                <div className="animate-slideUp hover:z-20 transition-all" style={{ animationDelay: '100ms' }}>
                   <MetricCard
                     icon="🔥"
-                    title="Calories Burned"
+                    title="Calories"
                     value={todayMetrics.metrics?.calories || 0}
                     unit="kcal"
                     color="calories"
@@ -1569,198 +1595,124 @@ const Dashboard = () => {
                     trend={trendData.calories}
                     lastValue={previousDayMetrics?.metrics?.calories}
                     isOptimistic={todayMetrics._optimistic}
+                    className="h-full"
                   />
                 </div>
 
                 {/* Sleep */}
-                <div className="animate-slideUp" style={{ animationDelay: '200ms' }}>
+                <div className="animate-slideUp hover:z-20 transition-all" style={{ animationDelay: '200ms' }}>
                   <MetricCard
                     icon="😴"
-                    title="Sleep Quality"
+                    title="Sleep"
                     value={todayMetrics.metrics?.sleepHours || 0}
-                    unit="hours"
+                    unit="hrs"
                     color="sleep"
                     goal={getGoalForMetric('sleepHours')}
                     trend={trendData.sleepHours}
                     lastValue={previousDayMetrics?.metrics?.sleepHours}
                     isOptimistic={todayMetrics._optimistic}
+                    className="h-full"
                   />
                 </div>
 
                 {/* Weight */}
-                <div className="animate-slideUp" style={{ animationDelay: '300ms' }}>
+                <div className="animate-slideUp hover:z-20 transition-all" style={{ animationDelay: '300ms' }}>
                   <MetricCard
                     icon="⚖️"
-                    title="Body Weight"
+                    title="Weight"
                     value={todayMetrics.metrics?.weight || 0}
                     unit="kg"
                     color="weight"
                     trend={trendData.weight}
                     lastValue={previousDayMetrics?.metrics?.weight}
                     isOptimistic={todayMetrics._optimistic}
+                    className="h-full"
                   />
                 </div>
               </div>
             ) : (
-              /* No Data State */
+              /* No Data State - Enhanced */
               <div className="
-                bg-gradient-to-br from-blue-50 to-cyan-50
-                border-2 border-dashed border-blue-200
-                rounded-xl p-12 text-center
-                animate-scaleIn hover-lift
-                transition-all duration-300
+                relative overflow-hidden
+                bg-gradient-to-br from-white/60 to-blue-50/60
+                backdrop-blur-md
+                border-2 border-dashed border-blue-200/60
+                rounded-3xl p-12 text-center
+                animate-scaleIn group hover:border-blue-300 transition-all duration-500
               ">
-                <div className="text-6xl mb-6 animate-bounce">📊</div>
+                <div className="absolute inset-0 bg-grid-pattern opacity-5 pointer-events-none"></div>
+                
+                <div className="relative z-10">
+                  <div className="text-7xl mb-6 animate-bounce-slow drop-shadow-xl filter grayscale-0 group-hover:scale-110 transition-transform duration-500">📊</div>
 
-                <h3 className="text-2xl font-bold text-gray-900 mb-3">
-                  No Metrics Yet
-                </h3>
+                  <h3 className="text-3xl font-black text-gray-900 mb-4 tracking-tight">
+                    Start Your Journey Today
+                  </h3>
 
-                <p className="text-gray-600 mb-6 max-w-md mx-auto text-lg">
-                  Start tracking your health journey! You have two options:
-                </p>
+                  <p className="text-gray-600 mb-10 max-w-lg mx-auto text-lg leading-relaxed">
+                    Track your progress and reach your goals. Choose how you want to log your data:
+                  </p>
 
-                <div className="mb-8 max-w-lg mx-auto">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
-                    {/* Google Fit Option */}
-                    <div className="bg-white/80 backdrop-blur-sm p-4 rounded-lg border border-blue-200 shadow-sm">
-                      <div className="text-3xl mb-2">🏃</div>
-                      <h4 className="font-bold text-gray-900 mb-2">Automatic Sync</h4>
-                      <p className="text-xs text-gray-600 mb-3">
-                        Connect Google Fit for automatic data sync every 15 minutes
-                      </p>
-                      <div className="text-xs text-green-600 font-medium">
-                        ✓ Recommended
-                      </div>
-                    </div>
-
-                    {/* Manual Entry Option */}
-                    <div className="bg-white/80 backdrop-blur-sm p-4 rounded-lg border border-blue-200 shadow-sm">
-                      <div className="text-3xl mb-2">✍️</div>
-                      <h4 className="font-bold text-gray-900 mb-2">Manual Entry</h4>
-                      <p className="text-xs text-gray-600 mb-3">
-                        Manually log your metrics like steps, weight, and sleep
-                      </p>
-                      <div className="text-xs text-blue-600 font-medium">
-                        ✓ Quick & Easy
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  {googleFitStatus?.connected ? (
+                  <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                    {googleFitStatus?.connected ? (
+                      <Button
+                        variant="primary"
+                        size="lg"
+                        onClick={handleManualSync}
+                        disabled={isSyncing}
+                        className="shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1"
+                      >
+                        {isSyncing ? (
+                          <span className="flex items-center gap-2">
+                            <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                            Syncing...
+                          </span>
+                        ) : (
+                          '🔄 Sync from Google Fit'
+                        )}
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="primary"
+                        size="lg"
+                        onClick={handleConnectGoogleFit}
+                        className="shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 bg-gradient-to-r from-blue-500 to-blue-600"
+                      >
+                        🔗 Connect Google Fit
+                      </Button>
+                    )}
+                    
                     <Button
-                      variant="primary"
+                      variant="secondary"
                       size="lg"
-                      onClick={handleManualSync}
-                      disabled={isSyncing}
+                      onClick={() => setShowForm(true)}
                       className="shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1"
                     >
-                      {isSyncing ? (
-                        <span className="flex items-center gap-2">
-                          <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                          </svg>
-                          Syncing...
-                        </span>
-                      ) : (
-                        '🔄 Sync from Google Fit'
-                      )}
+                      ✍️ Log Manually
                     </Button>
-                  ) : (
-                    <Button
-                      variant="primary"
-                      size="lg"
-                      onClick={handleConnectGoogleFit}
-                      className="shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 bg-gradient-to-r from-blue-500 to-blue-600"
-                    >
-                      🔗 Connect Google Fit
-                    </Button>
-                  )}
-                  
-                  <Button
-                    variant="secondary"
-                    size="lg"
-                    onClick={() => setShowForm(true)}
-                    className="shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1"
-                  >
-                    ✍️ Log Manually
-                  </Button>
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* Trend Info */}
+            {/* Trend Info - Integrated */}
             {todayMetrics && previousDayMetrics && (
-              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm">
-                <p className="text-blue-900 font-semibold mb-2">
-                  📈 Compared to yesterday:
-                </p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-                  {trendData.steps && (
-                    <div>
-                      <span className="font-semibold text-gray-900">Steps:</span>
-                      <span
-                        className={`ml-2 ${trendData.steps.direction === 'up'
-                          ? 'text-green-600'
-                          : 'text-red-600'
-                          }`}
-                      >
-                        {trendData.steps.direction === 'up' ? '↑' : '↓'}
-                        {trendData.steps.percentage}%
-                      </span>
-                    </div>
-                  )}
-
-                  {trendData.calories && (
-                    <div>
-                      <span className="font-semibold text-gray-900">Calories:</span>
-                      <span
-                        className={`ml-2 ${trendData.calories.direction === 'up'
-                          ? 'text-green-600'
-                          : 'text-red-600'
-                          }`}
-                      >
-                        {trendData.calories.direction === 'up' ? '↑' : '↓'}
-                        {trendData.calories.percentage}%
-                      </span>
-                    </div>
-                  )}
-
-                  {trendData.sleepHours && (
-                    <div>
-                      <span className="font-semibold text-gray-900">Sleep:</span>
-                      <span
-                        className={`ml-2 ${trendData.sleepHours.direction === 'up'
-                          ? 'text-green-600'
-                          : 'text-red-600'
-                          }`}
-                      >
-                        {trendData.sleepHours.direction === 'up' ? '↑' : '↓'}
-                        {trendData.sleepHours.percentage}%
-                      </span>
-                    </div>
-                  )}
-
-                  {trendData.weight && (
-                    <div>
-                      <span className="font-semibold text-gray-900">Weight:</span>
-                      <span
-                        className={`ml-2 ${trendData.weight.direction === 'down'
-                          ? 'text-green-600'
-                          : 'text-red-600'
-                          }`}
-                      >
-                        {trendData.weight.direction === 'down' ? '↓' : '↑'}
-                        {trendData.weight.percentage}%
-                      </span>
-                    </div>
-                  )}
+              <div className="mt-8 p-4 bg-white/40 backdrop-blur-sm border border-white/50 rounded-2xl text-sm flex items-center justify-between shadow-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">📈</span>
+                  <p className="text-gray-700 font-semibold">
+                    Daily Insight:
+                  </p>
+                </div>
+                <div className="text-gray-600">
+                  Comparing today&apos;s progress with yesterday&apos;s performance.
                 </div>
               </div>
             )}
+            </div>
           </div>
 
           {/* ===== GOOGLE FIT SYNC STATUS & TRIGGER SECTION ===== */}
