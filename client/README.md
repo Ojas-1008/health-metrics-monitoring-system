@@ -14,6 +14,8 @@ Modern React 19 single-page application (SPA) for health metrics tracking with r
 - **✅ Event Deduplication** - LRU cache-based duplicate event prevention
 - **✅ Responsive Design** - Mobile-first with Tailwind CSS custom theme
 - **✅ Advanced State Management** - Context API + custom hooks
+- **✅ Analytics Trend Charts** - Recharts-powered 7-day trend visualization
+- **✅ Loading Skeletons** - Professional shimmer animations during data loading
 
 ### Architecture
 
@@ -75,10 +77,10 @@ Modern React 19 single-page application (SPA) for health metrics tracking with r
 | **@tailwindcss/postcss** | 4.1.14 | PostCSS plugin (Tailwind v4) |
 | **Custom Theme** | - | Primary color palette, animations |
 
-### Visualization (Ready for Use)
+### Visualization (Implemented)
 | Technology | Version | Purpose |
 |-----------|---------|---------|
-| **Recharts** | 3.3.0 | React charting library |
+| **Recharts** | 3.3.0 | React charting library for analytics trend charts |
 
 ### Development Tools
 | Technology | Version | Purpose |
@@ -107,7 +109,7 @@ client/
     ├── index.css                 # Global styles + Tailwind directives (181 lines)
     │
     ├── pages/                    # Page components
-    │   ├── Dashboard.jsx         # Main dashboard (1,893 lines) ✅
+    │   ├── Dashboard.jsx         # Main dashboard (1,900 lines) ✅
     │   ├── Home.jsx              # Landing page (176 lines) ✅
     │   ├── Login.jsx             # Login page (325 lines) ✅
     │   ├── Register.jsx          # Registration page (413 lines) ✅
@@ -131,7 +133,8 @@ client/
     │   │   ├── GoalsForm.jsx     # Goals input (353 lines) ✅
     │   │   ├── GoogleFitConnection.jsx # OAuth flow (336 lines) ✅
     │   │   ├── GoogleFitStatus.jsx     # Sync status (145 lines) ✅
-    │   │   ├── AnalyticsInsights.jsx   # Analytics display (292 lines) ✅
+    │   │   ├── AnalyticsInsights.jsx   # Analytics display (427 lines) ✅
+    │   │   ├── AnalyticsTrendChart.jsx # Trend chart component (193 lines) ✅
     │   │   └── AnalyticsMonitor.jsx    # Analytics monitor (141 lines) ✅
     │   │
     │   ├── metrics/              # Metric components
@@ -394,7 +397,8 @@ function Dashboard() {
 - `GoalsForm.jsx` (353 lines) - Goals input form
 - `GoogleFitConnection.jsx` (336 lines) - OAuth integration
 - `GoogleFitStatus.jsx` (145 lines) - Sync status display
-- `AnalyticsInsights.jsx` (292 lines) - Analytics visualization
+- `AnalyticsInsights.jsx` (427 lines) - Analytics visualization with trend charts
+- `AnalyticsTrendChart.jsx` (193 lines) - Mini trend chart component
 - `AnalyticsMonitor.jsx` (141 lines) - Analytics monitoring
 
 **Features**:
@@ -472,7 +476,8 @@ function Dashboard() {
 ### 6. Analytics Display (✅ Complete)
 
 **Components**:
-- `AnalyticsInsights.jsx` (292 lines) - Analytics visualization
+- `AnalyticsInsights.jsx` (427 lines) - Analytics visualization with trend charts
+- `AnalyticsTrendChart.jsx` (193 lines) - Mini trend chart component
 - `AnalyticsMonitor.jsx` (141 lines) - Analytics monitoring
 
 **Analytics Types**:
@@ -487,7 +492,9 @@ function Dashboard() {
 - Visual indicators for anomalies
 - Trend badges (↑ increasing, ↓ decreasing, → stable)
 - Multiple time ranges (7-day, 30-day, 90-day)
-- Recharts integration ready for visualization
+- **Recharts-powered trend charts** for each metric type
+- **Loading skeleton animations** during data fetching
+- **Live timestamp display** with "Last updated" indicators
 
 ---
 

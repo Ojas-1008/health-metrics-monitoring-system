@@ -183,7 +183,7 @@ export const addMetric = async (date, metrics, source = 'manual', activities = [
 
     // ===== PREPARE REQUEST DATA =====
     const requestData = {
-      date: dateValidation.normalizedDate.toISOString(),
+      date: dateValidation.isoDate,
       metrics: {
         steps: metrics.steps || 0,
         distance: metrics.distance || 0,

@@ -17,7 +17,9 @@
  */
 
 import PropTypes from 'prop-types';
-import { getRelativeTimeAgo } from '../../utils/dateUtils';
+import { useState, useEffect } from 'react';
+import { formatDistanceToNow } from 'date-fns';
+import AnalyticsTrendChart from './AnalyticsTrendChart';
 
 /**
  * Get trend arrow based on trend type
@@ -98,7 +100,7 @@ const getMetricUnit = (metricType) => {
  */
 const formatValue = (value, metricType) => {
   if (value === null || value === undefined) return '—';
-  
+
   switch (metricType) {
     case 'steps':
     case 'calories':
@@ -117,7 +119,7 @@ const formatValue = (value, metricType) => {
 /**
  * Single Analytics Card Component
  */
-const AnalyticsCard = ({ metricType, analytics, calculatedAt }) => {
+const AnalyticsCard = ({ metricType, analytics, calculatedAt, trendData }) => {
   if (!analytics) return null;
 
   const trend = getTrendArrow(analytics.trend);
@@ -137,7 +139,7 @@ const AnalyticsCard = ({ metricType, analytics, calculatedAt }) => {
             <p className="text-xs text-gray-500">7-day average</p>
           </div>
         </div>
-        
+
         {/* Trend Arrow */}
         <div className={`${trend.bgColor} ${trend.color} px-2 py-1 rounded-full`}>
           <span className="text-xl font-bold">{trend.icon}</span>
@@ -150,7 +152,7 @@ const AnalyticsCard = ({ metricType, analytics, calculatedAt }) => {
           <span className="text-2xl font-bold text-gray-900">{value}</span>
           <span className="text-sm text-gray-500">{unit}</span>
         </div>
-        
+
         {/* Trend Percentage */}
         {analytics.trendPercentage && (
           <p className={`text-xs ${trend.color} mt-1`}>
@@ -200,12 +202,29 @@ const AnalyticsCard = ({ metricType, analytics, calculatedAt }) => {
         </div>
       )}
 
+      {/* Trend Chart */}
+      {trendData && trendData.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          <p className="text-xs text-gray-500 mb-2">7-day trend</p>
+          <AnalyticsTrendChart
+            data={trendData}
+            metricType={metricType}
+          />
+        </div>
+      )}
+
       {/* Last Updated */}
       {calculatedAt && (
         <div className="mt-2 pt-2 border-t border-gray-100">
-          <p className="text-xs text-gray-400">
-            Updated {getRelativeTimeAgo(calculatedAt)}
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-gray-400">
+              Updated {formatDistanceToNow(new Date(calculatedAt), { addSuffix: true })}
+            </p>
+            <div className="flex items-center space-x-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+              <span className="text-xs text-green-600 font-medium">Live</span>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -224,12 +243,98 @@ AnalyticsCard.propTypes = {
     percentile: PropTypes.number,
   }),
   calculatedAt: PropTypes.string,
+  trendData: PropTypes.arrayOf(
+    PropTypes.shape({
+      date: PropTypes.string.isRequired,
+      value: PropTypes.number.isRequired,
+    })
+  ),
+};
+
+/**
+ * Loading Skeleton Component
+ */
+const AnalyticsLoadingSkeleton = () => {
+  return (
+    <div className="space-y-4">
+      {/* Header Skeleton */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-2">
+          <div className="h-6 w-40 bg-gray-200 rounded animate-pulse"></div>
+          <div className="h-4 w-64 bg-gray-200 rounded animate-pulse"></div>
+        </div>
+        <div className="space-y-2 text-right">
+          <div className="h-3 w-20 bg-gray-200 rounded animate-pulse ml-auto"></div>
+          <div className="h-4 w-24 bg-gray-200 rounded animate-pulse ml-auto"></div>
+        </div>
+      </div>
+
+      {/* Cards Skeleton */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <div key={i} className="bg-white rounded-lg border border-gray-200 p-4">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 bg-gray-200 rounded animate-pulse"></div>
+                <div className="space-y-1">
+                  <div className="h-4 w-20 bg-gray-200 rounded animate-pulse"></div>
+                  <div className="h-3 w-24 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+              </div>
+              <div className="w-10 h-10 bg-gray-200 rounded-full animate-pulse"></div>
+            </div>
+
+            {/* Value */}
+            <div className="mb-3 space-y-1">
+              <div className="h-8 w-32 bg-gray-200 rounded animate-pulse"></div>
+              <div className="h-3 w-40 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+
+            {/* Stats */}
+            <div className="flex items-center justify-between">
+              <div className="h-3 w-20 bg-gray-200 rounded animate-pulse"></div>
+              <div className="h-3 w-24 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+
+            {/* Chart */}
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <div className="h-3 w-16 bg-gray-200 rounded animate-pulse mb-2"></div>
+              <div className="h-24 bg-gray-100 rounded animate-pulse"></div>
+            </div>
+
+            {/* Footer */}
+            <div className="mt-2 pt-2 border-t border-gray-100">
+              <div className="h-3 w-28 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Info Banner Skeleton */}
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+        <div className="flex items-start space-x-2">
+          <div className="w-6 h-6 bg-gray-200 rounded animate-pulse"></div>
+          <div className="flex-1 space-y-2">
+            <div className="h-4 w-32 bg-gray-200 rounded animate-pulse"></div>
+            <div className="h-3 w-full bg-gray-200 rounded animate-pulse"></div>
+            <div className="h-3 w-5/6 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 /**
  * Main AnalyticsInsights Component
  */
-const AnalyticsInsights = ({ analyticsData, lastUpdated }) => {
+const AnalyticsInsights = ({ analyticsData, lastUpdated, isLoading }) => {
+  // Show loading skeleton while waiting for first analytics update
+  if (isLoading) {
+    return <AnalyticsLoadingSkeleton />;
+  }
+
   if (!analyticsData || Object.keys(analyticsData).length === 0) {
     return (
       <div className="bg-white rounded-lg border border-gray-200 p-6">
@@ -261,12 +366,12 @@ const AnalyticsInsights = ({ analyticsData, lastUpdated }) => {
             Real-time analytics powered by Apache Spark
           </p>
         </div>
-        
+
         {lastUpdated && (
           <div className="text-right">
             <p className="text-xs text-gray-500">Last updated</p>
             <p className="text-sm font-medium text-gray-700">
-              {getRelativeTimeAgo(lastUpdated)}
+              {formatDistanceToNow(new Date(lastUpdated), { addSuffix: true })}
             </p>
           </div>
         )}
@@ -276,12 +381,17 @@ const AnalyticsInsights = ({ analyticsData, lastUpdated }) => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {metricsWithAnalytics.map((metricType) => {
           const analytics = analyticsData[metricType]['7day'];
+
+          // Extract trend data for chart (last 7 data points if available)
+          const trendData = analytics?.historicalData || [];
+
           return (
             <AnalyticsCard
               key={metricType}
               metricType={metricType}
               analytics={analytics?.analytics}
               calculatedAt={analytics?.calculatedAt}
+              trendData={trendData}
             />
           );
         })}
@@ -296,8 +406,8 @@ const AnalyticsInsights = ({ analyticsData, lastUpdated }) => {
               About Analytics
             </h4>
             <p className="text-xs text-blue-700">
-              Analytics are calculated in real-time by our Apache Spark engine. 
-              Data includes rolling averages, trends, streaks, and percentile rankings 
+              Analytics are calculated in real-time by our Apache Spark engine.
+              Data includes rolling averages, trends, streaks, and percentile rankings
               compared to your historical data. Anomaly detection alerts you to unusual patterns.
             </p>
           </div>
@@ -310,6 +420,7 @@ const AnalyticsInsights = ({ analyticsData, lastUpdated }) => {
 AnalyticsInsights.propTypes = {
   analyticsData: PropTypes.object,
   lastUpdated: PropTypes.string,
+  isLoading: PropTypes.bool,
 };
 
 export default AnalyticsInsights;

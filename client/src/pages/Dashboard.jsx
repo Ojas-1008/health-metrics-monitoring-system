@@ -207,6 +207,7 @@ const Dashboard = () => {
    */
   const [analyticsData, setAnalyticsData] = useState({});
   const [lastAnalyticsUpdate, setLastAnalyticsUpdate] = useState(null);
+  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(true);
 
   // ===== HELPER FUNCTIONS =====
 
@@ -935,6 +936,9 @@ const Dashboard = () => {
 
     // Update last analytics update timestamp
     setLastAnalyticsUpdate(new Date().toISOString());
+    
+    // Mark analytics as loaded on first update
+    setIsLoadingAnalytics(false);
 
     // Show toast notification for batch updates
     if (isBatch && analyticsArray.length > 1) {
@@ -1881,14 +1885,13 @@ const Dashboard = () => {
             </div>
 
             {/* Analytics Insights Section (Spark-powered) */}
-            {analyticsData && Object.keys(analyticsData).length > 0 && (
-              <div className="mt-6">
-                <AnalyticsInsights
-                  analyticsData={analyticsData}
-                  lastUpdated={lastAnalyticsUpdate}
-                />
-              </div>
-            )}
+            <div className="mt-6">
+              <AnalyticsInsights
+                analyticsData={analyticsData}
+                lastUpdated={lastAnalyticsUpdate}
+                isLoading={isLoadingAnalytics}
+              />
+            </div>
 
             {/* Quick Achievements Section */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
