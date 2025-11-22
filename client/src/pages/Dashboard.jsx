@@ -43,14 +43,7 @@ import Button from '../components/common/Button';
 import Alert from '../components/common/Alert';
 
 // Debug component
-import RealtimeDebug from '../debug/RealtimeDebug';
-import TestSSEComponent from '../components/test/TestSSEComponent';
-import TestRealtimeHook from '../components/TestRealtimeHook';
-import MultiEventTest from '../components/MultiEventTest';
-import FilteredMetricsTest from '../components/test/FilteredMetricsTest';
-import ConditionalSubscriptionTest from '../components/test/ConditionalSubscriptionTest';
-import ManualUnsubscribeTest from '../components/test/ManualUnsubscribeTest';
-import EventDeduplicationDebug from '../components/debug/EventDeduplicationDebug';
+
 
 /**
  * ============================================
@@ -156,7 +149,7 @@ const Dashboard = () => {
   const [showForm, setShowForm] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [showTest, setShowTest] = useState(true); // For testing component unmount
+
 
   // Form Specific State
   // Reserved for future form submission loading indicator
@@ -172,19 +165,19 @@ const Dashboard = () => {
   const refreshTimeoutRef = useRef(null);
 
   // ===== NEW STATE FOR REAL-TIME FEATURES =====
-  
+
   /**
    * Track recently submitted metrics to enable optimistic updates
    * and prevent duplicate rendering from SSE events
    */
   const [optimisticMetrics, setOptimisticMetrics] = useState(new Set());
-  
+
   /**
    * Debounce timer ref for summary stat refetches
    * Prevents thrashing when multiple events arrive quickly
    */
   const summaryRefetchTimerRef = useRef(null);
-  
+
   /**
    * Last event timestamp for deduplication
    * Helps identify duplicate events from controller + change stream
@@ -273,26 +266,26 @@ const Dashboard = () => {
     const { operation, date } = eventData;
     const eventKey = `${operation}-${date}`;
     const now = Date.now();
-    
+
     // Check if we processed this event recently
     const lastEventTime = lastEventRef.current.get(eventKey);
-    
+
     if (lastEventTime && (now - lastEventTime < 5000)) {
       // Duplicate detected within 5-second window
       console.log(`[Dashboard] Duplicate event detected: ${eventKey}, skipping`);
       return true;
     }
-    
+
     // Not a duplicate - record this event
     lastEventRef.current.set(eventKey, now);
-    
+
     // Cleanup old entries (older than 10 seconds)
     for (const [key, timestamp] of lastEventRef.current.entries()) {
       if (now - timestamp > 10000) {
         lastEventRef.current.delete(key);
       }
     }
-    
+
     return false;
   }, []);
 
@@ -309,22 +302,22 @@ const Dashboard = () => {
     if (summaryRefetchTimerRef.current) {
       clearTimeout(summaryRefetchTimerRef.current);
     }
-    
+
     // Set new timer
     summaryRefetchTimerRef.current = setTimeout(async () => {
       console.log('[Dashboard] Refetching summary stats (debounced)...');
-      
+
       try {
         const endDate = new Date();
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - 7);
-        
+
         const summaryResult = await metricsService.getMetricsSummary(
           'weekly',
           dateUtils.formatDateISO(startDate),
           dateUtils.formatDateISO(endDate)
         );
-        
+
         if (summaryResult.success) {
           setSummaryStats(summaryResult.data);
           console.log('[Dashboard] ✓ Summary stats refreshed');
@@ -834,8 +827,8 @@ const Dashboard = () => {
     const toastDescription = summary
       ? `${summary.totalSteps.toLocaleString()} steps • ${summary.totalCalories.toLocaleString()} calories`
       : syncedDates?.length > 0
-      ? `Dates: ${syncedDates.slice(0, 3).join(', ')}${syncedDates.length > 3 ? '...' : ''}`
-      : undefined;
+        ? `Dates: ${syncedDates.slice(0, 3).join(', ')}${syncedDates.length > 3 ? '...' : ''}`
+        : undefined;
 
     setSyncToast({
       id: Date.now(),
@@ -936,7 +929,7 @@ const Dashboard = () => {
 
     // Update last analytics update timestamp
     setLastAnalyticsUpdate(new Date().toISOString());
-    
+
     // Mark analytics as loaded on first update
     setIsLoadingAnalytics(false);
 
@@ -1297,10 +1290,10 @@ const Dashboard = () => {
       <div className="fixed top-4 right-4 z-50">
         <div className={`
           flex items-center space-x-2 px-4 py-2 rounded-full shadow-lg text-sm font-medium
-          transition-all duration-300
-          ${isConnected 
-            ? 'bg-green-50 text-green-800 border border-green-200' 
-            : 'bg-red-50 text-red-800 border border-red-200'
+          transition-all duration-300 hover-lift glass
+          ${isConnected
+            ? 'bg-green-50/90 text-green-800 border border-green-200 animate-pulse-highlight'
+            : 'bg-red-50/90 text-red-800 border border-red-200'
           }
         `}>
           {isConnected ? (
@@ -1309,7 +1302,7 @@ const Dashboard = () => {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
               </span>
-              <span>Live</span>
+              <span>Live Updates Active</span>
             </>
           ) : (
             <>
@@ -1318,8 +1311,8 @@ const Dashboard = () => {
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
               </span>
               <span>
-                {realtimeConnectionStatus?.reason === 'reconnecting' 
-                  ? `Reconnecting... (${realtimeConnectionStatus?.retryCount || 0})` 
+                {realtimeConnectionStatus?.reason === 'reconnecting'
+                  ? `Reconnecting... (${realtimeConnectionStatus?.retryCount || 0})`
                   : 'Offline'}
               </span>
             </>
@@ -1327,13 +1320,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* ===== DEBUG PANEL (TEMPORARY - REMOVE AFTER TESTING) ===== */}
-      <div className="fixed bottom-4 right-4 z-50 max-w-md">
-        <RealtimeDebug />
-      </div>
 
-      {/* ===== EVENT DEDUPLICATION DEBUG PANEL ===== */}
-      <EventDeduplicationDebug />
 
       <div className="flex flex-col lg:flex-row min-h-screen">
         {/* ===== SIDEBAR ===== */}
@@ -1393,7 +1380,7 @@ const Dashboard = () => {
         )}
 
         {/* ===== MAIN CONTENT ===== */}
-        <main className="flex-1 p-6 lg:p-8 overflow-y-auto">
+        <main className="flex-1 p-6 lg:p-8 overflow-y-auto animate-fadeIn">
           {/* Mobile Sidebar Toggle */}
           <button
             onClick={() => setShowSidebar(!showSidebar)}
@@ -1440,37 +1427,6 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* ===== SSE TEST COMPONENT ===== */}
-          <TestSSEComponent />
-
-          {/* ===== REALTIME HOOK TEST TOGGLE ===== */}
-          <div className="mb-4">
-            <button
-              onClick={() => setShowTest(!showTest)}
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
-            >
-              {showTest ? '🙈 Hide' : '🐵 Show'} Test Component
-            </button>
-            <span className="ml-2 text-sm text-gray-600">
-              Test component unmounting and cleanup
-            </span>
-          </div>
-
-          {/* ===== REALTIME HOOK TEST COMPONENT ===== */}
-          {showTest && <TestRealtimeHook />}
-
-          {/* ===== MULTI-EVENT SUBSCRIPTION TEST ===== */}
-          <MultiEventTest />
-
-          {/* ===== FILTERED METRICS TEST (DEPENDENCIES ARRAY) ===== */}
-          <FilteredMetricsTest />
-
-          {/* ===== CONDITIONAL SUBSCRIPTION TEST ===== */}
-          <ConditionalSubscriptionTest />
-
-          {/* ===== MANUAL UNSUBSCRIBE TEST ===== */}
-          <ManualUnsubscribeTest />
-
           {/* ===== ADVANCED QUICK STATS SECTION ===== */}
           <div className="mb-8">
             {/* Section Header */}
@@ -1512,8 +1468,12 @@ const Dashboard = () => {
               /* Loading Skeleton */
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="animate-pulse">
-                    <div className="bg-gray-200 rounded-lg h-40 mb-2"></div>
+                  <div key={i} className="animate-pulse animate-slideUp" style={{ animationDelay: `${i * 100}ms` }}>
+                    <div className="bg-white rounded-xl h-40 border border-gray-100 shadow-sm p-4">
+                      <div className="h-8 w-8 bg-gray-200 rounded-full mb-4"></div>
+                      <div className="h-4 w-24 bg-gray-200 rounded mb-2"></div>
+                      <div className="h-8 w-16 bg-gray-200 rounded"></div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1521,116 +1481,93 @@ const Dashboard = () => {
               /* Stats Cards */
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Steps */}
-                <MetricCard
-                  icon="👟"
-                  title="Steps Taken"
-                  value={todayMetrics.metrics?.steps || 0}
-                  unit="steps"
-                  color="steps"
-                  goal={getGoalForMetric('steps')}
-                  trend={trendData.steps}
-                  lastValue={previousDayMetrics?.metrics?.steps}
-                  isOptimistic={todayMetrics._optimistic}
-                />
+                <div className="animate-slideUp" style={{ animationDelay: '0ms' }}>
+                  <MetricCard
+                    icon="👟"
+                    title="Steps Taken"
+                    value={todayMetrics.metrics?.steps || 0}
+                    unit="steps"
+                    color="steps"
+                    goal={getGoalForMetric('steps')}
+                    trend={trendData.steps}
+                    lastValue={previousDayMetrics?.metrics?.steps}
+                    isOptimistic={todayMetrics._optimistic}
+                  />
+                </div>
 
                 {/* Calories */}
-                <MetricCard
-                  icon="🔥"
-                  title="Calories Burned"
-                  value={todayMetrics.metrics?.calories || 0}
-                  unit="kcal"
-                  color="calories"
-                  goal={getGoalForMetric('calories')}
-                  trend={trendData.calories}
-                  lastValue={previousDayMetrics?.metrics?.calories}
-                  isOptimistic={todayMetrics._optimistic}
-                />
+                <div className="animate-slideUp" style={{ animationDelay: '100ms' }}>
+                  <MetricCard
+                    icon="🔥"
+                    title="Calories Burned"
+                    value={todayMetrics.metrics?.calories || 0}
+                    unit="kcal"
+                    color="calories"
+                    goal={getGoalForMetric('calories')}
+                    trend={trendData.calories}
+                    lastValue={previousDayMetrics?.metrics?.calories}
+                    isOptimistic={todayMetrics._optimistic}
+                  />
+                </div>
 
                 {/* Sleep */}
-                <MetricCard
-                  icon="😴"
-                  title="Sleep Quality"
-                  value={todayMetrics.metrics?.sleepHours || 0}
-                  unit="hours"
-                  color="sleep"
-                  goal={getGoalForMetric('sleepHours')}
-                  trend={trendData.sleepHours}
-                  lastValue={previousDayMetrics?.metrics?.sleepHours}
-                  isOptimistic={todayMetrics._optimistic}
-                />
+                <div className="animate-slideUp" style={{ animationDelay: '200ms' }}>
+                  <MetricCard
+                    icon="😴"
+                    title="Sleep Quality"
+                    value={todayMetrics.metrics?.sleepHours || 0}
+                    unit="hours"
+                    color="sleep"
+                    goal={getGoalForMetric('sleepHours')}
+                    trend={trendData.sleepHours}
+                    lastValue={previousDayMetrics?.metrics?.sleepHours}
+                    isOptimistic={todayMetrics._optimistic}
+                  />
+                </div>
 
                 {/* Weight */}
-                <MetricCard
-                  icon="⚖️"
-                  title="Body Weight"
-                  value={todayMetrics.metrics?.weight || 0}
-                  unit="kg"
-                  color="weight"
-                  trend={trendData.weight}
-                  lastValue={previousDayMetrics?.metrics?.weight}
-                  isOptimistic={todayMetrics._optimistic}
-                />
+                <div className="animate-slideUp" style={{ animationDelay: '300ms' }}>
+                  <MetricCard
+                    icon="⚖️"
+                    title="Body Weight"
+                    value={todayMetrics.metrics?.weight || 0}
+                    unit="kg"
+                    color="weight"
+                    trend={trendData.weight}
+                    lastValue={previousDayMetrics?.metrics?.weight}
+                    isOptimistic={todayMetrics._optimistic}
+                  />
+                </div>
               </div>
             ) : (
               /* No Data State */
               <div className="
                 bg-gradient-to-br from-blue-50 to-cyan-50
-                border-2 border-dashed border-blue-300
-                rounded-lg p-12 text-center
+                border-2 border-dashed border-blue-200
+                rounded-xl p-12 text-center
+                animate-scaleIn hover-lift
+                transition-all duration-300
               ">
-                <div className="text-5xl mb-4">📊</div>
+                <div className="text-6xl mb-6 animate-bounce">📊</div>
 
-                <h3 className="text-xl font-bold text-gray-900 mb-2">
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">
                   Start Tracking Today
                 </h3>
 
-                <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                <p className="text-gray-600 mb-8 max-w-md mx-auto text-lg">
                   Begin logging your health metrics to see your daily performance,
                   track progress, and achieve your goals!
                 </p>
 
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Button
                     variant="primary"
+                    size="lg"
                     onClick={() => setShowForm(true)}
+                    className="shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1"
                   >
                     + Log First Metric
                   </Button>
-
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      /* Navigate to learn more */
-                    }}
-                  >
-                    Learn More
-                  </Button>
-                </div>
-
-                <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-                  <div className="bg-white rounded p-3">
-                    <div className="text-2xl mb-1">👟</div>
-                    <p className="font-semibold text-gray-900">Steps</p>
-                    <p className="text-xs text-gray-600">Track daily movement</p>
-                  </div>
-
-                  <div className="bg-white rounded p-3">
-                    <div className="text-2xl mb-1">🔥</div>
-                    <p className="font-semibold text-gray-900">Calories</p>
-                    <p className="text-xs text-gray-600">Monitor energy</p>
-                  </div>
-
-                  <div className="bg-white rounded p-3">
-                    <div className="text-2xl mb-1">😴</div>
-                    <p className="font-semibold text-gray-900">Sleep</p>
-                    <p className="text-xs text-gray-600">Rest quality</p>
-                  </div>
-
-                  <div className="bg-white rounded p-3">
-                    <div className="text-2xl mb-1">⚖️</div>
-                    <p className="font-semibold text-gray-900">Weight</p>
-                    <p className="text-xs text-gray-600">Health tracking</p>
-                  </div>
                 </div>
               </div>
             )}
@@ -1646,11 +1583,10 @@ const Dashboard = () => {
                     <div>
                       <span className="font-semibold text-gray-900">Steps:</span>
                       <span
-                        className={`ml-2 ${
-                          trendData.steps.direction === 'up'
-                            ? 'text-green-600'
-                            : 'text-red-600'
-                        }`}
+                        className={`ml-2 ${trendData.steps.direction === 'up'
+                          ? 'text-green-600'
+                          : 'text-red-600'
+                          }`}
                       >
                         {trendData.steps.direction === 'up' ? '↑' : '↓'}
                         {trendData.steps.percentage}%
@@ -1662,11 +1598,10 @@ const Dashboard = () => {
                     <div>
                       <span className="font-semibold text-gray-900">Calories:</span>
                       <span
-                        className={`ml-2 ${
-                          trendData.calories.direction === 'up'
-                            ? 'text-green-600'
-                            : 'text-red-600'
-                        }`}
+                        className={`ml-2 ${trendData.calories.direction === 'up'
+                          ? 'text-green-600'
+                          : 'text-red-600'
+                          }`}
                       >
                         {trendData.calories.direction === 'up' ? '↑' : '↓'}
                         {trendData.calories.percentage}%
@@ -1678,11 +1613,10 @@ const Dashboard = () => {
                     <div>
                       <span className="font-semibold text-gray-900">Sleep:</span>
                       <span
-                        className={`ml-2 ${
-                          trendData.sleepHours.direction === 'up'
-                            ? 'text-green-600'
-                            : 'text-red-600'
-                        }`}
+                        className={`ml-2 ${trendData.sleepHours.direction === 'up'
+                          ? 'text-green-600'
+                          : 'text-red-600'
+                          }`}
                       >
                         {trendData.sleepHours.direction === 'up' ? '↑' : '↓'}
                         {trendData.sleepHours.percentage}%
@@ -1694,11 +1628,10 @@ const Dashboard = () => {
                     <div>
                       <span className="font-semibold text-gray-900">Weight:</span>
                       <span
-                        className={`ml-2 ${
-                          trendData.weight.direction === 'down'
-                            ? 'text-green-600'
-                            : 'text-red-600'
-                        }`}
+                        className={`ml-2 ${trendData.weight.direction === 'down'
+                          ? 'text-green-600'
+                          : 'text-red-600'
+                          }`}
                       >
                         {trendData.weight.direction === 'down' ? '↓' : '↑'}
                         {trendData.weight.percentage}%
@@ -1711,16 +1644,18 @@ const Dashboard = () => {
           </div>
 
           {/* ===== NEW: GOOGLE FIT STATUS SECTION ===== */}
-          {googleFitStatus && (
-            <div className="mb-8">
-              <GoogleFitStatus
-                googleFitStatus={googleFitStatus}
-                lastSyncAt={lastSyncAt}
-                onSyncClick={handleManualSync}
-                isSyncing={isSyncing}
-              />
-            </div>
-          )}
+          {
+            googleFitStatus && (
+              <div className="mb-8">
+                <GoogleFitStatus
+                  googleFitStatus={googleFitStatus}
+                  lastSyncAt={lastSyncAt}
+                  onSyncClick={handleManualSync}
+                  isSyncing={isSyncing}
+                />
+              </div>
+            )
+          }
 
           {/* ===== NEW: ANALYTICS MONITOR SECTION ===== */}
           <div className="mb-8">
@@ -1730,7 +1665,7 @@ const Dashboard = () => {
           {/* ===== ADVANCED COLLAPSIBLE FORM SECTION ===== */}
           <div className="mb-8">
             {/* Form Trigger Header */}
-            <div 
+            <div
               onClick={toggleFormVisibility}
               className={`
                 bg-white rounded-t-lg border-2 p-4 cursor-pointer
@@ -1857,10 +1792,9 @@ const Dashboard = () => {
                         onClick={() => handleSummaryPeriodChange(key)}
                         className={`
                           px-4 py-2 rounded font-medium transition flex items-center gap-2
-                          ${
-                            summaryPeriod === key
-                              ? 'bg-blue-600 text-white'
-                              : 'text-gray-700 hover:bg-gray-100'
+                          ${summaryPeriod === key
+                            ? 'bg-blue-600 text-white'
+                            : 'text-gray-700 hover:bg-gray-100'
                           }
                         `}
                       >
@@ -2036,10 +1970,9 @@ const Dashboard = () => {
                       className={`
                         px-3 py-2 text-sm font-medium rounded-t-lg transition
                         border-b-2
-                        ${
-                          listPeriodSelected === key
-                            ? 'border-blue-600 text-blue-600 bg-blue-50'
-                            : 'border-transparent text-gray-600 hover:text-gray-900'
+                        ${listPeriodSelected === key
+                          ? 'border-blue-600 text-blue-600 bg-blue-50'
+                          : 'border-transparent text-gray-600 hover:text-gray-900'
                         }
                       `}
                     >
@@ -2114,21 +2047,23 @@ const Dashboard = () => {
 
           {/* Footer Spacing */}
           <div className="h-12"></div>
-        </main>
-      </div>
+        </main >
+      </div >
 
       {/* ===== NEW: TOAST NOTIFICATIONS ===== */}
-      {syncToast && (
-        <Toast
-          message={syncToast.message}
-          description={syncToast.description}
-          variant={syncToast.variant}
-          duration={5000}
-          onClose={() => setSyncToast(null)}
-          showProgress={true}
-        />
-      )}
-    </div>
+      {
+        syncToast && (
+          <Toast
+            message={syncToast.message}
+            description={syncToast.description}
+            variant={syncToast.variant}
+            duration={5000}
+            onClose={() => setSyncToast(null)}
+            showProgress={true}
+          />
+        )
+      }
+    </div >
   );
 };
 
