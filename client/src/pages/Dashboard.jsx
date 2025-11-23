@@ -379,6 +379,33 @@ const Dashboard = () => {
     return colors[metricType];
   }, []);
 
+  /**
+   * Get display value for weight
+   * Uses today's weight if available, otherwise falls back to latest known weight
+   * This prevents showing "0 kg" when weight hasn't been logged today
+   */
+  const getDisplayWeight = useCallback(() => {
+    // 1. Try today's weight
+    if (todayMetrics?.metrics?.weight && todayMetrics.metrics.weight > 0) {
+      return todayMetrics.metrics.weight;
+    }
+    
+    // 2. Try yesterday's weight (from previousDayMetrics)
+    if (previousDayMetrics?.metrics?.weight && previousDayMetrics.metrics.weight > 0) {
+      return previousDayMetrics.metrics.weight;
+    }
+    
+    // 3. Try finding in recent history (allMetrics)
+    if (allMetrics && allMetrics.length > 0) {
+      // Sort by date descending to get most recent
+      const sortedMetrics = [...allMetrics].sort((a, b) => new Date(b.date) - new Date(a.date));
+      const lastWeightMetric = sortedMetrics.find(m => m.metrics?.weight && m.metrics.weight > 0);
+      if (lastWeightMetric) return lastWeightMetric.metrics.weight;
+    }
+    
+    return 0;
+  }, [todayMetrics, previousDayMetrics, allMetrics]);
+
   // ===== DATA FETCHING FUNCTIONS =====
 
   /**
@@ -1690,10 +1717,10 @@ const Dashboard = () => {
                   <MetricCard
                     icon="⚖️"
                     title="Weight"
-                    value={todayMetrics.metrics?.weight || 0}
+                    value={getDisplayWeight()}
                     unit="kg"
                     color="weight"
-                    trend={trendData.weight}
+                    trend={todayMetrics?.metrics?.weight ? trendData.weight : null}
                     lastValue={previousDayMetrics?.metrics?.weight}
                     isOptimistic={todayMetrics._optimistic}
                     className="h-full"
