@@ -10,6 +10,7 @@ import {
   emitToUser,
   emitHeartbeat
 } from '../utils/eventEmitter.js';
+import { getPayloadStats } from '../middleware/payloadMonitor.js';
 
 const router = express.Router();
 
@@ -466,6 +467,58 @@ router.get('/debug/count/:userId?', protect, (req, res) => {
     connectionCount: count,
     isConnected: count > 0
   });
+});
+
+/**
+ * ============================================
+ * DEBUG ENDPOINT: PAYLOAD STATISTICS
+ * ============================================
+ *
+ * @route   GET /api/events/debug/payload-stats
+ * @desc    Get SSE payload monitoring statistics
+ * @access  Private
+ *
+ * PURPOSE:
+ * Monitor SSE payload sizes for optimization opportunities.
+ * Shows total events sent, average payload size, large payload rate, etc.
+ *
+ * Response:
+ * {
+ *   "success": true,
+ *   "stats": {
+ *     "totalEvents": 245,
+ *     "totalBytes": 61250,
+ *     "totalKB": "59.81",
+ *     "largePayloads": 5,
+ *     "averageSize": 250,
+ *     "largePayloadRate": "2.04%",
+ *     "startTime": "2025-01-23T10:30:00.000Z",
+ *     "uptime": "2025-01-23T12:45:00.000Z",
+ *     "byEventType": {
+ *       "metrics:updated": { "count": 150, "totalBytes": 37500, "averageSize": 250 },
+ *       "goals:updated": { "count": 50, "totalBytes": 10000, "averageSize": 200 },
+ *       "heartbeat": { "count": 45, "totalBytes": 1350, "averageSize": 30 }
+ *     }
+ *   }
+ * }
+ */
+router.get('/debug/payload-stats', protect, (req, res) => {
+  try {
+    const stats = getPayloadStats();
+    
+    res.status(200).json({
+      success: true,
+      stats,
+      message: 'Payload statistics retrieved successfully'
+    });
+  } catch (error) {
+    console.error('[Events API] Error getting payload stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve payload statistics',
+      error: error.message
+    });
+  }
 });
 
 export default router;

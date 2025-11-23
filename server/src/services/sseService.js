@@ -3,22 +3,18 @@
  * SSE SERVICE
  * ============================================
  *
- * Service layer for Server-Sent Events with payload monitoring
+ * Service layer for Server-Sent Events
+ * Note: Payload monitoring is handled by eventEmitter to avoid double counting
  */
 
 import { emitToUser as emitToUserInternal, getConnectionCount as getConnectionCountInternal } from '../utils/eventEmitter.js';
-import { monitorEventPayload } from '../middleware/payloadMonitor.js';
 
 /**
- * Emit event to user with optional payload monitoring
+ * Emit event to user
+ * Payload monitoring is handled by eventEmitter layer
  */
 export function emitToUser(userId, eventType, data) {
-  // Monitor payload size in development
-  if (process.env.NODE_ENV === 'development') {
-    monitorEventPayload(userId, eventType, { type: eventType, data });
-  }
-
-  // Delegate to internal emitter
+  // Delegate to internal emitter (monitoring handled there)
   return emitToUserInternal(userId, eventType, data);
 }
 

@@ -14,6 +14,8 @@ const stats = {
   totalBytes: 0,
   largePayloads: 0,
   averageSize: 0,
+  startTime: new Date().toISOString(),
+  byEventType: {}, // Track per event type
 };
 
 /**
@@ -25,6 +27,20 @@ export function monitorEventPayload(userId, eventType, payload) {
   stats.totalEvents++;
   stats.totalBytes += size;
   stats.averageSize = Math.round(stats.totalBytes / stats.totalEvents);
+
+  // Track per event type
+  if (!stats.byEventType[eventType]) {
+    stats.byEventType[eventType] = {
+      count: 0,
+      totalBytes: 0,
+      averageSize: 0,
+    };
+  }
+  stats.byEventType[eventType].count++;
+  stats.byEventType[eventType].totalBytes += size;
+  stats.byEventType[eventType].averageSize = Math.round(
+    stats.byEventType[eventType].totalBytes / stats.byEventType[eventType].count
+  );
 
   // Safe access to CONFIG with fallback value
   const maxPayloadSize = payloadOptimizer.CONFIG?.maxPayloadSize || 500;
@@ -50,10 +66,15 @@ export function monitorEventPayload(userId, eventType, payload) {
  * Get payload statistics
  */
 export function getPayloadStats() {
+  // Prevent division by zero
+  const totalEvents = stats.totalEvents || 1;
+  const largePayloads = stats.largePayloads || 0;
+  
   return {
     ...stats,
     totalKB: (stats.totalBytes / 1024).toFixed(2),
-    largePayloadRate: ((stats.largePayloads / stats.totalEvents) * 100).toFixed(2) + '%',
+    largePayloadRate: ((largePayloads / totalEvents) * 100).toFixed(2) + '%',
+    uptime: stats.startTime ? new Date().toISOString() : null,
   };
 }
 
