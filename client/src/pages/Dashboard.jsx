@@ -396,21 +396,12 @@ const Dashboard = () => {
         setTodayMetrics(result.data);
         trackAction('LOAD_TODAY_METRICS', { success: true });
       } else {
-        // If no data for today, try yesterday (common case after midnight)
-        const yesterday = dateUtils.subtractDays(new Date(), 1);
-        const yesterdayDate = dateUtils.formatDateISO(yesterday);
-        const yesterdayResult = await metricsService.getMetricByDate(yesterdayDate);
-        
-        if (yesterdayResult.success) {
-          console.log('[Dashboard] No data for today, showing yesterday\'s metrics');
-          setTodayMetrics(yesterdayResult.data);
-          trackAction('LOAD_TODAY_METRICS', { success: true, fallbackToYesterday: true });
-        } else {
-          // No data for today or yesterday
-          setTodayMetrics(null);
-          setMetricsError(null); // Clear any previous errors
-          trackAction('LOAD_TODAY_METRICS', { success: true, noData: true });
-        }
+        // If no data for today, show empty state (0s) instead of falling back to yesterday
+        // This ensures the user sees "Today's" status accurately
+        console.log('[Dashboard] No data for today yet');
+        setTodayMetrics(null);
+        setMetricsError(null);
+        trackAction('LOAD_TODAY_METRICS', { success: true, noData: true });
       }
     } catch (error) {
       console.error('Error loading today metrics:', error);
@@ -1320,6 +1311,31 @@ const Dashboard = () => {
     loadMetricsRange();
     loadSummaryStats('week');
     loadAnalytics();
+
+    // Trigger a manual sync if we have no data for today
+    // This helps if the user just opened the app and background sync hasn't run
+    const checkAndSync = async () => {
+      // Wait a bit for initial load
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // We can't check todayMetrics state here because of closure, 
+      // but we can blindly trigger a sync on mount to be safe
+      console.log('[Dashboard] Triggering background sync on mount...');
+      try {
+        const token = localStorage.getItem(import.meta.env.VITE_TOKEN_KEY || 'health_metrics_token');
+        if (token) {
+          // Fix: Use correct API URL without duplicate /api prefix
+          const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+          await fetch(`${apiBaseUrl}/googlefit/sync`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+        }
+      } catch (err) {
+        console.warn('[Dashboard] Auto-sync trigger failed:', err);
+      }
+    };
+    
+    checkAndSync();
 
     // Note: SSE connection is handled by AuthContext
     // Real-time updates are received via useRealtimeMetrics and useRealtimeSync hooks

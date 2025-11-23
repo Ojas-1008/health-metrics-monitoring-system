@@ -365,9 +365,12 @@ export const getMetricsByDate = asyncHandler(async (req, res, next) => {
   });
 
   if (!healthMetric) {
-    return next(
-      new ErrorResponse(`No health metrics found for date: ${date}`, 404)
-    );
+    // Return 200 with null data instead of 404 to avoid console errors
+    return res.status(200).json({
+      success: true,
+      data: null,
+      message: `No health metrics found for date: ${date}`
+    });
   }
 
   res.status(200).json({
@@ -568,11 +571,15 @@ export const getMetricsSummary = asyncHandler(async (req, res, next) => {
     },
   }).sort({ date: 1 });
 
+  // If no metrics found, return zeroed summary instead of 404
+  // This prevents console errors and provides a better UX (empty state)
+  /* 
   if (metrics.length === 0) {
     return next(
       new ErrorResponse(`No health metrics found for the last ${period}`, 404)
     );
   }
+  */
 
   const summary = {
     totalSteps: metrics.reduce((sum, m) => sum + (m.metrics.steps || 0), 0),
@@ -647,9 +654,12 @@ export const getLatestMetrics = asyncHandler(async (req, res, next) => {
     .limit(1);
 
   if (!healthMetric) {
-    return next(
-      new ErrorResponse("No health metrics found. Start tracking today!", 404)
-    );
+    // Return 200 with null data instead of 404 to avoid console errors
+    return res.status(200).json({
+      success: true,
+      data: null,
+      message: "No health metrics found. Start tracking today!"
+    });
   }
 
   res.status(200).json({

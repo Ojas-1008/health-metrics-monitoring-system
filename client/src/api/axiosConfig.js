@@ -113,12 +113,20 @@ axiosInstance.interceptors.response.use(
 
     // Development logging
     if (import.meta.env.VITE_NODE_ENV === 'development') {
-      console.error('❌ API Error:', {
-        status: statusCode,
-        url: originalRequest?.url,
-        message: errorData?.message,
-        fullError: error,
-      });
+      // Don't log 404s as errors, they are often expected (e.g. checking if resource exists)
+      if (statusCode === 404) {
+        console.log('ℹ️ API Resource Not Found (404):', {
+          url: originalRequest?.url,
+          message: errorData?.message
+        });
+      } else {
+        console.error('❌ API Error:', {
+          status: statusCode,
+          url: originalRequest?.url,
+          message: errorData?.message,
+          fullError: error,
+        });
+      }
     }
 
     // ===== HANDLE SPECIFIC ERROR CASES =====

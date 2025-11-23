@@ -1,11 +1,11 @@
 /**
-* server/routes/googleFitRoutes.js
-* 
-* Google Fit OAuth and data synchronization routes
-* Handles OAuth flow, token management, and sync operations
-* 
-* Pattern matches authRoutes.js structure with validation and error handling
-*/
+ * server/routes/googleFitRoutes.js
+ * 
+ * Google Fit OAuth and data synchronization routes
+ * Handles OAuth flow, token management, and sync operations
+ * 
+ * Pattern matches authRoutes.js structure with validation and error handling
+ */
 import express from "express";
 import {
   initiateGoogleFitOAuth,
@@ -123,10 +123,10 @@ router.get('/sync', protect, async (req, res, next) => {
     console.log(`[googleFitRoutes] Manual sync triggered by user: ${userId}`);
 
     // Import sync function
-    const { syncSingleUser } = await import('../../workers/googleFitSyncWorker.js');
+    const { triggerManualSync } = await import('../../workers/googleFitSyncWorker.js');
 
     // Trigger sync asynchronously (don't wait for completion)
-    syncSingleUser(userId).catch(error => {
+    triggerManualSync(userId).catch(error => {
       console.error(`[googleFitRoutes] Sync error for user ${userId}:`, error);
     });
 
@@ -174,7 +174,7 @@ router.get("/debug/token-scopes", async (req, res) => {
   try {
     const User = (await import("../models/User.js")).default;
     const user = await User.findById("690b9449c3325e85f9ab7a0e").select("+googleFitTokens");
-    
+
     if (!user) {
       return res.status(404).json({ success: false, error: "User not found" });
     }

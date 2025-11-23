@@ -358,19 +358,33 @@ export const getMetricByDate = async (date) => {
       return { success: true, message: 'Metric retrieved successfully', data };
     }
 
-    return { success: false, message: 'Failed to retrieve metric' };
-  } catch (error) {
-    // ===== HANDLE ERROR RESPONSE =====
-    if (import.meta.env.VITE_NODE_ENV === 'development') {
-      console.error('❌ Get metric by date error:', error);
-    }
-
-    // Check if it's a 404 (no metrics found for that date)
-    if (error.statusCode === 404) {
+    // Handle case where success is true but data is null (was 404)
+    if (success && !data) {
+      if (import.meta.env.VITE_NODE_ENV === 'development') {
+        console.log(`ℹ️ No metrics found for date (200 OK)`);
+      }
       return {
         success: false,
         message: 'No metrics found for this date. Add your first metric!',
       };
+    }
+
+    return { success: false, message: 'Failed to retrieve metric' };
+  } catch (error) {
+    // Check if it's a 404 (no metrics found for that date)
+    if (error.statusCode === 404) {
+      if (import.meta.env.VITE_NODE_ENV === 'development') {
+        console.log(`ℹ️ No metrics found for date (404)`);
+      }
+      return {
+        success: false,
+        message: 'No metrics found for this date. Add your first metric!',
+      };
+    }
+
+    // ===== HANDLE ERROR RESPONSE =====
+    if (import.meta.env.VITE_NODE_ENV === 'development') {
+      console.error('❌ Get metric by date error:', error);
     }
 
     return {
@@ -531,19 +545,31 @@ export const getMetricsSummary = async (period = 'week') => {
       };
     }
 
-    return { success: false, message: 'Failed to retrieve summary' };
-  } catch (error) {
-    // ===== HANDLE ERROR RESPONSE =====
-    if (import.meta.env.VITE_NODE_ENV === 'development') {
-      console.error('❌ Get metrics summary error:', error);
-    }
-
-    // Check if it's a 404 (no metrics in that period)
-    if (error.statusCode === 404) {
+    // Handle case where success is true but data is null (was 404)
+    // Note: Backend now returns zeroed summary instead of null, so this might not be hit often
+    if (success && !data) {
       return {
         success: false,
         message: `No metrics found for the last ${period}. Start tracking!`,
       };
+    }
+
+    return { success: false, message: 'Failed to retrieve summary' };
+  } catch (error) {
+    // Check if it's a 404 (no metrics in that period)
+    if (error.statusCode === 404) {
+      if (import.meta.env.VITE_NODE_ENV === 'development') {
+        console.log(`ℹ️ No metrics found for summary (404)`);
+      }
+      return {
+        success: false,
+        message: `No metrics found for the last ${period}. Start tracking!`,
+      };
+    }
+
+    // ===== HANDLE ERROR RESPONSE =====
+    if (import.meta.env.VITE_NODE_ENV === 'development') {
+      console.error('❌ Get metrics summary error:', error);
     }
 
     return {
@@ -599,19 +625,33 @@ export const getLatestMetrics = async () => {
       };
     }
 
-    return { success: false, message: 'Failed to retrieve latest metric' };
-  } catch (error) {
-    // ===== HANDLE ERROR RESPONSE =====
-    if (import.meta.env.VITE_NODE_ENV === 'development') {
-      console.error('❌ Get latest metrics error:', error);
-    }
-
-    // Check if it's a 404 (no metrics exist yet)
-    if (error.statusCode === 404) {
+    // Handle case where success is true but data is null (was 404)
+    if (success && !data) {
+      if (import.meta.env.VITE_NODE_ENV === 'development') {
+        console.log(`ℹ️ No latest metrics found (200 OK)`);
+      }
       return {
         success: false,
         message: 'No metrics found yet. Start tracking today!',
       };
+    }
+
+    return { success: false, message: 'Failed to retrieve latest metric' };
+  } catch (error) {
+    // Check if it's a 404 (no metrics exist yet)
+    if (error.statusCode === 404) {
+      if (import.meta.env.VITE_NODE_ENV === 'development') {
+        console.log(`ℹ️ No latest metrics found (404)`);
+      }
+      return {
+        success: false,
+        message: 'No metrics found yet. Start tracking today!',
+      };
+    }
+
+    // ===== HANDLE ERROR RESPONSE =====
+    if (import.meta.env.VITE_NODE_ENV === 'development') {
+      console.error('❌ Get latest metrics error:', error);
     }
 
     return {
