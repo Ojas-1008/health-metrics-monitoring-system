@@ -249,7 +249,7 @@ export const addOrUpdateMetrics = asyncHandler(async (req, res, next) => {
 
   // ===== OPTIMIZED: EMIT EVENT WITH MINIMAL PAYLOAD =====
   const connectionCount = getConnectionCount(req.user._id);
-  
+
   if (connectionCount > 0) {
     // Create optimized payload
     const payload = payloadOptimizer.optimizeMetricPayload(healthMetric, 'upsert');
@@ -266,7 +266,7 @@ export const addOrUpdateMetrics = asyncHandler(async (req, res, next) => {
 
       // Emit optimized event
       emitToUser(req.user._id, 'metrics:change', payload);
-      
+
       console.log(
         `[healthMetricsController] Emitted metrics:change to ${connectionCount} connection(s) for ${date} (${payloadOptimizer.calculatePayloadSize(payload)} bytes)`
       );
@@ -354,7 +354,7 @@ export const getMetricsByDate = asyncHandler(async (req, res, next) => {
 
   // Parse date as UTC to avoid timezone issues
   const queryDate = new Date(date + 'T00:00:00.000Z');
-  
+
   if (isNaN(queryDate.getTime())) {
     return next(new ErrorResponse("Invalid date format", 400));
   }
@@ -444,7 +444,7 @@ export const updateMetric = asyncHandler(async (req, res, next) => {
 
   // ===== OPTIMIZED: EMIT EVENT WITH ONLY CHANGED FIELDS =====
   const connectionCount = getConnectionCount(req.user._id);
-  
+
   if (connectionCount > 0) {
     // Create payload with only changed fields
     const payload = payloadOptimizer.optimizeMetricPayload(
@@ -456,7 +456,7 @@ export const updateMetric = asyncHandler(async (req, res, next) => {
     if (payloadOptimizer.shouldEmitEvent(payload)) {
       payloadOptimizer.validatePayloadSize(payload, 'metrics:change');
       emitToUser(req.user._id, 'metrics:change', payload);
-      
+
       console.log(
         `[healthMetricsController] Emitted update with ${Object.keys(metrics).length} changed field(s) (${payloadOptimizer.calculatePayloadSize(payload)} bytes)`
       );
@@ -504,7 +504,7 @@ export const deleteMetrics = asyncHandler(async (req, res, next) => {
 
   // ===== OPTIMIZED: MINIMAL DELETE EVENT =====
   const connectionCount = getConnectionCount(req.user._id);
-  
+
   if (connectionCount > 0) {
     const payload = {
       operation: 'delete',
@@ -602,7 +602,7 @@ export const getMetricsSummary = asyncHandler(async (req, res, next) => {
     ),
     avgCalories: Math.round(
       metrics.reduce((sum, m) => sum + (m.metrics.calories || 0), 0) /
-        metrics.length
+      metrics.length
     ),
     avgActiveMinutes: parseFloat(
       (
@@ -695,19 +695,19 @@ export const deleteMetricsByDate = asyncHandler(async (req, res, next) => {
   // ===== EMIT DELETE EVENT =====
   if (result.deletedCount > 0) {
     const connectionCount = getConnectionCount(userId);
-    
+
     if (connectionCount > 0) {
       console.log(
         `[healthMetricsController] Emitting metrics:change (bulk delete) for ${date}`
       );
-      
+
       emitToUser(userId, 'metrics:change', {
         operation: 'bulk_delete',
         date: date,
         deletedCount: result.deletedCount,
         deletedAt: new Date().toISOString()
       });
-      
+
       console.log(
         `[healthMetricsController] ✓ Emitted bulk delete event to ${connectionCount} connection(s)`
       );

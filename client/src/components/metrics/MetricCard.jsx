@@ -300,15 +300,26 @@ const MetricCard = ({
         {/* Value Display */}
         <div className="mt-4 mb-2">
           <div className="flex items-baseline gap-2">
-            <span className={`text-5xl font-black bg-gradient-to-r ${colorScheme.gradient} bg-clip-text text-transparent tracking-tight drop-shadow-sm`}>
-              {formatValue(value)}
-            </span>
-            {unit && <span className={`text-lg font-bold ${colorScheme.text} opacity-60`}>{unit}</span>}
+            {value === null || value === undefined ? (
+              <div className="flex flex-col">
+                <span className={`text-4xl font-black ${colorScheme.text} opacity-30 tracking-tight`}>
+                  --
+                </span>
+                <span className="text-xs font-medium text-gray-500 mt-1">Not tracked yet</span>
+              </div>
+            ) : (
+              <>
+                <span className={`text-5xl font-black bg-gradient-to-r ${colorScheme.gradient} bg-clip-text text-transparent tracking-tight drop-shadow-sm`}>
+                  {formatValue(value)}
+                </span>
+                {unit && <span className={`text-lg font-bold ${colorScheme.text} opacity-60`}>{unit}</span>}
+              </>
+            )}
           </div>
         </div>
 
         {/* Goal Progress Bar */}
-        {goal && (
+        {goal && value !== null && value !== undefined && (
           <div className="mt-auto pt-4">
             <div className="flex justify-between text-xs font-bold mb-2">
               <span className={`${colorScheme.text} opacity-70`}>Goal: {formatValue(goal)}</span>
@@ -359,7 +370,7 @@ const MetricCard = ({
 
 MetricCard.propTypes = {
   title: PropTypes.string,
-  value: PropTypes.number,
+  value: PropTypes.oneOfType([PropTypes.number, PropTypes.oneOf([null])]),
   unit: PropTypes.string,
   icon: PropTypes.string,
   trend: PropTypes.shape({
@@ -368,7 +379,7 @@ MetricCard.propTypes = {
   }),
   color: PropTypes.string,
   goal: PropTypes.number,
-  lastValue: PropTypes.number,
+  lastValue: PropTypes.oneOfType([PropTypes.number, PropTypes.oneOf([null])]),
   onClick: PropTypes.func,
   className: PropTypes.string,
   isOptimistic: PropTypes.bool,

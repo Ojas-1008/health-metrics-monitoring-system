@@ -76,7 +76,7 @@ const GOOGLE_FIT_DATA_SOURCES = {
     unit: "minutes",
     aggregation: "sum",
   },
-  
+
   // ⭐ FIXED: Heart Points now uses fpVal
   heartPoints: {
     dataSourceId: "derived:com.google.heart_minutes:com.google.android.gms:merge_heart_minutes",
@@ -86,7 +86,7 @@ const GOOGLE_FIT_DATA_SOURCES = {
     // ⭐ ADD FALLBACK
     fallback: "derived:com.google.heart_minutes:com.google.android.gms",
   },
-  
+
   // ⭐ ADD: Move Minutes (alternative to Heart Points)
   moveMinutes: {
     dataSourceId: "derived:com.google.active_minutes:com.google.android.gms:from_activities",
@@ -94,7 +94,7 @@ const GOOGLE_FIT_DATA_SOURCES = {
     unit: "minutes",
     aggregation: "sum",
   },
-  
+
   weight: {
     dataSourceId: "derived:com.google.weight:com.google.android.gms:merge_weight",
     field: "fpVal",
@@ -174,11 +174,11 @@ const determineSyncWindow = (lastSyncAt) => {
     // ⭐ CRITICAL FIX: Ensure minimum window of 24 hours
     // Google Fit aggregates data and may not have data in very short windows
     const hoursSinceLastSync = (now - startDate) / (1000 * 60 * 60);
-    
+
     if (hoursSinceLastSync < 24) {
       console.log(`    ⚠️  Last sync was ${hoursSinceLastSync.toFixed(1)} hours ago (< 24h)`);
       console.log(`    📅 Expanding window to last 24 hours for better data coverage`);
-      
+
       startDate = new Date();
       startDate.setDate(startDate.getDate() - 1); // Last 24 hours
     } else {
@@ -201,7 +201,7 @@ const determineSyncWindow = (lastSyncAt) => {
 
   const windowHours = ((endTimeMs - startTimeMs) / (1000 * 60 * 60)).toFixed(1);
   const windowDays = (windowHours / 24).toFixed(1);
-  
+
   console.log(`    📅 Final sync window: ${windowDays} days (${windowHours} hours)`);
   console.log(`       From: ${startDate.toISOString()}`);
   console.log(`       To:   ${now.toISOString()}`);
@@ -261,7 +261,7 @@ const fetchGoogleFitData = async (
       console.error(`    🚨 401 UNAUTHORIZED for ${dataSourceId}`);
       console.error(`       Token may be invalid or missing required scopes`);
       console.error(`       User needs to reconnect Google Fit with all permissions`);
-      
+
       // Throw error to trigger user disconnection
       throw new Error(
         `401 Unauthorized: Token invalid or missing fitness scopes. User must reconnect.`
@@ -279,15 +279,15 @@ const fetchGoogleFitData = async (
     if (error.response && error.response.status === 429) {
       console.error(`    ⏰ 429 RATE LIMIT EXCEEDED`);
       console.error(`       Too many requests. Retrying after delay...`);
-      
+
       // Wait and retry once
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
+
       const retryResponse = await axios.get(url, {
         headers: { Authorization: `Bearer ${accessToken}` },
         timeout: API_TIMEOUT,
       });
-      
+
       return retryResponse.data.point || [];
     }
 
@@ -295,7 +295,7 @@ const fetchGoogleFitData = async (
     console.error(`    ❌ API Error for ${dataSourceId}:`);
     console.error(`       Status: ${error.response?.status || 'Unknown'}`);
     console.error(`       Message: ${error.response?.data?.error?.message || error.message}`);
-    
+
     // Re-throw error
     throw error;
   }
@@ -329,16 +329,16 @@ const aggregateByDay = (dataPoints, field, aggregation = "sum") => {
     if (field === "mapVal") {
       // Blood pressure has multiple values (systolic/diastolic)
       const mapData = point.value && point.value[0] ? point.value[0][field] : null;
-      
+
       if (mapData) {
         // ⭐ FIX: Use correct key names from Google Fit API
-        const systolicItem = mapData.find(item => 
+        const systolicItem = mapData.find(item =>
           item.key === "blood_pressure_systolic" || item.key === "systolic"
         );
-        const diastolicItem = mapData.find(item => 
+        const diastolicItem = mapData.find(item =>
           item.key === "blood_pressure_diastolic" || item.key === "diastolic"
         );
-        
+
         value = {
           systolic: systolicItem?.value?.fpVal || null,
           diastolic: diastolicItem?.value?.fpVal || null,
@@ -504,157 +504,157 @@ const syncUserGoogleFitData = async (user) => {
       }
     }
 
-// ===== STEP 4: TRANSFORM AND UPSERT DAILY METRICS =====
-const allDates = new Set();
+    // ===== STEP 4: TRANSFORM AND UPSERT DAILY METRICS =====
+    const allDates = new Set();
 
-// Collect all unique dates across all data types
-Object.values(fetchedData).forEach((dailyData) => {
-  Object.keys(dailyData).forEach((date) => allDates.add(date));
-});
-
-console.log(`    💾 Upserting ${allDates.size} days of metrics...`);
-
-let upsertedCount = 0;
-const upsertPromises = [];
-const upsertedMetrics = []; // ← NEW: Track upserted data for SSE
-
-for (const dateStr of allDates) {
-  const dayDate = new Date(dateStr);
-
-  // Build metrics object for this day
-  const metrics = {
-    steps: fetchedData.steps?.[dateStr] || 0,
-    distance: (fetchedData.distance?.[dateStr] || 0) / 1000,
-    calories: Math.round(fetchedData.calories?.[dateStr] || 0),
-    activeMinutes: fetchedData.activeMinutes?.[dateStr] || 0,
-    heartPoints: fetchedData.heartPoints?.[dateStr] || 0,
-    moveMinutes: fetchedData.moveMinutes?.[dateStr] || 0,
-    weight: fetchedData.weight?.[dateStr] || null,
-    sleepHours: fetchedData.sleep?.[dateStr]
-      ? Math.round((fetchedData.sleep[dateStr] / 1000 / 60 / 60) * 10) / 10
-      : null,
-    height: fetchedData.height?.[dateStr]
-      ? Math.round(fetchedData.height[dateStr] * 100)
-      : null,
-    bloodPressure: fetchedData.bloodPressure?.[dateStr]
-      ? {
-          systolic: fetchedData.bloodPressure[dateStr].systolic || null,
-          diastolic: fetchedData.bloodPressure[dateStr].diastolic || null,
-        }
-      : { systolic: null, diastolic: null },
-    heartRate: fetchedData.heartRate?.[dateStr] || null,
-    oxygenSaturation: fetchedData.oxygenSaturation?.[dateStr] || null,
-    bodyTemperature: fetchedData.bodyTemperature?.[dateStr] || null,
-    hydration: fetchedData.hydration?.[dateStr] || null,
-  };
-
-  // Smart upsert: only update non-null fields
-  const setFields = {
-    source: "googlefit",
-    syncedAt: new Date(),
-  };
-
-  Object.entries(metrics).forEach(([key, value]) => {
-    if (value !== null && value !== undefined) {
-      setFields[`metrics.${key}`] = value;
-    }
-  });
-
-  const upsertPromise = HealthMetric.findOneAndUpdate(
-    {
-      userId: user._id,
-      date: dayDate,
-    },
-    {
-      $set: setFields,
-    },
-    {
-      upsert: true,
-      new: true,
-      runValidators: true,
-    }
-  ).then((doc) => {
-    // ← NEW: Store upserted document for SSE emission
-    upsertedMetrics.push({
-      date: doc.date,
-      metrics: doc.metrics,
-      source: doc.source
+    // Collect all unique dates across all data types
+    Object.values(fetchedData).forEach((dailyData) => {
+      Object.keys(dailyData).forEach((date) => allDates.add(date));
     });
-    return doc;
-  });
 
-  upsertPromises.push(upsertPromise);
-}
+    console.log(`    💾 Upserting ${allDates.size} days of metrics...`);
 
-// Execute all upserts in parallel
-await Promise.all(upsertPromises);
-upsertedCount = allDates.size;
+    let upsertedCount = 0;
+    const upsertPromises = [];
+    const upsertedMetrics = []; // ← NEW: Track upserted data for SSE
 
-console.log(`    ✅ Upserted ${upsertedCount} health metric documents`);
+    for (const dateStr of allDates) {
+      const dayDate = new Date(dateStr);
 
-// ===== OPTIMIZED: BATCH AGGREGATION FOR LARGE SYNCS =====
-if (upsertedCount > 0) {
-  const connectionCount = getConnectionCount(user._id);
-  
-  if (connectionCount > 0) {
-    if (payloadOptimizer.shouldUseBatchAggregation(upsertedCount)) {
-      // Large sync (50+ days) - send aggregated event
-      console.log(
-        `    🔔 Large sync (${upsertedCount} days), using batch aggregation`
-      );
+      // Build metrics object for this day
+      const metrics = {
+        steps: fetchedData.steps?.[dateStr] || 0,
+        distance: (fetchedData.distance?.[dateStr] || 0) / 1000,
+        calories: Math.round(fetchedData.calories?.[dateStr] || 0),
+        activeMinutes: fetchedData.activeMinutes?.[dateStr] || 0,
+        heartPoints: fetchedData.heartPoints?.[dateStr] || 0,
+        moveMinutes: fetchedData.moveMinutes?.[dateStr] || 0,
+        weight: fetchedData.weight?.[dateStr] || null,
+        sleepHours: fetchedData.sleep?.[dateStr]
+          ? Math.round((fetchedData.sleep[dateStr] / 1000 / 60 / 60) * 10) / 10
+          : null,
+        height: fetchedData.height?.[dateStr]
+          ? Math.round(fetchedData.height[dateStr] * 100)
+          : null,
+        bloodPressure: fetchedData.bloodPressure?.[dateStr]
+          ? {
+            systolic: fetchedData.bloodPressure[dateStr].systolic || null,
+            diastolic: fetchedData.bloodPressure[dateStr].diastolic || null,
+          }
+          : { systolic: null, diastolic: null },
+        heartRate: fetchedData.heartRate?.[dateStr] || null,
+        oxygenSaturation: fetchedData.oxygenSaturation?.[dateStr] || null,
+        bodyTemperature: fetchedData.bodyTemperature?.[dateStr] || null,
+        hydration: fetchedData.hydration?.[dateStr] || null,
+      };
 
-      const aggregatedPayload = payloadOptimizer.aggregateSyncEvents(upsertedMetrics);
+      // Smart upsert: only update non-null fields
+      const setFields = {
+        source: "googlefit",
+        syncedAt: new Date(),
+      };
 
-      if (aggregatedPayload) {
-        // Validate aggregated payload size
-        payloadOptimizer.validatePayloadSize(aggregatedPayload, 'sync:update');
-
-        // Log payload stats
-        if (process.env.NODE_ENV === 'development') {
-          payloadOptimizer.logPayloadStats(aggregatedPayload, 'sync:update');
+      Object.entries(metrics).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) {
+          setFields[`metrics.${key}`] = value;
         }
+      });
 
-        // Emit single aggregated event
-        emitToUser(user._id, 'sync:update', aggregatedPayload);
-
-        console.log(
-          `    ✅ Emitted aggregated sync:update for ${upsertedCount} days (${payloadOptimizer.calculatePayloadSize(aggregatedPayload)} bytes)`
-        );
-      }
-    } else {
-      // Small sync (< 50 days) - send individual events for each day
-      console.log(
-        `    🔔 Small sync (${upsertedCount} days), using individual events`
-      );
-
-      let emittedCount = 0;
-      let skippedCount = 0;
-
-      for (const metric of upsertedMetrics) {
-        const payload = payloadOptimizer.optimizeMetricPayload(metric, 'sync');
-
-        if (payloadOptimizer.shouldEmitEvent(payload)) {
-          emitToUser(user._id, 'metrics:change', payload);
-          emittedCount++;
-        } else {
-          skippedCount++;
+      const upsertPromise = HealthMetric.findOneAndUpdate(
+        {
+          userId: user._id,
+          date: dayDate,
+        },
+        {
+          $set: setFields,
+        },
+        {
+          upsert: true,
+          new: true,
+          runValidators: true,
         }
-      }
+      ).then((doc) => {
+        // ← NEW: Store upserted document for SSE emission
+        upsertedMetrics.push({
+          date: doc.date,
+          metrics: doc.metrics,
+          source: doc.source
+        });
+        return doc;
+      });
 
-      console.log(
-        `    ✅ Emitted ${emittedCount} metrics:change events, skipped ${skippedCount} (outside date range)`
-      );
-
-      // Send summary sync:update event
-      const summaryPayload = payloadOptimizer.aggregateSyncEvents(upsertedMetrics);
-      if (summaryPayload) {
-        emitToUser(user._id, 'sync:update', summaryPayload);
-      }
+      upsertPromises.push(upsertPromise);
     }
-  } else {
-    console.log(`    ℹ️ User offline (0 connections), skipping SSE emission`);
-  }
-}    // ===== STEP 5: UPDATE USER lastSyncAt ATOMICALLY =====
+
+    // Execute all upserts in parallel
+    await Promise.all(upsertPromises);
+    upsertedCount = allDates.size;
+
+    console.log(`    ✅ Upserted ${upsertedCount} health metric documents`);
+
+    // ===== OPTIMIZED: BATCH AGGREGATION FOR LARGE SYNCS =====
+    if (upsertedCount > 0) {
+      const connectionCount = getConnectionCount(user._id);
+
+      if (connectionCount > 0) {
+        if (payloadOptimizer.shouldUseBatchAggregation(upsertedCount)) {
+          // Large sync (50+ days) - send aggregated event
+          console.log(
+            `    🔔 Large sync (${upsertedCount} days), using batch aggregation`
+          );
+
+          const aggregatedPayload = payloadOptimizer.aggregateSyncEvents(upsertedMetrics);
+
+          if (aggregatedPayload) {
+            // Validate aggregated payload size
+            payloadOptimizer.validatePayloadSize(aggregatedPayload, 'sync:update');
+
+            // Log payload stats
+            if (process.env.NODE_ENV === 'development') {
+              payloadOptimizer.logPayloadStats(aggregatedPayload, 'sync:update');
+            }
+
+            // Emit single aggregated event
+            emitToUser(user._id, 'sync:update', aggregatedPayload);
+
+            console.log(
+              `    ✅ Emitted aggregated sync:update for ${upsertedCount} days (${payloadOptimizer.calculatePayloadSize(aggregatedPayload)} bytes)`
+            );
+          }
+        } else {
+          // Small sync (< 50 days) - send individual events for each day
+          console.log(
+            `    🔔 Small sync (${upsertedCount} days), using individual events`
+          );
+
+          let emittedCount = 0;
+          let skippedCount = 0;
+
+          for (const metric of upsertedMetrics) {
+            const payload = payloadOptimizer.optimizeMetricPayload(metric, 'sync');
+
+            if (payloadOptimizer.shouldEmitEvent(payload)) {
+              emitToUser(user._id, 'metrics:change', payload);
+              emittedCount++;
+            } else {
+              skippedCount++;
+            }
+          }
+
+          console.log(
+            `    ✅ Emitted ${emittedCount} metrics:change events, skipped ${skippedCount} (outside date range)`
+          );
+
+          // Send summary sync:update event
+          const summaryPayload = payloadOptimizer.aggregateSyncEvents(upsertedMetrics);
+          if (summaryPayload) {
+            emitToUser(user._id, 'sync:update', summaryPayload);
+          }
+        }
+      } else {
+        console.log(`    ℹ️ User offline (0 connections), skipping SSE emission`);
+      }
+    }    // ===== STEP 5: UPDATE USER lastSyncAt ATOMICALLY =====
     // Use findByIdAndUpdate to ensure atomic update
     // This prevents incorrect lastSyncAt if crash occurs mid-sync
     // IMPORTANT: Set to syncWindow.endDate (not new Date()) so next sync continues from where this one ended
@@ -1008,9 +1008,9 @@ export const getWorkerStatus = () => {
       successRate:
         totalSyncsCompleted + totalSyncsFailed > 0
           ? (
-              (totalSyncsCompleted / (totalSyncsCompleted + totalSyncsFailed)) *
-              100
-            ).toFixed(2) + "%"
+            (totalSyncsCompleted / (totalSyncsCompleted + totalSyncsFailed)) *
+            100
+          ).toFixed(2) + "%"
           : "N/A",
     },
   };

@@ -379,33 +379,6 @@ const Dashboard = () => {
     return colors[metricType];
   }, []);
 
-  /**
-   * Get display value for weight
-   * Uses today's weight if available, otherwise falls back to latest known weight
-   * This prevents showing "0 kg" when weight hasn't been logged today
-   */
-  const getDisplayWeight = useCallback(() => {
-    // 1. Try today's weight
-    if (todayMetrics?.metrics?.weight && todayMetrics.metrics.weight > 0) {
-      return todayMetrics.metrics.weight;
-    }
-    
-    // 2. Try yesterday's weight (from previousDayMetrics)
-    if (previousDayMetrics?.metrics?.weight && previousDayMetrics.metrics.weight > 0) {
-      return previousDayMetrics.metrics.weight;
-    }
-    
-    // 3. Try finding in recent history (allMetrics)
-    if (allMetrics && allMetrics.length > 0) {
-      // Sort by date descending to get most recent
-      const sortedMetrics = [...allMetrics].sort((a, b) => new Date(b.date) - new Date(a.date));
-      const lastWeightMetric = sortedMetrics.find(m => m.metrics?.weight && m.metrics.weight > 0);
-      if (lastWeightMetric) return lastWeightMetric.metrics.weight;
-    }
-    
-    return 0;
-  }, [todayMetrics, previousDayMetrics, allMetrics]);
-
   // ===== DATA FETCHING FUNCTIONS =====
 
   /**
@@ -1342,23 +1315,37 @@ const Dashboard = () => {
     // Trigger a manual sync if we have no data for today
     // This helps if the user just opened the app and background sync hasn't run
     const checkAndSync = async () => {
-      // Wait a bit for initial load
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Wait for initial metrics load to complete
+      await new Promise(resolve => setTimeout(resolve, 3000));
       
-      // We can't check todayMetrics state here because of closure, 
-      // but we can blindly trigger a sync on mount to be safe
-      console.log('[Dashboard] Triggering background sync on mount...');
+      console.log('[Dashboard] Checking if auto-sync is needed...');
       try {
         const token = localStorage.getItem(import.meta.env.VITE_TOKEN_KEY || 'health_metrics_token');
-        if (token) {
-          // Fix: Use correct API URL without duplicate /api prefix
-          const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-          await fetch(`${apiBaseUrl}/googlefit/sync`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
+        if (!token) {
+          console.log('[Dashboard] No auth token, skipping auto-sync');
+          return;
+        }
+
+        // Check Google Fit status first
+        const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+        const statusResponse = await fetch(`${apiBaseUrl}/googlefit/status`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (statusResponse.ok) {
+          const statusData = await statusResponse.json();
+          if (statusData.connected) {
+            console.log('[Dashboard] Google Fit connected, triggering sync...');
+            await fetch(`${apiBaseUrl}/googlefit/sync`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            console.log('[Dashboard] Auto-sync triggered successfully');
+          } else {
+            console.log('[Dashboard] Google Fit not connected, skipping auto-sync');
+          }
         }
       } catch (err) {
-        console.warn('[Dashboard] Auto-sync trigger failed:', err);
+        console.warn('[Dashboard] Auto-sync check/trigger failed:', err);
       }
     };
     
@@ -1676,6 +1663,7 @@ const Dashboard = () => {
                     trend={trendData.steps}
                     lastValue={previousDayMetrics?.metrics?.steps}
                     isOptimistic={todayMetrics._optimistic}
+                    source={todayMetrics.source}
                     className="h-full"
                   />
                 </div>
@@ -1692,6 +1680,7 @@ const Dashboard = () => {
                     trend={trendData.calories}
                     lastValue={previousDayMetrics?.metrics?.calories}
                     isOptimistic={todayMetrics._optimistic}
+                    source={todayMetrics.source}
                     className="h-full"
                   />
                 </div>
@@ -1701,13 +1690,14 @@ const Dashboard = () => {
                   <MetricCard
                     icon="😴"
                     title="Sleep"
-                    value={todayMetrics.metrics?.sleepHours || 0}
+                    value={todayMetrics.metrics?.sleepHours ?? null}
                     unit="hrs"
                     color="sleep"
                     goal={getGoalForMetric('sleepHours')}
                     trend={trendData.sleepHours}
                     lastValue={previousDayMetrics?.metrics?.sleepHours}
                     isOptimistic={todayMetrics._optimistic}
+                    source={todayMetrics.source}
                     className="h-full"
                   />
                 </div>
@@ -1717,12 +1707,13 @@ const Dashboard = () => {
                   <MetricCard
                     icon="⚖️"
                     title="Weight"
-                    value={getDisplayWeight()}
+                    value={todayMetrics.metrics?.weight ?? null}
                     unit="kg"
                     color="weight"
-                    trend={todayMetrics?.metrics?.weight ? trendData.weight : null}
+                    trend={trendData.weight}
                     lastValue={previousDayMetrics?.metrics?.weight}
                     isOptimistic={todayMetrics._optimistic}
+                    source={todayMetrics.source}
                     className="h-full"
                   />
                 </div>
