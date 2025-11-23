@@ -155,6 +155,20 @@ axiosInstance.interceptors.response.use(
     }
 
     /**
+     * 429 TOO MANY REQUESTS - Rate limit exceeded
+     * Action: Show user-friendly message with retry info
+     */
+    if (statusCode === 429) {
+      const retryAfter = errorData?.retryAfter || 60;
+      return Promise.reject({
+        message: errorData?.message || `Too many requests. Please try again in ${retryAfter} seconds.`,
+        statusCode: 429,
+        retryAfter: retryAfter,
+        originalError: error,
+      });
+    }
+
+    /**
      * 400 BAD REQUEST - Validation errors or business logic errors
      * Extract message from backend: { success: false, message: "..." }
      */

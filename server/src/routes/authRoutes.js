@@ -13,6 +13,7 @@ import {
   validateProfileUpdate,
   handleValidationErrors
 } from '../middleware/validator.js';
+import { loginLimiter, registerLimiter, authLimiter } from '../middleware/rateLimiter.js';
 
 const router = express.Router();
 
@@ -41,6 +42,7 @@ const router = express.Router();
  */
 router.post(
   '/register',
+  registerLimiter.middleware,
   validateRegister,
   handleValidationErrors,
   registerUser
@@ -58,6 +60,7 @@ router.post(
  */
 router.post(
   '/login',
+  loginLimiter.middleware,
   validateLogin,
   handleValidationErrors,
   loginUser
@@ -72,7 +75,7 @@ router.post(
  * Headers:
  * Authorization: Bearer <token>
  */
-router.get('/me', protect, getCurrentUser);
+router.get('/me', protect, authLimiter.middleware, getCurrentUser);
 
 /**
  * PUT /api/auth/profile
@@ -97,6 +100,7 @@ router.get('/me', protect, getCurrentUser);
 router.put(
   '/profile',
   protect,
+  authLimiter.middleware,
   validateProfileUpdate,
   handleValidationErrors,
   updateProfile
@@ -112,6 +116,6 @@ router.put(
  * Headers:
  * Authorization: Bearer <token>
  */
-router.post('/logout', protect, logoutUser);
+router.post('/logout', protect, authLimiter.middleware, logoutUser);
 
 export default router;

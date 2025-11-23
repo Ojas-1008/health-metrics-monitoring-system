@@ -71,9 +71,10 @@ export const getLatestAnalytics = asyncHandler(async (req, res, next) => {
     metricType: metricType.toLowerCase()
   };
 
-  // Add timeRange filter if provided
+  // Add timeRange filter if provided (support both new 'timeRange' and legacy 'period' fields)
   if (timeRange) {
     const validTimeRanges = ['7day', '30day', '90day'];
+    const periodMapping = { '7day': 'week', '30day': 'month', '90day': 'quarter' };
 
     if (!validTimeRanges.includes(timeRange)) {
       return next(
@@ -84,7 +85,11 @@ export const getLatestAnalytics = asyncHandler(async (req, res, next) => {
       );
     }
 
-    query.timeRange = timeRange;
+    // Query both fields to support legacy data and new schema
+    query.$or = [
+      { timeRange: timeRange },
+      { period: periodMapping[timeRange] || timeRange }
+    ];
   }
 
   // Query latest analytics
@@ -171,9 +176,10 @@ export const getAllAnalytics = asyncHandler(async (req, res, next) => {
     query.metricType = metricType.toLowerCase();
   }
 
-  // Filter by time range
+  // Filter by time range (support both new 'timeRange' and legacy 'period' fields)
   if (timeRange) {
     const validTimeRanges = ['7day', '30day', '90day'];
+    const periodMapping = { '7day': 'week', '30day': 'month', '90day': 'quarter' };
 
     if (!validTimeRanges.includes(timeRange)) {
       return next(
@@ -184,7 +190,11 @@ export const getAllAnalytics = asyncHandler(async (req, res, next) => {
       );
     }
 
-    query.timeRange = timeRange;
+    // Query both fields to support legacy data and new schema
+    query.$or = [
+      { timeRange: timeRange },
+      { period: periodMapping[timeRange] || timeRange }
+    ];
   }
 
   // Filter by anomalies only
@@ -269,6 +279,16 @@ export const getAllAnalytics = asyncHandler(async (req, res, next) => {
  */
 export const getAnalyticsById = asyncHandler(async (req, res, next) => {
   const { id } = req.params;
+
+  // Validate MongoDB ObjectId format
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return next(
+      new ErrorResponse(
+        `Invalid analytics ID format: ${id}`,
+        400
+      )
+    );
+  }
 
   const analytics = await Analytics.findOne({
     _id: id,
@@ -427,10 +447,44 @@ export const getAnalyticsSummary = asyncHandler(async (req, res, next) => {
           { $project: { metricType: '$_id', count: 1, _id: 0 } }
         ],
 
-        // Count by time range
+        // Count by time range (support both timeRange and period fields)
         byTimeRange: [
-          { $group: { _id: '$timeRange', count: { $sum: 1 } } },
+          {
+            $project: {
+              normalizedRange: {
+                $switch: {
+                  branches: [
+                    // If timeRange is a string, use it directly
+                    { 
+                      case: { 
+                        $and: [
+                          { $ne: ['$timeRange', null] },
+                          { $eq: [{ $type: '$timeRange' }, 'string'] }
+                        ]
+                      }, 
+                      then: '$timeRange' 
+                    },
+                    // Map period values to timeRange equivalents
+                    { case: { $eq: ['$period', 'week'] }, then: '7day' },
+                    { case: { $eq: ['$period', 'month'] }, then: '30day' },
+                    { case: { $eq: ['$period', 'quarter'] }, then: '90day' }
+                  ],
+                  default: null
+                }
+              }
+            }
+          },
+          // Filter out null values (date range objects and unknown values)
+          { $match: { normalizedRange: { $ne: null } } },
+          { $group: { _id: '$normalizedRange', count: { $sum: 1 } } },
           { $project: { timeRange: '$_id', count: 1, _id: 0 } }
+        ],
+
+        // Count by period (legacy field)
+        byPeriod: [
+          { $match: { period: { $exists: true } } },
+          { $group: { _id: '$period', count: { $sum: 1 } } },
+          { $project: { period: '$_id', count: 1, _id: 0 } }
         ],
 
         // Anomalies detected
@@ -446,9 +500,9 @@ export const getAnalyticsSummary = asyncHandler(async (req, res, next) => {
           { $project: { calculatedAt: 1, _id: 0 } }
         ],
 
-        // Current streaks (latest 7day analytics per metric)
+        // Current streaks (latest 7day/week analytics per metric)
         currentStreaks: [
-          { $match: { timeRange: '7day' } },
+          { $match: { $or: [{ timeRange: '7day' }, { period: 'week' }] } },
           { $sort: { calculatedAt: -1 } },
           {
             $group: {
@@ -470,7 +524,14 @@ export const getAnalyticsSummary = asyncHandler(async (req, res, next) => {
       return acc;
     }, {}) || {},
     byTimeRange: summary[0]?.byTimeRange.reduce((acc, item) => {
-      acc[item.timeRange] = item.count;
+      // Handle both timeRange and period fields
+      const key = item.timeRange || item.period || 'unknown';
+      acc[key] = item.count;
+      return acc;
+    }, {}) || {},
+    byPeriod: summary[0]?.byPeriod?.reduce((acc, item) => {
+      const key = item.period || 'unknown';
+      acc[key] = item.count;
       return acc;
     }, {}) || {},
     anomaliesDetected: summary[0]?.anomaliesDetected[0]?.count || 0,
@@ -478,8 +539,7 @@ export const getAnalyticsSummary = asyncHandler(async (req, res, next) => {
     currentStreaks: summary[0]?.currentStreaks.reduce((acc, item) => {
       acc[item.metricType] = item.streak;
       return acc;
-    }, {}) || {},
-    latestUpdate: summary[0]?.latestUpdate[0]?.calculatedAt || null
+    }, {}) || {}
   };
 
   res.status(200).json({

@@ -28,18 +28,30 @@ const handleValidationErrors = (req, res, next) => {
   // Instead of: [{ msg: 'Error', param: 'email', location: 'body' }]
   // Return: { email: 'Error', password: 'Error' }
   const formattedErrors = {};
+  let primaryMessage = "Validation failed. Please check your input.";
 
   errors.array().forEach((error) => {
     // Group errors by field name
     if (!formattedErrors[error.path]) {
       formattedErrors[error.path] = error.msg;
     }
+    
+    // Set primary message to first specific error for better UX
+    if (!primaryMessage.includes("Validation failed")) {
+      primaryMessage = error.msg;
+    }
   });
+
+  // If there's a single specific error, use it as the main message
+  const errorKeys = Object.keys(formattedErrors);
+  if (errorKeys.length === 1) {
+    primaryMessage = formattedErrors[errorKeys[0]];
+  }
 
   // Return 400 Bad Request with detailed error information
   return res.status(400).json({
     success: false,
-    message: "Validation failed. Please check your input.",
+    message: primaryMessage,
     errors: formattedErrors,
     errorCount: errors.array().length,
   });
@@ -344,6 +356,78 @@ const validateHealthMetric = [
 
 /**
  * ============================================
+ * VALIDATE ADD/UPDATE METRICS (POST /api/metrics)
+ * ============================================
+ * Validates request body for adding or updating health metrics
+ */
+const validateAddOrUpdateMetrics = [
+  // Date validation
+  body('date')
+    .trim()
+    .notEmpty()
+    .withMessage('Date is required')
+    .matches(/^\d{4}-\d{2}-\d{2}$/)
+    .withMessage('Date must be in YYYY-MM-DD format')
+    .custom((value) => {
+      const date = new Date(value + 'T00:00:00.000Z');
+      if (isNaN(date.getTime())) {
+        throw new Error('Invalid date format');
+      }
+      const today = new Date();
+      today.setUTCHours(0, 0, 0, 0);
+      if (date > today) {
+        throw new Error('Cannot add metrics for future dates');
+      }
+      return true;
+    }),
+
+  // Metrics object validation
+  body('metrics')
+    .notEmpty()
+    .withMessage('Metrics object is required')
+    .isObject()
+    .withMessage('Metrics must be an object')
+    .custom((value) => {
+      if (!value || typeof value !== 'object' || Object.keys(value).length === 0) {
+        throw new Error('At least one metric value is required');
+      }
+      return true;
+    }),
+
+  // Optional source validation
+  body('source')
+    .optional()
+    .isIn(['manual', 'googlefit', 'import'])
+    .withMessage('Source must be one of: manual, googlefit, import'),
+
+  handleValidationErrors
+];
+
+/**
+ * ============================================
+ * VALIDATE UPDATE METRICS (PATCH /api/metrics/:date)
+ * ============================================
+ * Validates request body for partial metric updates
+ */
+const validateUpdateMetrics = [
+  // Metrics object validation
+  body('metrics')
+    .notEmpty()
+    .withMessage('Metrics object is required')
+    .isObject()
+    .withMessage('Metrics must be an object')
+    .custom((value) => {
+      if (!value || typeof value !== 'object' || Object.keys(value).length === 0) {
+        throw new Error('At least one metric value is required');
+      }
+      return true;
+    }),
+
+  handleValidationErrors
+];
+
+/**
+ * ============================================
  * VALIDATE DELETE METRICS BY DATE
  * ============================================
  * Validates query parameters for deleting health metrics by date
@@ -410,6 +494,8 @@ export {
 
   // Health metrics validations
   validateHealthMetric,
+  validateAddOrUpdateMetrics,
+  validateUpdateMetrics,
   validateDeleteMetrics,
 
   // Utility validations

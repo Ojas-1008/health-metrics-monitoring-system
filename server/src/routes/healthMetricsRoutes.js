@@ -13,6 +13,8 @@ import {
 import { protect } from "../middleware/auth.js";
 import {
   validateHealthMetric,
+  validateAddOrUpdateMetrics,
+  validateUpdateMetrics,
   validateDeleteMetrics,
   handleValidationErrors,
 } from "../middleware/validator.js";
@@ -39,6 +41,7 @@ const router = express.Router();
 router.post(
   "/",
   protect,
+  validateAddOrUpdateMetrics,
   addOrUpdateMetrics
 );
 
@@ -83,7 +86,7 @@ router.delete("/", protect, validateDeleteMetrics, deleteMetricsByDate);
  * @access  Private
  * @body    { metrics: {...} }
  */
-router.patch("/:date", protect, updateMetric);
+router.patch("/:date", protect, validateUpdateMetrics, updateMetric);
 
 // ----- Delete Metrics for Specific Date -----
 /**

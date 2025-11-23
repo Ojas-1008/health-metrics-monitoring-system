@@ -25,6 +25,31 @@ import User from "../models/User.js";
 import { asyncHandler, ErrorResponse } from "../middleware/errorHandler.js";
 import { emitToUser } from "../utils/eventEmitter.js";
 
+// Shared list of goal field names for iteration (avoids repetition)
+const GOAL_FIELDS = ["weightGoal", "stepGoal", "sleepGoal", "calorieGoal", "distanceGoal"];
+
+/**
+ * Apply incoming goal updates to a user document (only defined fields).
+ * Returns true if at least one field was updated, otherwise false.
+ */
+function applyGoalUpdates(user, body) {
+  let updated = false;
+  for (const field of GOAL_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(body, field) && body[field] !== undefined) {
+      user.goals[field] = body[field];
+      updated = true;
+    }
+  }
+  return updated;
+}
+
+/**
+ * Validate that at least one goal field is present in request body.
+ */
+function hasAtLeastOneGoal(body) {
+  return GOAL_FIELDS.some(f => Object.prototype.hasOwnProperty.call(body, f));
+}
+
 /**
  * ============================================
  * @desc    Set or Update User Fitness Goals
@@ -33,60 +58,23 @@ import { emitToUser } from "../utils/eventEmitter.js";
  * ============================================
  */
 export const setGoals = asyncHandler(async (req, res, next) => {
-  const { weightGoal, stepGoal, sleepGoal, calorieGoal, distanceGoal } = req.body;
+  const body = req.body || {};
 
-  // ===== VALIDATION: At Least One Goal Required =====
-  if (
-    weightGoal === undefined &&
-    stepGoal === undefined &&
-    sleepGoal === undefined &&
-    calorieGoal === undefined &&
-    distanceGoal === undefined
-  ) {
-    return next(
-      new ErrorResponse("At least one goal field must be provided", 400)
-    );
+  if (!hasAtLeastOneGoal(body)) {
+    return next(new ErrorResponse("At least one goal field must be provided", 400));
   }
 
-  // ===== QUERY DATABASE: Find User =====
   const user = await User.findById(req.user._id);
-
   if (!user) {
     return next(new ErrorResponse("User not found", 404));
   }
 
-  // ===== UPDATE GOALS: Only Update Provided Fields =====
-  if (weightGoal !== undefined) {
-    user.goals.weightGoal = weightGoal;
-  }
-  if (stepGoal !== undefined) {
-    user.goals.stepGoal = stepGoal;
-  }
-  if (sleepGoal !== undefined) {
-    user.goals.sleepGoal = sleepGoal;
-  }
-  if (calorieGoal !== undefined) {
-    user.goals.calorieGoal = calorieGoal;
-  }
-  if (distanceGoal !== undefined) {
-    user.goals.distanceGoal = distanceGoal;
-  }
-
-  // ===== SAVE USER: Mongoose Validation Runs Automatically =====
+  applyGoalUpdates(user, body);
   await user.save();
 
-  // ===== BROADCAST: Notify connected clients of goals update =====
-  emitToUser(req.user._id, 'goals:updated', {
-    goals: user.goals,
-    updatedAt: new Date()
-  });
+  emitToUser(req.user._id, 'goals:updated', { goals: user.goals, updatedAt: new Date() });
 
-  // ===== RESPONSE =====
-  res.status(200).json({
-    success: true,
-    message: "Goals updated successfully",
-    data: user.goals,
-  });
+  res.status(200).json({ success: true, message: "Goals updated successfully", data: user.goals });
 });
 
 /**
@@ -117,60 +105,23 @@ export const getGoals = asyncHandler(async (req, res, next) => {
  * ============================================
  */
 export const updateGoals = asyncHandler(async (req, res, next) => {
-  const { weightGoal, stepGoal, sleepGoal, calorieGoal, distanceGoal } = req.body;
+  const body = req.body || {};
 
-  // ===== VALIDATION: At Least One Goal Required =====
-  if (
-    weightGoal === undefined &&
-    stepGoal === undefined &&
-    sleepGoal === undefined &&
-    calorieGoal === undefined &&
-    distanceGoal === undefined
-  ) {
-    return next(
-      new ErrorResponse("At least one goal field must be provided", 400)
-    );
+  if (!hasAtLeastOneGoal(body)) {
+    return next(new ErrorResponse("At least one goal field must be provided", 400));
   }
 
-  // ===== QUERY DATABASE: Find User =====
   const user = await User.findById(req.user._id);
-
   if (!user) {
     return next(new ErrorResponse("User not found", 404));
   }
 
-  // ===== UPDATE GOALS: Only Update Provided Fields =====
-  if (weightGoal !== undefined) {
-    user.goals.weightGoal = weightGoal;
-  }
-  if (stepGoal !== undefined) {
-    user.goals.stepGoal = stepGoal;
-  }
-  if (sleepGoal !== undefined) {
-    user.goals.sleepGoal = sleepGoal;
-  }
-  if (calorieGoal !== undefined) {
-    user.goals.calorieGoal = calorieGoal;
-  }
-  if (distanceGoal !== undefined) {
-    user.goals.distanceGoal = distanceGoal;
-  }
-
-  // ===== SAVE USER: Run Validators =====
+  applyGoalUpdates(user, body);
   await user.save();
 
-  // ===== BROADCAST: Notify connected clients of goals update =====
-  emitToUser(req.user._id, 'goals:updated', {
-    goals: user.goals,
-    updatedAt: new Date()
-  });
+  emitToUser(req.user._id, 'goals:updated', { goals: user.goals, updatedAt: new Date() });
 
-  // ===== RESPONSE =====
-  res.status(200).json({
-    success: true,
-    message: "Goals updated successfully",
-    data: user.goals,
-  });
+  res.status(200).json({ success: true, message: "Goals updated successfully", data: user.goals });
 });
 
 /**
@@ -231,7 +182,7 @@ export const getGoalProgress = asyncHandler(async (req, res, next) => {
   const progress = {};
 
   if (todayMetrics) {
-    if (user.goals.stepGoal) {
+    if (user.goals.stepGoal && typeof todayMetrics.metrics.steps === 'number') {
       const stepPercentage = Math.min(
         Math.round((todayMetrics.metrics.steps / user.goals.stepGoal) * 100),
         100
@@ -244,7 +195,7 @@ export const getGoalProgress = asyncHandler(async (req, res, next) => {
       };
     }
 
-    if (user.goals.sleepGoal && todayMetrics.metrics.sleepHours) {
+    if (user.goals.sleepGoal && typeof todayMetrics.metrics.sleepHours === 'number') {
       const sleepPercentage = Math.min(
         Math.round((todayMetrics.metrics.sleepHours / user.goals.sleepGoal) * 100),
         100
@@ -256,8 +207,7 @@ export const getGoalProgress = asyncHandler(async (req, res, next) => {
         achieved: todayMetrics.metrics.sleepHours >= user.goals.sleepGoal,
       };
     }
-
-    if (user.goals.calorieGoal) {
+    if (user.goals.calorieGoal && typeof todayMetrics.metrics.calories === 'number') {
       const caloriePercentage = Math.min(
         Math.round((todayMetrics.metrics.calories / user.goals.calorieGoal) * 100),
         100
@@ -270,7 +220,7 @@ export const getGoalProgress = asyncHandler(async (req, res, next) => {
       };
     }
 
-    if (user.goals.distanceGoal) {
+    if (user.goals.distanceGoal && typeof todayMetrics.metrics.distance === 'number') {
       const distancePercentage = Math.min(
         Math.round((todayMetrics.metrics.distance / user.goals.distanceGoal) * 100),
         100
@@ -283,7 +233,7 @@ export const getGoalProgress = asyncHandler(async (req, res, next) => {
       };
     }
 
-    if (user.goals.weightGoal && todayMetrics.metrics.weight) {
+    if (user.goals.weightGoal && typeof todayMetrics.metrics.weight === 'number') {
       const weightDifference = Math.abs(
         todayMetrics.metrics.weight - user.goals.weightGoal
       );

@@ -114,7 +114,7 @@ export const initiateGoogleFitOAuth = asyncHandler(async (req, res, next) => {
  * 
  * @route GET /api/googlefit/callback
  * @desc Handle Google OAuth callback and store tokens
- * @access Private (requires authentication)
+ * @access Public (secured by one-time state token; Authorization header not guaranteed on Google redirect)
  * 
  * Query Parameters (from Google redirect):
  * - code: Authorization code (exchanged for tokens)
@@ -122,12 +122,17 @@ export const initiateGoogleFitOAuth = asyncHandler(async (req, res, next) => {
  * - error: Error code if user denied (e.g., "access_denied")
  * 
  * Process:
- * 1. Validate state parameter (CSRF protection)
- * 2. Check for errors in callback (user denial, invalid scope, etc.)
- * 3. Exchange authorization code for tokens
- * 4. Validate scopes (enforce Android phone-only data constraint)
- * 5. Store tokens securely in User document
- * 6. Trigger initial data sync (optional)
+ * 1. Check for explicit OAuth error codes and handle
+ * 2. Validate required parameters (code, state)
+ * 3. Extract userId from state (CSRF binding) & load user
+ * 4. Validate state (CSRF protection, single use)
+ * 5. Prevent duplicate connection if already connected
+ * 6. Exchange authorization code for tokens
+ * 7. Validate token completeness
+ * 8. Validate scopes (reject wearable-only, ensure required phone scopes)
+ * 9. Store tokens securely in User document (normalized scope string)
+ * 10. Return sanitized user profile (adds daysUntilExpiry)
+ * 11. (Optional) Emit event to trigger initial sync
  * 
  * Response (200):
  * {
@@ -226,7 +231,7 @@ export const handleGoogleFitCallback = asyncHandler(
       );
     }
 
-    // ===== STEP 4: LOAD USER FROM DATABASE =====
+    // ===== STEP 3b: LOAD USER FROM DATABASE =====
     const user = await User.findById(userId);
     if (!user) {
       return next(
@@ -237,7 +242,7 @@ export const handleGoogleFitCallback = asyncHandler(
       );
     }
 
-    // ===== STEP 5: VALIDATE STATE PARAMETER (CSRF PROTECTION) =====
+    // ===== STEP 4: VALIDATE STATE PARAMETER (CSRF PROTECTION) =====
     try {
       validateOAuthState(userId, state);
       console.log(`✅ CSRF state validated for user: ${user.email}`);
@@ -255,7 +260,17 @@ export const handleGoogleFitCallback = asyncHandler(
 
     // State is now deleted in validateOAuthState() - prevents replay attacks
 
-    // ===== STEP 4: EXCHANGE AUTHORIZATION CODE FOR TOKENS =====
+    // ===== STEP 5: PREVENT DUPLICATE CONNECTION =====
+    if (user.googleFitConnected) {
+      return next(
+        new ErrorResponse(
+          "Google Fit already connected. Disconnect before initiating a new OAuth flow.",
+          400
+        )
+      );
+    }
+
+    // ===== STEP 6: EXCHANGE AUTHORIZATION CODE FOR TOKENS =====
     const oauth2Client = createOAuth2Client();
 
     let tokens;
@@ -299,7 +314,7 @@ export const handleGoogleFitCallback = asyncHandler(
       );
     }
 
-    // ===== STEP 5: VALIDATE RECEIVED TOKENS =====
+    // ===== STEP 7: VALIDATE RECEIVED TOKENS =====
     if (
       !tokens.access_token ||
       !tokens.refresh_token ||
@@ -317,7 +332,7 @@ export const handleGoogleFitCallback = asyncHandler(
       );
     }
 
-    // ===== STEP 6: VALIDATE SCOPE (CRITICAL - PREVENT WEARABLE DATA) =====
+    // ===== STEP 8: VALIDATE SCOPE (CRITICAL - PREVENT WEARABLE DATA) =====
     /**
      * SCOPE VALIDATION: Ensure returned scopes match expectations
      * 
@@ -391,14 +406,24 @@ export const handleGoogleFitCallback = asyncHandler(
 
     console.log(`✅ Scope validation passed for user: ${user.email}`);
 
-    // ===== STEP 7: STORE TOKENS IN USER DOCUMENT =====
+    // ===== STEP 9: STORE TOKENS IN USER DOCUMENT =====
     // Use updateGoogleFitTokens method with validated tokens
     try {
+      // Normalize scope string: only persist allowed (required) scopes in canonical form
+      const REQUIRED_SCOPES = [
+        "fitness.activity.read",
+        "fitness.body.read",
+        "fitness.sleep.read",
+      ];
+      const normalizedScope = REQUIRED_SCOPES
+        .filter(reqScope => scopeArray.some(s => s.includes(reqScope)))
+        .join(" ");
+
       user.updateGoogleFitTokens({
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
         token_expiry: new Date(tokens.expiry_date),
-        scope: oauthConfig.googleFit.scopes,  // Use canonical scope string
+        scope: normalizedScope,
       });
 
       // Save with runValidators to enforce schema validation
@@ -418,7 +443,7 @@ export const handleGoogleFitCallback = asyncHandler(
       );
     }
 
-    // ===== STEP 8: REFRESH USER DATA (HIDE SENSITIVE TOKENS) =====
+    // ===== STEP 10: REFRESH USER DATA (HIDE SENSITIVE TOKENS) =====
     const updatedUser = await User.findById(user._id).select(
       "-password -googleFitTokens"  // Exclude sensitive fields
     );
@@ -427,7 +452,7 @@ export const handleGoogleFitCallback = asyncHandler(
       `✅ Google Fit connected successfully for user: ${updatedUser.email}`
     );
 
-    // ===== STEP 9: RETURN SUCCESS RESPONSE =====
+    // ===== STEP 11: RETURN SUCCESS RESPONSE =====
     res.status(200).json({
       success: true,
       message:
@@ -440,6 +465,7 @@ export const handleGoogleFitCallback = asyncHandler(
         lastSyncAt: updatedUser.lastSyncAt,
         isGoogleFitActive: updatedUser.isGoogleFitActive,
         syncPreferences: updatedUser.syncPreferences,
+        daysUntilExpiry: updatedUser.daysUntilTokenExpiry,
       },
     });
 
