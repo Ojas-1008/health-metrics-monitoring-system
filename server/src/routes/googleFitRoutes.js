@@ -13,10 +13,41 @@ import {
   getGoogleFitStatus,
   disconnectGoogleFit,
 } from "../controllers/googleFitController.js";
-import { protect } from "../middleware/auth.js";
+import { protect, serviceAuth } from "../middleware/auth.js";
 import { asyncHandler, ErrorResponse } from "../middleware/errorHandler.js";
+import RateLimiter from "../middleware/rateLimiter.js";
+import { triggerManualSync } from "../../workers/googleFitSyncWorker.js";
 
 const router = express.Router();
+
+/**
+ * ============================================
+ * RATE LIMITERS FOR GOOGLE FIT ROUTES
+ * ============================================
+ * 
+ * Protect OAuth endpoints from abuse
+ */
+
+// Limit OAuth connection attempts (5 per 15 minutes)
+const oauthLimiter = new RateLimiter({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  maxAttempts: 5,
+  message: 'Too many Google Fit connection attempts. Please try again in 15 minutes.'
+});
+
+// Limit manual sync triggers (10 per 5 minutes)
+const syncLimiter = new RateLimiter({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  maxAttempts: 10,
+  message: 'Too many sync requests. Please wait before triggering another sync.'
+});
+
+// Limit disconnect attempts (3 per 15 minutes)
+const disconnectLimiter = new RateLimiter({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  maxAttempts: 3,
+  message: 'Too many disconnect attempts. Please try again later.'
+});
 
 /**
  * ============================================
@@ -46,7 +77,7 @@ const router = express.Router();
  * - 401: Not authenticated
  * - 400: Already connected to Google Fit
  */
-router.get("/connect", protect, initiateGoogleFitOAuth);
+router.get("/connect", protect, oauthLimiter.middleware, initiateGoogleFitOAuth);
 
 /**
  * GET /api/googlefit/callback
@@ -116,29 +147,22 @@ router.get("/status", protect, getGoogleFitStatus);
  * - 400: Not connected to Google Fit
  * - 500: Sync worker error
  */
-router.get('/sync', protect, async (req, res, next) => {
-  try {
-    const userId = req.user._id;
+router.get('/sync', protect, syncLimiter.middleware, asyncHandler(async (req, res, next) => {
+  const userId = req.user._id;
 
-    console.log(`[googleFitRoutes] Manual sync triggered by user: ${userId}`);
+  console.log(`[googleFitRoutes] Manual sync triggered by user: ${userId}`);
 
-    // Import sync function
-    const { triggerManualSync } = await import('../../workers/googleFitSyncWorker.js');
+  // Trigger sync asynchronously (don't wait for completion)
+  triggerManualSync(userId).catch(error => {
+    console.error(`[googleFitRoutes] Sync error for user ${userId}:`, error);
+  });
 
-    // Trigger sync asynchronously (don't wait for completion)
-    triggerManualSync(userId).catch(error => {
-      console.error(`[googleFitRoutes] Sync error for user ${userId}:`, error);
-    });
-
-    res.status(200).json({
-      success: true,
-      message: 'Google Fit sync started',
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+  res.status(200).json({
+    success: true,
+    message: 'Google Fit sync started',
+    timestamp: new Date().toISOString(),
+  });
+}));
 
 /**
  * POST /api/googlefit/disconnect
@@ -152,48 +176,76 @@ router.get('/sync', protect, async (req, res, next) => {
  *   "message": "Google Fit disconnected successfully"
  * }
  */
-router.post("/disconnect", protect, disconnectGoogleFit);
+router.post("/disconnect", protect, disconnectLimiter.middleware, disconnectGoogleFit);
 
 /**
- * GET /api/googlefit/debug/token-scopes
+ * GET /api/googlefit/debug/token-scopes/:userId
  * Debug route to check token scopes for a specific user
  * 
+ * PROTECTED: Requires service authentication (backend-to-backend)
+ * 
  * Returns scope information for debugging OAuth token validation
+ * 
+ * Request:
+ * - Headers: Authorization: Bearer <SERVICE_TOKEN>
+ * - Params: userId - MongoDB user ID
  * 
  * Response (200):
  * {
  *   "success": true,
+ *   "userId": "690b9449c3325e85f9ab7a0e",
  *   "scopes": "https://www.googleapis.com/auth/fitness.activity.read https://...",
  *   "scopeArray": ["https://www.googleapis.com/auth/fitness.activity.read", ...],
  *   "hasActivityRead": true,
  *   "hasBodyRead": true,
  *   "hasSleepRead": true
  * }
+ * 
+ * Errors:
+ * - 403: Missing or invalid service token
+ * - 404: User not found
+ * - 400: No Google Fit tokens found for user
  */
-router.get("/debug/token-scopes", async (req, res) => {
-  try {
-    const User = (await import("../models/User.js")).default;
-    const user = await User.findById("690b9449c3325e85f9ab7a0e").select("+googleFitTokens");
+router.get("/debug/token-scopes/:userId", serviceAuth, asyncHandler(async (req, res) => {
+  const { userId } = req.params;
 
-    if (!user) {
-      return res.status(404).json({ success: false, error: "User not found" });
-    }
-
-    if (!user.googleFitTokens || !user.googleFitTokens.scope) {
-      return res.status(400).json({ success: false, error: "No Google Fit tokens found for user" });
-    }
-
-    res.json({
-      success: true,
-      scopes: user.googleFitTokens.scope,
-      scopeArray: user.googleFitTokens.scope.split(" "),
-      hasActivityRead: user.googleFitTokens.scope.includes("fitness.activity.read"),
-      hasBodyRead: user.googleFitTokens.scope.includes("fitness.body.read"),
-      hasSleepRead: user.googleFitTokens.scope.includes("fitness.sleep.read"),
+  // Validate userId format
+  if (!userId || !userId.match(/^[0-9a-fA-F]{24}$/)) {
+    return res.status(400).json({ 
+      success: false, 
+      error: "Invalid user ID format. Must be a valid MongoDB ObjectId." 
     });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
   }
-});
+
+  const User = (await import("../models/User.js")).default;
+  const user = await User.findById(userId).select("+googleFitTokens");
+
+  if (!user) {
+    return res.status(404).json({ 
+      success: false, 
+      error: "User not found" 
+    });
+  }
+
+  if (!user.googleFitTokens || !user.googleFitTokens.scope) {
+    return res.status(400).json({ 
+      success: false, 
+      error: "No Google Fit tokens found for user" 
+    });
+  }
+
+  res.json({
+    success: true,
+    userId: user._id,
+    email: user.email,
+    scopes: user.googleFitTokens.scope,
+    scopeArray: user.googleFitTokens.scope.split(" "),
+    hasActivityRead: user.googleFitTokens.scope.includes("fitness.activity.read"),
+    hasBodyRead: user.googleFitTokens.scope.includes("fitness.body.read"),
+    hasSleepRead: user.googleFitTokens.scope.includes("fitness.sleep.read"),
+    tokenExpiry: user.googleFitTokens.token_expiry,
+    lastSync: user.lastSyncAt,
+  });
+}));
 
 export default router;

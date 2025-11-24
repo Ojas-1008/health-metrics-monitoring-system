@@ -33,17 +33,11 @@ import {
 
 const router = express.Router();
 
-/**
- * @route   GET /api/analytics/latest/:metricType
- * @desc    Get latest analytics for specific metric type
- * @access  Private
- * @param   metricType - Metric type (steps, calories, sleep, etc.)
- * @query   timeRange - Optional: Time range filter (7day, 30day, 90day)
- * 
- * Returns the most recent analytics document for the specified metric.
- * Returns null if no analytics found (not an error).
- */
-router.get('/latest/:metricType', protect, getLatestAnalytics);
+// ============================================================
+// STATIC ROUTES (Most Specific) - Defined First
+// ============================================================
+// These routes have static path segments and should be registered
+// before dynamic routes to ensure proper matching priority
 
 /**
  * @route   GET /api/analytics/summary
@@ -72,6 +66,24 @@ router.get('/summary', protect, getAnalyticsSummary);
  * Returns array of analytics documents with anomalyDetected = true
  */
 router.get('/anomalies', protect, getAnomalies);
+
+/**
+ * @route   GET /api/analytics/latest/:metricType
+ * @desc    Get latest analytics for specific metric type
+ * @access  Private
+ * @param   metricType - Metric type (steps, calories, sleep, etc.)
+ * @query   timeRange - Optional: Time range filter (7day, 30day, 90day)
+ * 
+ * Returns the most recent analytics document for the specified metric.
+ * Returns null if no analytics found (not an error).
+ */
+router.get('/latest/:metricType', protect, getLatestAnalytics);
+
+// ============================================================
+// DYNAMIC ROUTES (Least Specific) - Defined Last
+// ============================================================
+// These routes use path parameters (:id) and should be registered
+// after static routes to prevent unintended matching
 
 /**
  * @route   GET /api/analytics/:id
