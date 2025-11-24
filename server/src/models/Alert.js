@@ -158,7 +158,7 @@ const alertSchema = new mongoose.Schema(
     expiresAt: {
       type: Date,
       default: null,
-      index: true,
+      // Note: TTL index defined via schema.index() below (line 214)
     },
 
     // Alert dismissed by user (different from "read")

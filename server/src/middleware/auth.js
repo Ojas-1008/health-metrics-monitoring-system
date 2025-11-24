@@ -84,6 +84,11 @@ const protect = async (req, res, next) => {
     // Controllers can access user data via req.user
     req.user = user;
 
+    // Development logging for successful authentication
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`✅ User authenticated: ${user._id} (${user.email}) - ${req.method} ${req.path}`);
+    }
+
     // ===== STEP 7: Proceed to Next Middleware/Controller =====
 
     next();
@@ -127,7 +132,14 @@ const protect = async (req, res, next) => {
     }
 
     // Catch any other unexpected errors (database errors, etc.)
-    console.error("Auth Middleware Error:", error);
+    console.error("❌ Auth Middleware Error:", {
+      errorName: error.name,
+      errorMessage: error.message,
+      path: req.path,
+      method: req.method,
+      hasToken: !!token,
+      timestamp: new Date().toISOString()
+    });
     return res.status(500).json({
       success: false,
       message: "Authentication failed due to server error. Please try again.",
@@ -242,7 +254,14 @@ const serviceAuth = (req, res, next) => {
     // ===== STEP 4: Verify Token Matches SERVICE_TOKEN =====
 
     if (token !== serviceToken) {
-      console.warn("⚠️  Invalid service token attempt");
+      if (process.env.NODE_ENV === 'development') {
+        console.warn("⚠️  Invalid service token attempt", {
+          receivedTokenPrefix: token.substring(0, 10),
+          path: req.path,
+          method: req.method,
+          timestamp: new Date().toISOString()
+        });
+      }
       return res.status(403).json({
         success: false,
         message: "Access denied. Invalid service token.",
@@ -252,7 +271,9 @@ const serviceAuth = (req, res, next) => {
 
     // ===== STEP 5: Token Valid - Proceed =====
 
-    console.log("✅ Service authentication successful");
+    if (process.env.NODE_ENV === 'development') {
+      console.log("✅ Service authentication successful");
+    }
     next();
 
   } catch (error) {

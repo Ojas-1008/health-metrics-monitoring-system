@@ -150,6 +150,7 @@ const healthMetricSchema = new mongoose.Schema(
         message: "Source must be 'googlefit', 'manual', or 'import'",
       },
       default: "manual",
+      lowercase: true, // Normalize to lowercase for case-insensitive matching
       required: true,
     },
 
