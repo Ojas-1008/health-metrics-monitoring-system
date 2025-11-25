@@ -21,13 +21,13 @@
 const CONFIG = {
   // Maximum individual event payload size (bytes)
   maxPayloadSize: 500,
-  
+
   // Date range for filtering (days from now)
   relevantDateRange: 30,
-  
+
   // Batch size threshold for aggregation
   batchAggregationThreshold: 50,
-  
+
   // Essential fields to include
   essentialFields: ['date', 'metrics', 'source', 'syncedAt', 'lastUpdated'],
 };
@@ -86,6 +86,13 @@ export function optimizeMetricPayload(metric, operation = 'upsert', changedField
 export function isDateInRelevantRange(date, rangeDays = CONFIG.relevantDateRange) {
   try {
     const dateObj = new Date(date);
+
+    // Check if date is valid
+    if (isNaN(dateObj.getTime())) {
+      console.warn('[EventPayloadOptimizer] Invalid date format:', date);
+      return false; // Skip invalid dates
+    }
+
     const now = new Date();
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - rangeDays);
@@ -93,8 +100,8 @@ export function isDateInRelevantRange(date, rangeDays = CONFIG.relevantDateRange
     // Check if date is within range (not too old, not future)
     return dateObj >= cutoffDate && dateObj <= now;
   } catch (error) {
-    console.error('[EventPayloadOptimizer] Invalid date:', date, error);
-    return true; // Default to including on error
+    console.error('[EventPayloadOptimizer] Date parsing error:', date, error);
+    return false; // Skip on error
   }
 }
 
@@ -139,7 +146,8 @@ export function shouldEmitEvent(payload, options = {}) {
 export function calculatePayloadSize(payload) {
   try {
     const jsonString = JSON.stringify(payload);
-    return new Blob([jsonString]).size;
+    // Use Buffer for better Node.js compatibility and accurate UTF-8 byte counting
+    return Buffer.byteLength(jsonString, 'utf8');
   } catch (error) {
     console.error('[EventPayloadOptimizer] Failed to calculate payload size:', error);
     return 0;
@@ -206,7 +214,7 @@ export function aggregateSyncEvents(syncedMetrics) {
     summary.totalCalories += m.calories || 0;
     summary.totalDistance += m.distance || 0;
     summary.totalActiveMinutes += m.activeMinutes || 0;
-    
+
     if (m.sleepHours) {
       summary.avgSleepHours += m.sleepHours;
       summary.sleepCount++;
@@ -265,7 +273,7 @@ export function shouldUseBatchAggregation(itemCount) {
 export function logPayloadStats(payload, eventType) {
   const size = calculatePayloadSize(payload);
   console.log(`[EventPayloadOptimizer] ${eventType} payload: ${size} bytes`);
-  
+
   if (process.env.NODE_ENV === 'development') {
     console.log(`[EventPayloadOptimizer] Payload preview:`, JSON.stringify(payload).substring(0, 150) + '...');
   }

@@ -1,0 +1,73 @@
+[
+  {
+    "name": "optimizeMetricPayload_upsert",
+    "result": {
+      "operation": "upsert",
+      "date": "2025-11-20",
+      "source": "device",
+      "metrics": {
+        "steps": 1000,
+        "calories": 200
+      },
+      "syncedAt": "2025-11-20T10:00:00Z",
+      "lastUpdated": "2025-11-20T09:00:00Z"
+    }
+  },
+  {
+    "name": "optimizeMetricPayload_update",
+    "result": {
+      "operation": "update",
+      "date": "2025-11-20",
+      "source": "device",
+      "metrics": {
+        "steps": 1500
+      },
+      "syncedAt": "2025-11-20T10:00:00Z",
+      "lastUpdated": "2025-11-20T09:00:00Z"
+    }
+  },
+  {
+    "name": "isDateInRelevantRange_recent",
+    "result": true
+  },
+  {
+    "name": "isDateInRelevantRange_old",
+    "result": false
+  },
+  {
+    "name": "shouldEmitEvent_old",
+    "result": false
+  },
+  {
+    "name": "calculatePayloadSize",
+    "result": 171
+  },
+  {
+    "name": "validatePayloadSize",
+    "result": true
+  },
+  {
+    "name": "aggregateSyncEvents",
+    "result": {
+      "operation": "bulk_sync",
+      "totalDays": 3,
+      "syncedDates": [
+        "2025-11-18",
+        "2025-11-19",
+        "2025-11-20"
+      ],
+      "summary": {
+        "totalSteps": 5300,
+        "totalCalories": 830,
+        "totalDistance": 0,
+        "totalActiveMinutes": 0,
+        "avgSleepHours": 6.5
+      },
+      "syncedAt": "2025-11-25T08:00:29.704Z"
+    }
+  },
+  {
+    "name": "shouldUseBatchAggregation",
+    "result": true
+  }
+]
