@@ -8,15 +8,29 @@
  * Features:
  * - Glassmorphism and gradient backgrounds
  * - Smooth hover and active state transitions
- * - Ripple effect on click
+ * - Ripple effect on click (mouse & keyboard)
  * - Enhanced loading spinner with pulse effect
  * - Multiple variants with modern color schemes
  * - Icon support with proper spacing
  * - Full accessibility support
+ * - PropTypes validation with dev warnings
  * - Industry-standard coding practices
+ * 
+ * @version 2.0.0
+ * @updated 2025-11-27
  */
 
-import { forwardRef, useState } from 'react';
+import { forwardRef, useState, useRef } from 'react';
+import PropTypes from 'prop-types';
+
+// ===== CONSTANTS =====
+const RIPPLE_DURATION = 600; // ms
+const RIPPLE_SIZE = 20; // px
+
+// Valid prop values for validation
+const VALID_VARIANTS = ['primary', 'secondary', 'danger', 'success', 'outline', 'ghost'];
+const VALID_SIZES = ['small', 'medium', 'large'];
+const VALID_TYPES = ['button', 'submit', 'reset'];
 
 /**
  * Enhanced Loading Spinner Component
@@ -104,21 +118,59 @@ const Button = forwardRef(({
   ...rest
 }, ref) => {
   const [ripples, setRipples] = useState([]);
+  const rippleIdRef = useRef(0); // Monotonic counter for unique ripple IDs
+
+  // ===== DEV MODE WARNINGS =====
+  if (process.env.NODE_ENV === 'development') {
+    if (variant && !VALID_VARIANTS.includes(variant)) {
+      console.warn(
+        `[Button] Invalid variant "${variant}" provided. ` +
+        `Valid variants are: ${VALID_VARIANTS.join(', ')}. ` +
+        `Falling back to "primary".`
+      );
+    }
+    if (size && !VALID_SIZES.includes(size)) {
+      console.warn(
+        `[Button] Invalid size "${size}" provided. ` +
+        `Valid sizes are: ${VALID_SIZES.join(', ')}. ` +
+        `Falling back to "medium".`
+      );
+    }
+    if (type && !VALID_TYPES.includes(type)) {
+      console.warn(
+        `[Button] Invalid type "${type}" provided. ` +
+        `Valid types are: ${VALID_TYPES.join(', ')}. ` +
+        `Falling back to "button".`
+      );
+    }
+  }
 
   // ===== RIPPLE EFFECT =====
 
   const createRipple = (event) => {
     const button = event.currentTarget;
     const rect = button.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
+    
+    // Handle keyboard events (use center of button) vs mouse events
+    let x, y;
+    if (event.clientX !== undefined && event.clientX !== 0) {
+      // Mouse click - use click position
+      x = event.clientX - rect.left;
+      y = event.clientY - rect.top;
+    } else {
+      // Keyboard event or clientX is 0 - use button center
+      x = rect.width / 2;
+      y = rect.height / 2;
+    }
 
-    const newRipple = { x, y, id: Date.now() };
+    // Use monotonic counter for unique IDs (prevents Date.now() collisions)
+    const id = ++rippleIdRef.current;
+    const newRipple = { x, y, id };
     setRipples(prev => [...prev, newRipple]);
 
     setTimeout(() => {
-      setRipples(prev => prev.filter(r => r.id !== newRipple.id));
-    }, 600);
+      setRipples(prev => prev.filter(r => r.id !== id));
+    }, RIPPLE_DURATION);
   };
 
   // ===== BASE CLASSES =====
@@ -310,5 +362,48 @@ const Button = forwardRef(({
 });
 
 Button.displayName = 'Button';
+
+// ===== PROP TYPES VALIDATION =====
+Button.propTypes = {
+  /** Button content/text - required */
+  children: PropTypes.node.isRequired,
+  /** Click event handler */
+  onClick: PropTypes.func,
+  /** Button type for form behavior */
+  type: PropTypes.oneOf(VALID_TYPES),
+  /** Visual style variant */
+  variant: PropTypes.oneOf(VALID_VARIANTS),
+  /** Button size */
+  size: PropTypes.oneOf(VALID_SIZES),
+  /** Disabled state - prevents all interactions */
+  disabled: PropTypes.bool,
+  /** Loading state - shows spinner and disables button */
+  loading: PropTypes.bool,
+  /** Makes button take full container width */
+  fullWidth: PropTypes.bool,
+  /** Icon element to display on the left */
+  leftIcon: PropTypes.node,
+  /** Icon element to display on the right */
+  rightIcon: PropTypes.node,
+  /** Additional CSS classes for custom styling */
+  className: PropTypes.string,
+  /** Accessibility label for screen readers */
+  ariaLabel: PropTypes.string,
+};
+
+// ===== DEFAULT PROPS =====
+Button.defaultProps = {
+  onClick: undefined,
+  type: 'button',
+  variant: 'primary',
+  size: 'medium',
+  disabled: false,
+  loading: false,
+  fullWidth: false,
+  leftIcon: null,
+  rightIcon: null,
+  className: '',
+  ariaLabel: undefined,
+};
 
 export default Button;

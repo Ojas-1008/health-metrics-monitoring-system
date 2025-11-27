@@ -13,10 +13,18 @@
  * - Premium border styling
  * - Interactive states with scale transform
  * - Optimized for accessibility
+ * - PropTypes validation with dev warnings
  * - Industry-standard code structure
+ * 
+ * @version 2.0.0
+ * @updated 2025-11-27
  */
 
 import { forwardRef } from 'react';
+import PropTypes from 'prop-types';
+
+// ===== CONSTANTS =====
+const VALID_VARIANTS = ['default', 'bordered', 'elevated', 'glass', 'gradient'];
 
 /**
  * Card Component
@@ -49,6 +57,16 @@ const Card = forwardRef(({
   noPadding = false,
   ...rest
 }, ref) => {
+  // ===== DEVELOPMENT WARNINGS =====
+  // eslint-disable-next-line no-undef
+  if (process.env.NODE_ENV === 'development') {
+    if (variant && !VALID_VARIANTS.includes(variant)) {
+      console.warn(
+        `[Card] Invalid variant: "${variant}". Expected one of: ${VALID_VARIANTS.join(', ')}. Falling back to "default".`
+      );
+    }
+  }
+
   // ===== BASE CLASSES =====
 
   const baseClasses = `
@@ -226,5 +244,46 @@ const Card = forwardRef(({
 });
 
 Card.displayName = 'Card';
+
+// ===== PROP TYPES =====
+Card.propTypes = {
+  /** Card content - required */
+  children: PropTypes.node,
+  /** Card header title */
+  title: PropTypes.oneOfType([PropTypes.string, PropTypes.node]),
+  /** Card subtitle text */
+  subtitle: PropTypes.string,
+  /** Footer section content */
+  footer: PropTypes.node,
+  /** Action element in header (icon, button) */
+  headerAction: PropTypes.node,
+  /** Visual style variant */
+  variant: PropTypes.oneOf(VALID_VARIANTS),
+  /** Enable hover lift effect */
+  hoverable: PropTypes.bool,
+  /** Make card interactive with cursor */
+  clickable: PropTypes.bool,
+  /** Click handler callback */
+  onClick: PropTypes.func,
+  /** Additional CSS classes */
+  className: PropTypes.string,
+  /** Remove default padding from content */
+  noPadding: PropTypes.bool,
+};
+
+// ===== DEFAULT PROPS =====
+Card.defaultProps = {
+  children: null,
+  title: null,
+  subtitle: null,
+  footer: null,
+  headerAction: null,
+  variant: 'default',
+  hoverable: false,
+  clickable: false,
+  onClick: undefined,
+  className: '',
+  noPadding: false,
+};
 
 export default Card;

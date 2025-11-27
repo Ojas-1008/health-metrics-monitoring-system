@@ -13,6 +13,8 @@ import NotFound from './pages/NotFound';
 import PrivateRoute from './components/common/PrivateRoute';
 import GoogleFitTest from './components/test/GoogleFitTest';
 import ConnectionStatusTest from './components/test/ConnectionStatusTest';
+import CardTest from './components/test/CardTest';
+import ConnectionStatusBannerTest from './components/test/ConnectionStatusBannerTest';
 
 // Styles
 import './App.css';
@@ -157,6 +159,26 @@ function App() {
           element={
             <PrivateRoute>
               <ConnectionStatusTest />
+            </PrivateRoute>
+          }
+        />
+
+        {/* Card Component Test Page */}
+        <Route
+          path="/test/card"
+          element={
+            <PrivateRoute>
+              <CardTest />
+            </PrivateRoute>
+          }
+        />
+
+        {/* ConnectionStatusBanner Component Test Page (v2.0 Fix Verification) */}
+        <Route
+          path="/test/connection-status-banner"
+          element={
+            <PrivateRoute>
+              <ConnectionStatusBannerTest />
             </PrivateRoute>
           }
         />

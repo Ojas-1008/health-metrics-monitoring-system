@@ -1,6 +1,6 @@
 /**
  * ============================================
- * INPUT COMPONENT (ENHANCED)
+ * INPUT COMPONENT (ENHANCED v2.0.0)
  * ============================================
  * 
  * Premium input field with Modern Glassmorphism styling
@@ -14,30 +14,106 @@
  * - Gradient focus rings
  * - Icon support with state-based styling
  * - Industry-standard accessibility
+ * - PropTypes validation for type safety
  */
 
 import { useState, forwardRef } from 'react';
+import PropTypes from 'prop-types';
 
 /**
- * Input Component
+ * Input Component - Premium Form Input Field
+ * 
+ * A reusable, accessible form input component with glassmorphism styling,
+ * real-time validation feedback, password visibility toggle, and comprehensive
+ * accessibility features (WCAG 2.1 AA compliant).
  * 
  * @param {Object} props - Component props
- * @param {string} props.type - Input type
- * @param {string} props.name - Input name
- * @param {string} [props.id] - Input ID
- * @param {string} [props.placeholder] - Placeholder text
- * @param {string|number} [props.value] - Input value
- * @param {Function} [props.onChange] - Change handler
- * @param {Function} [props.onBlur] - Blur handler
- * @param {Function} [props.onFocus] - Focus handler
- * @param {string} [props.error] - Error message
- * @param {string} [props.label] - Label text
- * @param {boolean} [props.required=false] - Required field
- * @param {boolean} [props.disabled=false] - Disabled state
- * @param {boolean} [props.autoFocus=false] - Auto-focus
- * @param {string} [props.className] - Additional classes
- * @param {string} [props.helperText] - Helper text
- * @param {React.Ref} ref - Forward ref
+ * @param {string} [props.type='text'] - Input type (text, email, password, number, date, tel, url, search)
+ * @param {string} props.name - Input name attribute (form identifier) - REQUIRED
+ * @param {string} [props.id] - HTML id attribute (auto-generated from name if omitted)
+ * @param {string} [props.placeholder] - Placeholder text shown when empty
+ * @param {string|number} [props.value] - Input value (use with onChange for controlled component)
+ * @param {Function} [props.onChange] - Callback fired when input value changes (e: SyntheticEvent)
+ * @param {Function} [props.onBlur] - Callback fired when input loses focus (e: SyntheticEvent)
+ * @param {Function} [props.onFocus] - Callback fired when input gains focus (e: SyntheticEvent)
+ * @param {string} [props.error] - Error message to display (empty string = no error)
+ * @param {string} [props.label] - Label text displayed above input
+ * @param {boolean} [props.required=false] - Show required indicator (*) and set required attribute
+ * @param {boolean} [props.disabled=false] - Disable input interaction (grayed out, not-interactive)
+ * @param {boolean} [props.autoFocus=false] - Auto-focus input on component mount
+ * @param {string} [props.autoComplete] - HTML autocomplete attribute (e.g., 'email', 'current-password')
+ * @param {number|string} [props.min] - Minimum value for number inputs
+ * @param {number|string} [props.max] - Maximum value for number inputs
+ * @param {number} [props.minLength] - Minimum character length
+ * @param {number} [props.maxLength] - Maximum character length
+ * @param {string} [props.pattern] - Regular expression pattern for HTML5 validation
+ * @param {string} [props.className] - Additional Tailwind CSS classes (merged with base classes)
+ * @param {string} [props.helperText] - Helper text shown below input when no error present
+ * @param {React.Ref} ref - Forward ref for direct access to input element
+ * 
+ * @returns {React.ReactElement} Rendered input field component with label, validation feedback, and helper text
+ * 
+ * @example
+ * // Basic email input with validation
+ * const [email, setEmail] = useState('');
+ * const [error, setError] = useState('');
+ * 
+ * <Input
+ *   type="email"
+ *   name="email"
+ *   label="Email Address"
+ *   placeholder="user@example.com"
+ *   value={email}
+ *   onChange={(e) => setEmail(e.target.value)}
+ *   error={error}
+ *   required
+ * />
+ * 
+ * @example
+ * // Password input with helper text
+ * const [password, setPassword] = useState('');
+ * 
+ * <Input
+ *   type="password"
+ *   name="password"
+ *   label="Password"
+ *   placeholder="••••••••"
+ *   value={password}
+ *   onChange={(e) => setPassword(e.target.value)}
+ *   helperText="Must be at least 8 characters"
+ *   minLength={8}
+ *   required
+ * />
+ * 
+ * @example
+ * // Number input with min/max constraints
+ * <Input
+ *   type="number"
+ *   name="age"
+ *   label="Age"
+ *   value={age}
+ *   onChange={(e) => setAge(e.target.value)}
+ *   min={18}
+ *   max={120}
+ *   error={ageError}
+ * />
+ * 
+ * @example
+ * // Text input with custom styling and ref
+ * const inputRef = useRef();
+ * 
+ * <Input
+ *   ref={inputRef}
+ *   type="text"
+ *   name="fullName"
+ *   label="Full Name"
+ *   placeholder="John Doe"
+ *   value={fullName}
+ *   onChange={(e) => setFullName(e.target.value)}
+ *   onBlur={(e) => validateFullName(e.target.value)}
+ *   className="bg-blue-50 focus:bg-blue-100"
+ *   required
+ * />
  */
 const Input = forwardRef(({
   type = 'text',
@@ -253,6 +329,7 @@ const Input = forwardRef(({
               focus:ring-blue-200
             `}
             aria-label={showPassword ? 'Hide password' : 'Show password'}
+            title={showPassword ? 'Hide password' : 'Show password'}
             tabIndex={-1}
           >
             {showPassword ? (
@@ -315,5 +392,30 @@ const Input = forwardRef(({
 });
 
 Input.displayName = 'Input';
+
+// ===== PROP TYPES VALIDATION =====
+Input.propTypes = {
+  type: PropTypes.string,
+  name: PropTypes.string.isRequired,
+  id: PropTypes.string,
+  placeholder: PropTypes.string,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onChange: PropTypes.func,
+  onBlur: PropTypes.func,
+  onFocus: PropTypes.func,
+  error: PropTypes.string,
+  label: PropTypes.string,
+  required: PropTypes.bool,
+  disabled: PropTypes.bool,
+  autoFocus: PropTypes.bool,
+  autoComplete: PropTypes.string,
+  min: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  max: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  minLength: PropTypes.number,
+  maxLength: PropTypes.number,
+  pattern: PropTypes.string,
+  className: PropTypes.string,
+  helperText: PropTypes.string,
+};
 
 export default Input;
